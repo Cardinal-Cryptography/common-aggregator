@@ -1,0 +1,17 @@
+[profile.default]
+src = "contracts"
+script = "scripts"
+test = "tests"
+out = "artifacts"
+libs = ["node_modules"]
+optimizer = true
+via-ir = true
+
+remappings = [
+    "forge-std/=node_modules/forge-std/src",
+    "@openzeppelin/=node_modules/@openzeppelin/",
+]
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+[rpc_endpoints]
+aleph_evm_testnet = "${ALEPH_EVM_TESTNET_RPC_URL}"
