@@ -19,9 +19,10 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     function initialize(address admin) public initializer {
         __AccessControl_init();
+        __UUPSUpgradeable_init();
+
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(OWNER, admin);
-        __UUPSUpgradeable_init();
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER) {}

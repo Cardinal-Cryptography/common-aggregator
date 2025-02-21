@@ -16,3 +16,8 @@ deps:
 compile-contracts: # Compile solidity contracts
 compile-contracts:
 	forge build
+
+.PHONY: test
+test: # Run tests
+test:
+	forge test
