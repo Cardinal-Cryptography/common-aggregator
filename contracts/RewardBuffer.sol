@@ -10,10 +10,11 @@ library RewardBuffer {
 
     uint256 public constant DEFAULT_BUFFERING_DURATION = 20 days;
 
-    /// @dev This omits info about buffered shares as, for an ERC-4626 contract, we can use
-    /// `balanceOf(address(this))` instead - this will also distribute "airdroped" shares of `this`.
+    /// @dev MUST be initialized with non-zero value of `assetsCached` - vault should send some
+    /// assets (together with corresponding shares) to an unreachable address (in the constructor).
     struct Buffer {
         uint256 assetsCached;
+        uint256 bufferedShares;
         uint256 lastUpdate;
         uint256 currentBufferEnd;
     }
@@ -31,31 +32,39 @@ library RewardBuffer {
     function _updateBuffer(
         Buffer storage _buffer,
         uint256 _totalAssets,
-        uint256 _bufferedShares,
         uint256 _totalShares
     ) internal returns (uint256 sharesToMint, uint256 sharesToBurn) {
-        sharesToBurn = _sharesToRelease(_buffer, _bufferedShares);
-        _bufferedShares -= sharesToBurn;
+        require(_buffer.assetsCached != 0, "Buffer cannot have 0 assets cached.");
+
+        // -- Rewards unlock --
+
+        sharesToBurn = _sharesToRelease(_buffer);
+        _buffer.bufferedShares -= sharesToBurn;
+        _buffer.lastUpdate = block.timestamp;
+
+        // -- Buffer update (new rewards/loss) --
 
         if (_buffer.assetsCached <= _totalAssets) {
-            sharesToMint = _handleGain(_buffer, _bufferedShares, _totalShares, _totalAssets);
+            sharesToMint = _handleGain(_buffer, _totalShares, _totalAssets);
         } else {
-            sharesToBurn += _handleLoss(_buffer, _bufferedShares, _totalShares, _totalAssets);
+            sharesToBurn += _handleLoss(_buffer, _totalShares, _totalAssets);
         }
 
+        uint256 _cancelledOut = sharesToBurn.min(sharesToMint);
+        sharesToBurn -= _cancelledOut;
+        sharesToMint -= _cancelledOut;
+
+        _buffer.bufferedShares += (sharesToMint - sharesToBurn);
         _buffer.assetsCached = _totalAssets;
-        _buffer.lastUpdate = block.timestamp;
     }
 
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
     /// Use it to implement `totalSupply()`.
-    function _sharesToRelease(
-        Buffer storage _buffer,
-        uint256 _bufferedShares
-    ) internal view returns (uint256 sharesReleased) {
+    function _sharesToRelease(Buffer storage _buffer) internal view returns (uint256 sharesReleased) {
         uint256 _now = block.timestamp;
         uint256 _start = _buffer.lastUpdate;
         uint256 _end = _buffer.currentBufferEnd;
+        uint256 _bufferedShares = _buffer.bufferedShares;
 
         if (_end == _start || _now == _start) {
             return 0;
@@ -73,11 +82,16 @@ library RewardBuffer {
 
     function _handleGain(
         Buffer storage _buffer,
-        uint256 _bufferedShares,
         uint256 _totalShares,
         uint256 _totalAssets
     ) private returns (uint256 sharesToMint) {
         uint256 _gain = _totalAssets - _buffer.assetsCached;
+        uint256 _bufferedShares = _buffer.bufferedShares;
+
+        if (_gain == 0) {
+            return 0;
+        }
+
         sharesToMint = _gain.mulDiv(_totalShares, _buffer.assetsCached);
 
         uint256 _weightedOldEnd = _buffer.currentBufferEnd * _bufferedShares;
@@ -89,11 +103,16 @@ library RewardBuffer {
 
     function _handleLoss(
         Buffer storage _buffer,
-        uint256 _bufferedShares,
         uint256 _totalShares,
         uint256 _totalAssets
     ) private returns (uint256 sharesToBurn) {
         uint256 _loss = _buffer.assetsCached - _totalAssets;
+        uint256 _bufferedShares = _buffer.bufferedShares;
+
+        if (_loss == 0) {
+            return 0;
+        }
+
         uint256 _lossInShares = _loss.mulDiv(_totalShares, _buffer.assetsCached);
         sharesToBurn = _lossInShares.min(_bufferedShares);
 
