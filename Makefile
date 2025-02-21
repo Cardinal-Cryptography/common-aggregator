@@ -1,4 +1,7 @@
-include .env
+-include .env
+ifeq ($(wildcard .env),)
+$(error .env: No such file or directory (copy .env.example to .env and fill in the values))
+endif
 
 .PHONY: help
 help: # Show help for each of the Makefile recipes.
@@ -13,3 +16,8 @@ deps:
 compile-contracts: # Compile solidity contracts
 compile-contracts:
 	forge build
+
+.PHONY: test
+test: # Run tests
+test:
+	forge test
