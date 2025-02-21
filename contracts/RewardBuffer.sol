@@ -86,17 +86,15 @@ library RewardBuffer {
         uint256 _totalAssets
     ) private returns (uint256 sharesToMint) {
         uint256 _gain = _totalAssets - _buffer.assetsCached;
-        uint256 _bufferedShares = _buffer.bufferedShares;
-
         if (_gain == 0) {
             return 0;
         }
 
         sharesToMint = _gain.mulDiv(_totalShares, _buffer.assetsCached);
 
-        uint256 _weightedOldEnd = _buffer.currentBufferEnd * _bufferedShares;
+        uint256 _weightedOldEnd = _buffer.currentBufferEnd * _buffer.bufferedShares;
         uint256 _weightedNewEnd = (block.timestamp + DEFAULT_BUFFERING_DURATION) * sharesToMint;
-        uint256 _weightsCombined = sharesToMint + _bufferedShares;
+        uint256 _weightsCombined = sharesToMint + _buffer.bufferedShares;
 
         _buffer.currentBufferEnd = (_weightedOldEnd + _weightedNewEnd) / _weightsCombined;
     }
@@ -107,14 +105,12 @@ library RewardBuffer {
         uint256 _totalAssets
     ) private returns (uint256 sharesToBurn) {
         uint256 _loss = _buffer.assetsCached - _totalAssets;
-        uint256 _bufferedShares = _buffer.bufferedShares;
-
         if (_loss == 0) {
             return 0;
         }
 
         uint256 _lossInShares = _loss.mulDiv(_totalShares, _buffer.assetsCached);
-        sharesToBurn = _lossInShares.min(_bufferedShares);
+        sharesToBurn = _lossInShares.min(_buffer.bufferedShares);
 
         _buffer.currentBufferEnd = _buffer.currentBufferEnd.max(block.timestamp);
     }
