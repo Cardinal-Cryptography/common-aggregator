@@ -17,7 +17,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     uint256 public constant MAX_VAULTS = 5;
     uint256 public constant MAX_BPS = 10000;
 
-    /// @custom:storage-location erc7201:commonAggregator.aggregator
+    /// @custom:storage-location erc7201:common.storage.aggregator
     struct AggregatorStorage {
         uint256 assetsCached;
         IERC4626[] vaults; // Both for iterating and a fallback queue.
