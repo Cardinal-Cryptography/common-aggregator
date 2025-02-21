@@ -24,7 +24,7 @@ abstract contract CommonTimelocks {
     }
 
     // Adds a timelock entry for the given action if it doesn't exist yet.
-    function _register(bytes32 actionHash, uint256 delay) internal {
+    function register(bytes32 actionHash, uint256 delay) public {
         TimelocksStorage storage $ = _getTimelocksStorage();
         if ($.registeredTimelocks[actionHash] != NOT_REGISTERED) {
             revert ActionAlreadyRegistered(actionHash);
@@ -33,7 +33,7 @@ abstract contract CommonTimelocks {
     }
 
     // Removes a timelock entry for the given action, if it exists, and the timelock has passed.
-    function _execute(bytes32 actionHash) internal {
+    function execute(bytes32 actionHash) public {
         TimelocksStorage storage $ = _getTimelocksStorage();
         uint256 lockedUntil = $.registeredTimelocks[actionHash];
         if (lockedUntil == NOT_REGISTERED) {
@@ -46,7 +46,7 @@ abstract contract CommonTimelocks {
     }
 
     // Removes a timelock entry for the given action, if it exists, and the timelock has not passed yet.
-    function _cancel(bytes32 actionHash) internal {
+    function cancel(bytes32 actionHash) public {
         TimelocksStorage storage $ = _getTimelocksStorage();
         uint256 lockedUntil = $.registeredTimelocks[actionHash];
         if (lockedUntil == NOT_REGISTERED) {
