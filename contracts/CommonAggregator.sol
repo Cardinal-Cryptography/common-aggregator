@@ -14,17 +14,18 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     bytes32 public constant REBALANCER = keccak256("REBALANCER");
     bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
 
-    uint256 public constant MAX_VAULT_NUMBER = 5;
+    uint256 public constant MAX_VAULTS = 5;
     uint256 public constant MAX_BPS = 10000;
 
+    /// @custom:storage-location erc7201:commonAggregator.aggregator
     struct AggregatorStorage {
         uint256 assetsCached;
         IERC4626[] vaults; // Both for iterating and a fallback queue.
         mapping(address vault => uint256 limit) allocationLimit; 
     }
 
-    // keccak256(abi.encode(uint256(keccak256("commonAggregator.aggregator")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant AGGREGATOR_STORAGE_LOCATION = 0xf8468fe7f3a9575c25bfcbae37ff341b77a73598911f3b2ece5f7b3088577e00;
+    // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
+    bytes32 private constant AGGREGATOR_STORAGE_LOCATION = 0x1344fc1d9208ab003bf22755fd527b5337aabe73460e3f8720ef6cfd49b61d00;
     function _getAggregatorStorage() private pure returns (AggregatorStorage storage $) {
         assembly {
             $.slot := AGGREGATOR_STORAGE_LOCATION
@@ -49,8 +50,10 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     }
 
     function _ensureVaultCanBeAdded(address vault) private view {
+        require(vault != address(0), "CommonAggregator: zero address");
+
         AggregatorStorage storage $ = _getAggregatorStorage();
-        require($.vaults.length <  MAX_VAULT_NUMBER, "CommonAggregator: too many vaults");
+        require($.vaults.length <  MAX_VAULTS, "CommonAggregator: too many vaults");
         for (uint256 i = 0; i < $.vaults.length; i++) {
             require(address($.vaults[i]) != vault, "CommonAggregator: vault already exists");
         }
