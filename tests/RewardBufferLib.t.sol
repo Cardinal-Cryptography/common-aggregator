@@ -74,9 +74,24 @@ contract RewardBufferTest is Test {
         assertEq(_toBurn, 300);
     }
 
-    //function testBufferEndFirstUpdate() public {}
+    function testBufferEndFirstUpdate() public {
+        buffer._updateBuffer(100, 100);
+        assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 20 days);
+    }
 
-    //function testBufferEndSecondUpdateOldActive() public {}
+    function testBufferEndSecondUpdateOldActive() public {
+        buffer._updateBuffer(20, 100);
+        vm.warp(STARTING_TIMESTAMP + 4 days);
+        buffer._updateBuffer(40, 200);
 
-    //function testBufferEndSecondUpdateElapsed() public {}
+        assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 4 days + uint((16 days * 2 + 20 days * 5)) / 7);
+    }
+
+    function testBufferEndSecondUpdateElapsed() public {
+        buffer._updateBuffer(20, 100);
+        vm.warp(STARTING_TIMESTAMP + 40 days);
+        buffer._updateBuffer(40, 200);
+
+        assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 40 days + 20 days);
+    }
 }

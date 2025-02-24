@@ -46,15 +46,17 @@ library RewardBuffer {
 
         if (_buffer.assetsCached <= _totalAssets) {
             sharesToMint = _handleGain(_buffer, _totalShares, _totalAssets);
+            _buffer.bufferedShares += sharesToMint;
         } else {
-            sharesToBurn += _handleLoss(_buffer, _totalShares, _totalAssets);
+            uint256 _lossInShares = _handleLoss(_buffer, _totalShares, _totalAssets);
+            sharesToBurn += _lossInShares;
+            _buffer.bufferedShares -= _lossInShares;
         }
 
         uint256 _cancelledOut = sharesToBurn.min(sharesToMint);
         sharesToBurn -= _cancelledOut;
         sharesToMint -= _cancelledOut;
 
-        _buffer.bufferedShares += (sharesToMint - sharesToBurn);
         _buffer.assetsCached = _totalAssets;
     }
 
