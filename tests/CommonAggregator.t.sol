@@ -9,7 +9,6 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
-
 contract CommonAggregatorTest is Test {
     CommonAggregator commonAggregator;
     address owner = address(0x123);
@@ -49,7 +48,8 @@ contract CommonAggregatorTest is Test {
         IERC4626[] memory vaults = new IERC4626[](1);
         vaults[0] = new ERC4626Mock(address(asset));
 
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, new ERC20Mock(), vaults);
+        bytes memory initializeData =
+            abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, new ERC20Mock(), vaults);
 
         vm.expectRevert();
         new ERC1967Proxy(address(implementation), initializeData);

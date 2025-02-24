@@ -1,0 +1,36 @@
+name: Check formatting
+
+on: 
+  pull_request:
+    branches:
+    - main
+  push:
+    branches:
+    - main
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  check:
+    strategy:
+      fail-fast: true
+
+    name: Solidity contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: true
+        id: deps
+
+      - name: Run Forge formatter
+        run: |
+          forge fmt --check
+        id: fmt
