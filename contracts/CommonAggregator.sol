@@ -2,13 +2,14 @@
 pragma solidity ^0.8.28;
 
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
-contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUpgradeable {
+contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUpgradeable, ERC4626Upgradeable {
     bytes32 public constant OWNER = keccak256("OWNER");
     bytes32 public constant MANAGER = keccak256("MANAGER");
     bytes32 public constant REBALANCER = keccak256("REBALANCER");
@@ -32,9 +33,14 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         }
     }
 
-    function initialize(address owner, IERC4626[] memory vaults) public initializer {
+    function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
+        __ERC20_init(
+            string.concat("Common-Aggregator-", asset.name(), "-v1"),
+            string.concat("ca", asset.symbol())
+        );
+        __ERC4626_init(asset);
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(OWNER, owner);
@@ -43,19 +49,20 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         $.assetsCached = 0;
 
         for (uint256 i = 0; i < vaults.length; i++) {
-            _ensureVaultCanBeAdded(address(vaults[i]));
+            _ensureVaultCanBeAdded(vaults[i]);
             $.vaults.push(vaults[i]);
             $.allocationLimit[address(vaults[i])] = MAX_BPS;
         }
     }
 
-    function _ensureVaultCanBeAdded(address vault) private view {
-        require(vault != address(0), "CommonAggregator: zero address");
+    function _ensureVaultCanBeAdded(IERC4626 vault) private view {
+        require(address(vault) != address(0), "CommonAggregator: zero address");
+        require(vault.asset() == asset(), "CommonAggregator: wrong asset");
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         require($.vaults.length <  MAX_VAULTS, "CommonAggregator: too many vaults");
         for (uint256 i = 0; i < $.vaults.length; i++) {
-            require(address($.vaults[i]) != vault, "CommonAggregator: vault already exists");
+            require(address($.vaults[i]) != address(vault), "CommonAggregator: vault already exists");
         }
     }
 
