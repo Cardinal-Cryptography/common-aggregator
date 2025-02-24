@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-abstract contract CommonTimelocks {
+contract CommonTimelocks {
     error ActionAlreadyRegistered(bytes32 actionHash);
     error ActionNotRegistered(bytes32 actionHash);
     error ActionTimelocked(bytes32 actionHash, uint256 lockedUntil);

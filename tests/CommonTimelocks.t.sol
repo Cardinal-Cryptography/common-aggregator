@@ -4,13 +4,11 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
 
-contract CommonTimelocksImpl is CommonTimelocks {}
-
 contract CommonTimelocksTest is Test {
     CommonTimelocks timelocks;
     
     function setUp() public {
-        timelocks = new CommonTimelocksImpl();
+        timelocks = new CommonTimelocks();
     }
 
     function testSingleActionRegisterExecute() public {
