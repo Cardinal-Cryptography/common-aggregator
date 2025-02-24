@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
 
+/// Trivial implementation of `CommonTimelocks`
 contract CommonTimelocksImpl is CommonTimelocks {
     function register(bytes32 actionHash, uint256 delay) external registersTimelockedAction(actionHash, delay) {}
     function execute(bytes32 actionHash) external executesUnlockedAction(actionHash) {}
