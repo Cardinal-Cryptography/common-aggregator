@@ -30,7 +30,7 @@ jobs:
           run_install: true
         id: deps
 
-      - name: Run Forge tests
+      - name: Run Forge formatter
         run: |
           forge fmt --check
-        id: test
+        id: fmt
