@@ -11,9 +11,18 @@ contract CommonTimelocksTest is Test {
         timelocks = new CommonTimelocks();
     }
 
-    // Example scenarios
+    // Basic success / failure scenarios
 
-    function testSingleActionRegisterExecute() public {
+    function testExecuteAfterTimelockSucceeds() public {
+        vm.warp(1000);
+        bytes32 actionHash = bytes32(0);
+        timelocks.register(actionHash, 100);
+
+        vm.warp(1101);
+        timelocks.execute(actionHash);
+    }
+
+    function testExecuteDuringTimelockFails() public {
         vm.warp(1000);
         bytes32 actionHash = bytes32(0);
         timelocks.register(actionHash, 100);
@@ -21,12 +30,18 @@ contract CommonTimelocksTest is Test {
         vm.warp(1100);
         vm.expectRevert(abi.encodeWithSelector(CommonTimelocks.ActionTimelocked.selector, actionHash, 1100));
         timelocks.execute(actionHash);
-
-        vm.warp(1101);
-        timelocks.execute(actionHash);
     }
 
-    function testSingleActionRegisterCancel() public {
+    function testCancelDuringTimelockSucceeds() public {
+        vm.warp(1000);
+        bytes32 actionHash = bytes32(0);
+        timelocks.register(actionHash, 100);
+
+        vm.warp(1100);
+        timelocks.cancel(actionHash);
+    }
+
+    function testCancelAfterTimelockFails() public {
         vm.warp(1000);
         bytes32 actionHash = bytes32(0);
         timelocks.register(actionHash, 100);
@@ -34,10 +49,9 @@ contract CommonTimelocksTest is Test {
         vm.warp(1101);
         vm.expectRevert(abi.encodeWithSelector(CommonTimelocks.ActionNotTimelocked.selector, actionHash, 1100));
         timelocks.cancel(actionHash);
-
-        vm.warp(1100); // earlier time
-        timelocks.cancel(actionHash);
     }
+
+    // More complex scenario
 
     function testManyActions() public {
         vm.warp(2000);
