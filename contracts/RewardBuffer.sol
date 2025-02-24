@@ -57,7 +57,7 @@ library RewardBuffer {
         // -- Buffer update (new rewards/loss) --
 
         if (_buffer.assetsCached <= _totalAssets) {
-            sharesToMint = _handleGain(_buffer, _totalShares, _totalAssets);
+            (sharesToMint, _buffer.currentBufferEnd) = _handleGain(_buffer, _totalShares, _totalAssets);
             _buffer.bufferedShares = _checkedAdd(_buffer.bufferedShares, sharesToMint, 2);
         } else {
             uint256 _lossInShares = _handleLoss(_buffer, _totalShares, _totalAssets);
@@ -96,13 +96,14 @@ library RewardBuffer {
 
     function _handleGain(Buffer storage _buffer, uint256 _totalShares, uint256 _totalAssets)
         private
-        returns (uint256 sharesToMint)
+        view
+        returns (uint256 sharesToMint, uint256 newBufferEnd)
     {
         uint256 _gain = _checkedSub(_totalAssets, _buffer.assetsCached, 9);
         sharesToMint = _gain.mulDiv(_totalShares, _buffer.assetsCached);
 
         if (sharesToMint == 0) {
-            return 0;
+            return (0, _buffer.currentBufferEnd);
         }
 
         uint256 _weightedOldEnd = _checkedMul(_buffer.currentBufferEnd, _buffer.bufferedShares, 10);
@@ -112,11 +113,12 @@ library RewardBuffer {
         uint256 _weightsCombined = _checkedAdd(sharesToMint, _buffer.bufferedShares, 13);
 
         uint256 _weightedSum = _checkedAdd(_weightedOldEnd, _weightedNewEnd, 14);
-        _buffer.currentBufferEnd = _checkedDiv(_weightedSum, _weightsCombined, 15);
+        newBufferEnd = _checkedDiv(_weightedSum, _weightsCombined, 15);
     }
 
     function _handleLoss(Buffer storage _buffer, uint256 _totalShares, uint256 _totalAssets)
         private
+        view
         returns (uint256 sharesToBurn)
     {
         uint256 _loss = _checkedSub(_buffer.assetsCached, _totalAssets, 16);
@@ -126,8 +128,6 @@ library RewardBuffer {
 
         uint256 _lossInShares = _loss.mulDiv(_totalShares, _buffer.assetsCached);
         sharesToBurn = _lossInShares.min(_buffer.bufferedShares);
-
-        _buffer.currentBufferEnd = _buffer.currentBufferEnd.max(block.timestamp);
     }
 
     function _checkedAdd(uint256 _a, uint256 _b, uint256 _id) private pure returns (uint256 result) {
