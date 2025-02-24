@@ -11,7 +11,7 @@ contract CommonTimelocksTest is Test {
         timelocks = new CommonTimelocks();
     }
 
-    // Simple scenarios
+    // Example scenarios
 
     function testSingleActionRegisterExecute() public {
         vm.warp(1000);

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
+/**
+ * A contract which manages timelocked actions. A timelocked action can be registered to be executed
+ * after the timelock passes. During the timelock, the action can be cancelled. 
+ */
 contract CommonTimelocks {
     error ActionAlreadyRegistered(bytes32 actionHash);
     error ActionNotRegistered(bytes32 actionHash);
@@ -23,8 +27,10 @@ contract CommonTimelocks {
         }
     }
 
-    // Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that
-    // `block.timestamp` is greater than 0.
+    /**
+     * Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
+     * is greater than zero. A zero `delay` means that the action is locked only for the current timestamp.
+     */
     function register(bytes32 actionHash, uint256 delay) public {
         TimelocksStorage storage $ = _getTimelocksStorage();
         if ($.registeredTimelocks[actionHash] != NOT_REGISTERED) {
@@ -33,7 +39,9 @@ contract CommonTimelocks {
         $.registeredTimelocks[actionHash] = block.timestamp + delay;
     }
 
-    // Removes a timelock entry for the given action, if it exists, and the timelock has passed.
+    /**
+     * Removes a timelock entry for the given action if it exists and the timelock has passed.
+     */
     function execute(bytes32 actionHash) public {
         TimelocksStorage storage $ = _getTimelocksStorage();
         uint256 lockedUntil = $.registeredTimelocks[actionHash];
@@ -46,7 +54,9 @@ contract CommonTimelocks {
         delete $.registeredTimelocks[actionHash];
     }
 
-    // Removes a timelock entry for the given action, if it exists, and the timelock has not passed yet.
+    /**
+     * Removes a timelock entry for the given action if it exists and the timelock has not passed yet.
+     */
     function cancel(bytes32 actionHash) public {
         TimelocksStorage storage $ = _getTimelocksStorage();
         uint256 lockedUntil = $.registeredTimelocks[actionHash];
