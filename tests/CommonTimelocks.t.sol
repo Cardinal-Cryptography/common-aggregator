@@ -148,4 +148,12 @@ contract CommonTimelocksTest is Test {
         vm.expectRevert(abi.encodeWithSelector(CommonTimelocks.ActionNotRegistered.selector, actionHash));
         timelocks.execute(actionHash);
     }
+
+    // Arithmetic
+
+    function testRegisterOverflowingTimelockSucceeds() public {
+        vm.warp(type(uint256).max);
+        bytes32 actionHash = bytes32(0);
+        timelocks.register(actionHash, type(uint256).max);
+    }
 }
