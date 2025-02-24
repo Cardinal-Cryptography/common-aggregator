@@ -12,11 +12,18 @@ library RewardBuffer {
 
     /// @dev MUST be initialized with non-zero value of `assetsCached` - vault should send some
     /// assets (together with corresponding shares) to an unreachable address (in the constructor).
+    ///
+    /// Use `_newBuffer` in order to create new buffer instance.
     struct Buffer {
         uint256 assetsCached;
         uint256 bufferedShares;
         uint256 lastUpdate;
         uint256 currentBufferEnd;
+    }
+
+    function _newBuffer(uint256 _initialAssets) internal view returns (Buffer memory buffer) {
+        require(_initialAssets != 0, "Buffer cannot have 0 assets cached.");
+        return Buffer(_initialAssets, 0, block.timestamp, block.timestamp);
     }
 
     /// @dev Use this to implement `totalAssets()`.

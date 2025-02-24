@@ -14,7 +14,7 @@ contract RewardBufferTest is Test {
 
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
-        buffer = RewardBuffer.Buffer(STARTING_BALANCE, 0, STARTING_TIMESTAMP, STARTING_TIMESTAMP);
+        buffer = RewardBuffer._newBuffer(STARTING_BALANCE);
     }
 
     function testCachedAssetsAfterInit() public view {
