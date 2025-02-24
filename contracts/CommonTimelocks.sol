@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-/// An abstract contract which manages timelocked actions. A timelocked action can be registered to be executed
-/// after the timelock passes. During the timelock, the action can be cancelled. The contract only exposes
-/// modifiers which can be used to guard access to action management functions in the implementation.
+/// @title An abstract contract which manages timelocked actions.
+/// @notice A timelocked action can be registered to be executed after the timelock passes. A registered action
+/// can be cancelled anytime.
+/// @dev The contract only exposes modifiers which can be used to guard access to action management functions
+/// in the implementation.
 abstract contract CommonTimelocks {
     error ActionAlreadyRegistered(bytes32 actionHash);
     error ActionNotRegistered(bytes32 actionHash);
@@ -27,7 +29,7 @@ abstract contract CommonTimelocks {
         }
     }
 
-    /// Utility function for addition which returns the maximal uint256 value if the result would overflow.
+    /// @dev Utility function for addition which returns the maximal uint256 value if the result would overflow.
     function _saturatingAdd(uint256 a, uint256 b) private pure returns (uint256 result) {
         if (type(uint256).max - a < b) {
             result = type(uint256).max;
@@ -36,7 +38,7 @@ abstract contract CommonTimelocks {
         }
     }
 
-    /// Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
+    /// @dev Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
     /// is greater than zero. A zero `delay` means that the action is locked only for the current timestamp.
     function _register(bytes32 actionHash, uint256 delay) private {
         TimelocksStorage storage $ = _getTimelocksStorage();
@@ -46,7 +48,7 @@ abstract contract CommonTimelocks {
         $.registeredTimelocks[actionHash] = _saturatingAdd(block.timestamp, delay);
     }
 
-    /// Removes a timelock entry for the given action if it exists and the timelock has passed.
+    /// @dev Removes a timelock entry for the given action if it exists and the timelock has passed.
     function _execute(bytes32 actionHash) private {
         TimelocksStorage storage $ = _getTimelocksStorage();
         uint256 lockedUntil = $.registeredTimelocks[actionHash];
@@ -59,7 +61,7 @@ abstract contract CommonTimelocks {
         delete $.registeredTimelocks[actionHash];
     }
 
-    /// Removes a timelock entry for the given action if it exists. Cancellation works both during
+    /// @dev Removes a timelock entry for the given action if it exists. Cancellation works both during
     /// and after the timelock period.
     function _cancel(bytes32 actionHash) private {
         TimelocksStorage storage $ = _getTimelocksStorage();
@@ -69,20 +71,20 @@ abstract contract CommonTimelocks {
         delete $.registeredTimelocks[actionHash];
     }
 
-    /// Use this modifier for functions which submit a timelocked action proposal.
+    /// @notice Use this modifier for functions which submit a timelocked action proposal.
     modifier registersTimelockedAction(bytes32 actionHash, uint256 delay) {
         _register(actionHash, delay);
         _;
     }
 
-    /// Use this modifier for functions which execute a previously submitted action whose timelock
+    /// @notice Use this modifier for functions which execute a previously submitted action whose timelock
     /// period has passed.
     modifier executesUnlockedAction(bytes32 actionHash) {
         _execute(actionHash);
         _;
     }
 
-    /// Use this modifier to cancel a previously submitted action, so that it can't be executed.
+    /// @notice Use this modifier to cancel a previously submitted action, so that it can't be executed.
     modifier cancelsAction(bytes32 actionHash) {
         _cancel(actionHash);
         _;
