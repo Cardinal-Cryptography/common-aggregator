@@ -10,7 +10,6 @@ abstract contract CommonTimelocks {
     error ActionAlreadyRegistered(bytes32 actionHash);
     error ActionNotRegistered(bytes32 actionHash);
     error ActionTimelocked(bytes32 actionHash, uint256 lockedUntil);
-    error ActionNotTimelocked(bytes32 actionHash, uint256 lockedUntil);
 
     // A special value for the timelock, which denotes that there is no registered timelock for the given action.
     uint256 private constant NOT_REGISTERED = 0;
@@ -56,16 +55,13 @@ abstract contract CommonTimelocks {
     }
 
     /**
-     * Removes a timelock entry for the given action if it exists and the timelock has not passed yet.
+     * Removes a timelock entry for the given action if it exists. Cancellation works both during
+     * and after the timelock period.
      */
     function _cancel(bytes32 actionHash) private {
         TimelocksStorage storage $ = _getTimelocksStorage();
-        uint256 lockedUntil = $.registeredTimelocks[actionHash];
-        if (lockedUntil == NOT_REGISTERED) {
+        if ($.registeredTimelocks[actionHash] == NOT_REGISTERED) {
             revert ActionNotRegistered(actionHash);
-        }
-        if (lockedUntil < block.timestamp) {
-            revert ActionNotTimelocked(actionHash, lockedUntil);
         }
         delete $.registeredTimelocks[actionHash];
     }
@@ -80,7 +76,7 @@ abstract contract CommonTimelocks {
 
     /**
      * Use this modifier for functions which execute a previously submitted action whose timelock
-     * duration has passed.
+     * period has passed.
      */
     modifier executesUnlockedAction(bytes32 actionHash) {
         _execute(actionHash);

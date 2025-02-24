@@ -47,13 +47,12 @@ contract CommonTimelocksTest is Test {
         timelocks.cancel(actionHash);
     }
 
-    function testCancelAfterTimelockFails() public {
+    function testCancelAfterTimelockSucceeds() public {
         vm.warp(1000);
         bytes32 actionHash = bytes32(0);
         timelocks.register(actionHash, 100);
 
         vm.warp(1101);
-        vm.expectRevert(abi.encodeWithSelector(CommonTimelocks.ActionNotTimelocked.selector, actionHash, 1100));
         timelocks.cancel(actionHash);
     }
 
