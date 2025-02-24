@@ -40,4 +40,44 @@ contract CommonAggregatorTest is Test {
         commonAggregator.grantRole(keccak256("MANAGER"), otherAccount);
         assertTrue(commonAggregator.hasRole(commonAggregator.MANAGER(), otherAccount));
     }
+
+    // Initializer
+
+    function testWrongAssetInInitializer() public {
+        IERC20 asset = new ERC20Mock();
+        CommonAggregator implementation = new CommonAggregator();
+        IERC4626[] memory vaults = new IERC4626[](1);
+        vaults[0] = new ERC4626Mock(address(asset));
+
+        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, new ERC20Mock(), vaults);
+
+        vm.expectRevert();
+        new ERC1967Proxy(address(implementation), initializeData);
+    }
+
+    function testMismatchingAssetInVaultsInInitializer() public {
+        IERC20 asset = new ERC20Mock();
+        CommonAggregator implementation = new CommonAggregator();
+        IERC4626[] memory vaults = new IERC4626[](2);
+        vaults[0] = new ERC4626Mock(address(asset));
+        vaults[1] = new ERC4626Mock(address(new ERC20Mock()));
+
+        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
+
+        vm.expectRevert();
+        new ERC1967Proxy(address(implementation), initializeData);
+    }
+
+    function testSameVaultCantBeTwiceInInitializer() public {
+        IERC20 asset = new ERC20Mock();
+        CommonAggregator implementation = new CommonAggregator();
+        IERC4626[] memory vaults = new IERC4626[](2);
+        vaults[0] = new ERC4626Mock(address(asset));
+        vaults[1] = vaults[0];
+
+        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
+
+        vm.expectRevert();
+        new ERC1967Proxy(address(implementation), initializeData);
+    }
 }
