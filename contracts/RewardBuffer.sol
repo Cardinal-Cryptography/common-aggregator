@@ -8,6 +8,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 library RewardBuffer {
     using Math for uint256;
 
+    error AssetCacheIsZero();
+
     error AdditionOverflow(uint256 id);
     error MultiplicationOverflow(uint256 id);
     error DivisionByZero(uint256 id);
@@ -27,7 +29,7 @@ library RewardBuffer {
     }
 
     function _newBuffer(uint256 _initialAssets) internal view returns (Buffer memory buffer) {
-        require(_initialAssets != 0, "Buffer cannot have 0 assets cached.");
+        if (_initialAssets == 0) revert AssetCacheIsZero();
         return Buffer(_initialAssets, 0, block.timestamp, block.timestamp);
     }
 
@@ -45,7 +47,7 @@ library RewardBuffer {
         internal
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
-        require(_buffer.assetsCached != 0, "Buffer cannot have 0 assets cached.");
+        if (_buffer.assetsCached == 0) revert AssetCacheIsZero();
 
         // -- Rewards unlock --
 
