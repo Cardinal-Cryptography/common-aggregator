@@ -127,6 +127,9 @@ library RewardBuffer {
         }
 
         uint256 _lossInShares = _loss.mulDiv(_totalShares, _buffer.assetsCached);
+
+        // If we need to burn more than `_buffer.bufferedShares` shares to retain price-per-share,
+        // then it's impossible to cover that from the buffer, and sharp PPS drop is to be expected.
         sharesToBurn = _lossInShares.min(_buffer.bufferedShares);
     }
 
