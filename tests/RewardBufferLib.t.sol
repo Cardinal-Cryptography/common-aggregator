@@ -101,4 +101,30 @@ contract RewardBufferTest is Test {
         assertEq(_toMint, uint256(1 << 125) / 10);
         assertEq(_toBurn, 0);
     }
+
+    uint256 constant UPDATE_NUM = 10;
+
+    function testFuzz_BufferEndIsNeverLowerThanLastUpdate(
+        uint120[UPDATE_NUM] calldata _timeElapsed,
+        uint120[UPDATE_NUM] calldata _gain
+    ) public {
+        uint256 _currentTime = STARTING_TIMESTAMP;
+        uint256 _totalAssets = STARTING_BALANCE;
+        uint256 _totalShares = 100;
+
+        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
+            _currentTime += _timeElapsed[i];
+            vm.warp(_currentTime);
+
+            _totalAssets += _gain[i];
+            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares);
+
+            assertLe(_toBurn, _totalShares);
+
+            _totalShares += _toMint;
+            _totalShares -= _toBurn;
+
+            assertLe(buffer.lastUpdate, buffer.currentBufferEnd);
+        }
+    }
 }

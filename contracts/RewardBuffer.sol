@@ -8,6 +8,11 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 library RewardBuffer {
     using Math for uint256;
 
+    error AdditionOverflow(uint256 id);
+    error MultiplicationOverflow(uint256 id);
+    error DivisionByZero(uint256 id);
+    error SubtractionOverflow(uint256 id);
+
     uint256 public constant DEFAULT_BUFFERING_DURATION = 20 days;
 
     /// @dev MUST be initialized with non-zero value of `assetsCached` - vault should send some
@@ -45,23 +50,24 @@ library RewardBuffer {
         // -- Rewards unlock --
 
         sharesToBurn = _sharesToRelease(_buffer);
-        _buffer.bufferedShares -= sharesToBurn;
+        _buffer.bufferedShares = _checkedSub(_buffer.bufferedShares, sharesToBurn, 1);
         _buffer.lastUpdate = block.timestamp;
+        _buffer.currentBufferEnd = _buffer.currentBufferEnd.max(block.timestamp);
 
         // -- Buffer update (new rewards/loss) --
 
         if (_buffer.assetsCached <= _totalAssets) {
             sharesToMint = _handleGain(_buffer, _totalShares, _totalAssets);
-            _buffer.bufferedShares += sharesToMint;
+            _buffer.bufferedShares = _checkedAdd(_buffer.bufferedShares, sharesToMint, 2);
         } else {
             uint256 _lossInShares = _handleLoss(_buffer, _totalShares, _totalAssets);
-            sharesToBurn += _lossInShares;
-            _buffer.bufferedShares -= _lossInShares;
+            sharesToBurn = _checkedAdd(sharesToBurn, _lossInShares, 3);
+            _buffer.bufferedShares = _checkedSub(_buffer.bufferedShares, _lossInShares, 4);
         }
 
         uint256 _cancelledOut = sharesToBurn.min(sharesToMint);
-        sharesToBurn -= _cancelledOut;
-        sharesToMint -= _cancelledOut;
+        sharesToBurn = _checkedSub(sharesToBurn, _cancelledOut, 5);
+        sharesToMint = _checkedSub(sharesToMint, _cancelledOut, 6);
 
         _buffer.assetsCached = _totalAssets;
     }
@@ -78,8 +84,8 @@ library RewardBuffer {
             return 0;
         }
 
-        uint256 _duration = _end - _start;
-        uint256 _elapsed = _now - _start;
+        uint256 _duration = _checkedSub(_end, _start, 7);
+        uint256 _elapsed = _checkedSub(_now, _start, 8);
 
         if (_elapsed >= _duration) {
             sharesReleased = _bufferedShares;
@@ -92,25 +98,28 @@ library RewardBuffer {
         private
         returns (uint256 sharesToMint)
     {
-        uint256 _gain = _totalAssets - _buffer.assetsCached;
-        if (_gain == 0) {
+        uint256 _gain = _checkedSub(_totalAssets, _buffer.assetsCached, 9);
+        sharesToMint = _gain.mulDiv(_totalShares, _buffer.assetsCached);
+
+        if (sharesToMint == 0) {
             return 0;
         }
 
-        sharesToMint = _gain.mulDiv(_totalShares, _buffer.assetsCached);
+        uint256 _weightedOldEnd = _checkedMul(_buffer.currentBufferEnd, _buffer.bufferedShares, 10);
 
-        uint256 _weightedOldEnd = _buffer.currentBufferEnd * _buffer.bufferedShares;
-        uint256 _weightedNewEnd = (block.timestamp + DEFAULT_BUFFERING_DURATION) * sharesToMint;
-        uint256 _weightsCombined = sharesToMint + _buffer.bufferedShares;
+        uint256 _newUnlockEnd = _checkedAdd(block.timestamp, DEFAULT_BUFFERING_DURATION, 11);
+        uint256 _weightedNewEnd = _checkedMul(_newUnlockEnd, sharesToMint, 12);
+        uint256 _weightsCombined = _checkedAdd(sharesToMint, _buffer.bufferedShares, 13);
 
-        _buffer.currentBufferEnd = (_weightedOldEnd + _weightedNewEnd) / _weightsCombined;
+        uint256 _weightedSum = _checkedAdd(_weightedOldEnd, _weightedNewEnd, 14);
+        _buffer.currentBufferEnd = _checkedDiv(_weightedSum, _weightsCombined, 15);
     }
 
     function _handleLoss(Buffer storage _buffer, uint256 _totalShares, uint256 _totalAssets)
         private
         returns (uint256 sharesToBurn)
     {
-        uint256 _loss = _buffer.assetsCached - _totalAssets;
+        uint256 _loss = _checkedSub(_buffer.assetsCached, _totalAssets, 16);
         if (_loss == 0) {
             return 0;
         }
@@ -119,5 +128,29 @@ library RewardBuffer {
         sharesToBurn = _lossInShares.min(_buffer.bufferedShares);
 
         _buffer.currentBufferEnd = _buffer.currentBufferEnd.max(block.timestamp);
+    }
+
+    function _checkedAdd(uint256 _a, uint256 _b, uint256 _id) private pure returns (uint256 result) {
+        bool _success;
+        (_success, result) = _a.tryAdd(_b);
+        if (!_success) revert AdditionOverflow(_id);
+    }
+
+    function _checkedMul(uint256 _a, uint256 _b, uint256 _id) private pure returns (uint256 result) {
+        bool _success;
+        (_success, result) = _a.tryMul(_b);
+        if (!_success) revert MultiplicationOverflow(_id);
+    }
+
+    function _checkedDiv(uint256 _a, uint256 _b, uint256 _id) private pure returns (uint256 result) {
+        bool _success;
+        (_success, result) = _a.tryDiv(_b);
+        if (!_success) revert DivisionByZero(_id);
+    }
+
+    function _checkedSub(uint256 _a, uint256 _b, uint256 _id) private pure returns (uint256 result) {
+        bool _success;
+        (_success, result) = _a.trySub(_b);
+        if (!_success) revert SubtractionOverflow(_id);
     }
 }
