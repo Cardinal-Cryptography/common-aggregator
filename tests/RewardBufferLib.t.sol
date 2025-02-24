@@ -95,4 +95,10 @@ contract RewardBufferTest is Test {
 
         assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 40 days + 20 days);
     }
+
+    function testBigNumbers() public {
+        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(10 + (1 << 120), (1 << 5));
+        assertEq(_toMint, uint(1 << 125) / 10);
+        assertEq(_toBurn, 0);
+    }
 }
