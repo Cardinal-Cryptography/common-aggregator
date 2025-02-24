@@ -36,11 +36,10 @@ library RewardBuffer {
     ///
     /// Alternatively (or additionally), it may be called by an off-chain component at times
     /// when difference between `assetsCached` and `totalAssets()` becomes significant.
-    function _updateBuffer(
-        Buffer storage _buffer,
-        uint256 _totalAssets,
-        uint256 _totalShares
-    ) internal returns (uint256 sharesToMint, uint256 sharesToBurn) {
+    function _updateBuffer(Buffer storage _buffer, uint256 _totalAssets, uint256 _totalShares)
+        internal
+        returns (uint256 sharesToMint, uint256 sharesToBurn)
+    {
         require(_buffer.assetsCached != 0, "Buffer cannot have 0 assets cached.");
 
         // -- Rewards unlock --
@@ -89,11 +88,10 @@ library RewardBuffer {
         }
     }
 
-    function _handleGain(
-        Buffer storage _buffer,
-        uint256 _totalShares,
-        uint256 _totalAssets
-    ) private returns (uint256 sharesToMint) {
+    function _handleGain(Buffer storage _buffer, uint256 _totalShares, uint256 _totalAssets)
+        private
+        returns (uint256 sharesToMint)
+    {
         uint256 _gain = _totalAssets - _buffer.assetsCached;
         if (_gain == 0) {
             return 0;
@@ -108,11 +106,10 @@ library RewardBuffer {
         _buffer.currentBufferEnd = (_weightedOldEnd + _weightedNewEnd) / _weightsCombined;
     }
 
-    function _handleLoss(
-        Buffer storage _buffer,
-        uint256 _totalShares,
-        uint256 _totalAssets
-    ) private returns (uint256 sharesToBurn) {
+    function _handleLoss(Buffer storage _buffer, uint256 _totalShares, uint256 _totalAssets)
+        private
+        returns (uint256 sharesToBurn)
+    {
         uint256 _loss = _buffer.assetsCached - _totalAssets;
         if (_loss == 0) {
             return 0;

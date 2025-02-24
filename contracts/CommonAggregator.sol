@@ -22,11 +22,13 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     struct AggregatorStorage {
         uint256 assetsCached;
         IERC4626[] vaults; // Both for iterating and a fallback queue.
-        mapping(address vault => uint256 limit) allocationLimit; 
+        mapping(address vault => uint256 limit) allocationLimit;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant AGGREGATOR_STORAGE_LOCATION = 0x1344fc1d9208ab003bf22755fd527b5337aabe73460e3f8720ef6cfd49b61d00;
+    bytes32 private constant AGGREGATOR_STORAGE_LOCATION =
+        0x1344fc1d9208ab003bf22755fd527b5337aabe73460e3f8720ef6cfd49b61d00;
+
     function _getAggregatorStorage() private pure returns (AggregatorStorage storage $) {
         assembly {
             $.slot := AGGREGATOR_STORAGE_LOCATION
@@ -36,10 +38,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
-        __ERC20_init(
-            string.concat("Common-Aggregator-", asset.name(), "-v1"),
-            string.concat("ca", asset.symbol())
-        );
+        __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
         __ERC4626_init(asset);
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
@@ -60,7 +59,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         require(vault.asset() == asset(), "CommonAggregator: wrong asset");
 
         AggregatorStorage storage $ = _getAggregatorStorage();
-        require($.vaults.length <  MAX_VAULTS, "CommonAggregator: too many vaults");
+        require($.vaults.length < MAX_VAULTS, "CommonAggregator: too many vaults");
         for (uint256 i = 0; i < $.vaults.length; i++) {
             require(address($.vaults[i]) != address(vault), "CommonAggregator: vault already exists");
         }

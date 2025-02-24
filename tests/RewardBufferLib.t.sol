@@ -85,7 +85,7 @@ contract RewardBufferTest is Test {
         vm.warp(STARTING_TIMESTAMP + 4 days);
         buffer._updateBuffer(40, 200);
 
-        assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 4 days + uint((16 days * 2 + 20 days * 5)) / 7);
+        assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 4 days + uint256((16 days * 2 + 20 days * 5)) / 7);
     }
 
     function testBufferEndSecondUpdateElapsed() public {
@@ -98,7 +98,7 @@ contract RewardBufferTest is Test {
 
     function testBigNumbers() public {
         (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(10 + (1 << 120), (1 << 5));
-        assertEq(_toMint, uint(1 << 125) / 10);
+        assertEq(_toMint, uint256(1 << 125) / 10);
         assertEq(_toBurn, 0);
     }
 }
