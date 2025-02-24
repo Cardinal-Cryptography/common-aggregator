@@ -20,7 +20,9 @@ abstract contract CommonTimelocks {
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.timelocks")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant TIMELOCKS_STORAGE_LOCATION = 0xb4b5f37798c0578cab1322f006334977322f38ac9cf72880f6abeef244238800;
+    bytes32 private constant TIMELOCKS_STORAGE_LOCATION =
+        0xb4b5f37798c0578cab1322f006334977322f38ac9cf72880f6abeef244238800;
+
     function _getTimelocksStorage() private pure returns (TimelocksStorage storage $) {
         assembly {
             $.slot := TIMELOCKS_STORAGE_LOCATION
