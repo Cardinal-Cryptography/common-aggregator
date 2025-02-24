@@ -26,6 +26,7 @@ contract RewardBufferTest is Test {
         assertEq(buffer._getAssetsCache(), 20);
     }
 
+    /// forge-config: default.allow_internal_expect_revert = true
     function testUpdateRevertsWhenZeroStartingAssets() public {
         buffer.assetsCached = 0;
         vm.expectRevert(bytes("Buffer cannot have 0 assets cached."));
