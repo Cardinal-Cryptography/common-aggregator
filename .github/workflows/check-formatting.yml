@@ -1,4 +1,4 @@
-name: Test
+name: Check formatting
 
 on: 
   pull_request:
@@ -16,8 +16,7 @@ jobs:
     strategy:
       fail-fast: true
 
-
-    name: Foundry tests
+    name: Solidity contracts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,13 +30,7 @@ jobs:
           run_install: true
         id: deps
 
-      - name: Run Forge build
+      - name: Run Forge formatter
         run: |
-          forge --version
-          forge build --sizes
-        id: build
-
-      - name: Run Forge tests
-        run: |
-          forge test -vvv
-        id: test
+          forge fmt --check
+        id: fmt
