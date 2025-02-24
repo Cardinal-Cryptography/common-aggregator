@@ -106,14 +106,8 @@ library RewardBuffer {
             return (0, _buffer.currentBufferEnd);
         }
 
-        uint256 _weightedOldEnd = _checkedMul(_buffer.currentBufferEnd, _buffer.bufferedShares, 10);
-
-        uint256 _newUnlockEnd = _checkedAdd(block.timestamp, DEFAULT_BUFFERING_DURATION, 11);
-        uint256 _weightedNewEnd = _checkedMul(_newUnlockEnd, sharesToMint, 12);
-        uint256 _weightsCombined = _checkedAdd(sharesToMint, _buffer.bufferedShares, 13);
-
-        uint256 _weightedSum = _checkedAdd(_weightedOldEnd, _weightedNewEnd, 14);
-        newBufferEnd = _checkedDiv(_weightedSum, _weightsCombined, 15);
+        uint256 _newUnlockEnd = _checkedAdd(block.timestamp, DEFAULT_BUFFERING_DURATION, 10);
+        newBufferEnd = _weightedAvg(_buffer.currentBufferEnd, _buffer.bufferedShares, _newUnlockEnd, sharesToMint);
     }
 
     function _handleLoss(Buffer storage _buffer, uint256 _totalShares, uint256 _totalAssets)
@@ -121,7 +115,7 @@ library RewardBuffer {
         view
         returns (uint256 sharesToBurn)
     {
-        uint256 _loss = _checkedSub(_buffer.assetsCached, _totalAssets, 16);
+        uint256 _loss = _checkedSub(_buffer.assetsCached, _totalAssets, 11);
         if (_loss == 0) {
             return 0;
         }
@@ -131,6 +125,16 @@ library RewardBuffer {
         // If we need to burn more than `_buffer.bufferedShares` shares to retain price-per-share,
         // then it's impossible to cover that from the buffer, and sharp PPS drop is to be expected.
         sharesToBurn = _lossInShares.min(_buffer.bufferedShares);
+    }
+
+    function _weightedAvg(uint256 _v1, uint256 _w1, uint256 _v2, uint256 _w2) private pure returns (uint256 result) {
+        uint256 _weightedVal1 = _checkedMul(_w1, _v1, 12);
+        uint256 _weightedVal2 = _checkedMul(_w2, _v2, 13);
+
+        uint256 _weightedSum = _checkedAdd(_weightedVal1, _weightedVal2, 14);
+        uint256 _weightSum = _checkedAdd(_w1, _w2, 15);
+
+        result = _checkedDiv(_weightedSum, _weightSum, 16);
     }
 
     function _checkedAdd(uint256 _a, uint256 _b, uint256 _id) private pure returns (uint256 result) {
