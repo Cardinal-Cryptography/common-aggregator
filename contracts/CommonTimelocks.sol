@@ -23,7 +23,8 @@ contract CommonTimelocks {
         }
     }
 
-    // Adds a timelock entry for the given action if it doesn't exist yet.
+    // Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that
+    // `block.timestamp` is greater than 0.
     function register(bytes32 actionHash, uint256 delay) public {
         TimelocksStorage storage $ = _getTimelocksStorage();
         if ($.registeredTimelocks[actionHash] != NOT_REGISTERED) {
