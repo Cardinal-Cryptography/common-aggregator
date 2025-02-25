@@ -10,41 +10,11 @@ import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
 contract CommonAggregatorTest is Test {
-    CommonAggregator commonAggregator;
+    CommonAggregator implementation = new CommonAggregator();
     address owner = address(0x123);
-
-    function setUp() public {
-        IERC20 asset = new ERC20Mock();
-
-        CommonAggregator implementation = new CommonAggregator();
-        IERC4626[] memory vaults = new IERC4626[](2);
-        vaults[0] = new ERC4626Mock(address(asset));
-        vaults[1] = new ERC4626Mock(address(asset));
-
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
-
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
-        commonAggregator = CommonAggregator(address(proxy));
-    }
-
-    function testRoleGranting() public {
-        assertTrue(commonAggregator.hasRole(commonAggregator.DEFAULT_ADMIN_ROLE(), owner));
-        assertTrue(commonAggregator.hasRole(commonAggregator.OWNER(), owner));
-
-        address otherAccount = address(0x456);
-        assertFalse(commonAggregator.hasRole(commonAggregator.OWNER(), otherAccount));
-        assertFalse(commonAggregator.hasRole(commonAggregator.MANAGER(), otherAccount));
-
-        vm.prank(owner);
-        commonAggregator.grantRole(keccak256("MANAGER"), otherAccount);
-        assertTrue(commonAggregator.hasRole(commonAggregator.MANAGER(), otherAccount));
-    }
-
-    // Initializer
+    ERC20Mock asset = new ERC20Mock();
 
     function testWrongAssetInInitializer() public {
-        IERC20 asset = new ERC20Mock();
-        CommonAggregator implementation = new CommonAggregator();
         IERC4626[] memory vaults = new IERC4626[](1);
         vaults[0] = new ERC4626Mock(address(asset));
 
@@ -56,8 +26,6 @@ contract CommonAggregatorTest is Test {
     }
 
     function testMismatchingAssetInVaultsInInitializer() public {
-        IERC20 asset = new ERC20Mock();
-        CommonAggregator implementation = new CommonAggregator();
         IERC4626[] memory vaults = new IERC4626[](2);
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(new ERC20Mock()));
@@ -69,8 +37,6 @@ contract CommonAggregatorTest is Test {
     }
 
     function testSameVaultCantBeTwiceInInitializer() public {
-        IERC20 asset = new ERC20Mock();
-        CommonAggregator implementation = new CommonAggregator();
         IERC4626[] memory vaults = new IERC4626[](2);
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = vaults[0];
