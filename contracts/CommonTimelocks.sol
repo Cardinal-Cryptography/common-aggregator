@@ -11,9 +11,6 @@ abstract contract CommonTimelocks {
     error ActionNotRegistered(bytes32 actionHash);
     error ActionTimelocked(bytes32 actionHash, uint256 lockedUntil);
 
-    // A special value for the timelock, which denotes that there is no registered timelock for the given action.
-    uint256 private constant NOT_REGISTERED = 0;
-
     /// @custom:storage-location erc7201:common.storage.timelocks
     struct TimelocksStorage {
         mapping(bytes32 actionHash => uint256 lockedUntil) registeredTimelocks;
@@ -23,19 +20,26 @@ abstract contract CommonTimelocks {
     bytes32 private constant TIMELOCKS_STORAGE_LOCATION =
         0xb4b5f37798c0578cab1322f006334977322f38ac9cf72880f6abeef244238800;
 
-    function _getTimelocksStorage() private pure returns (TimelocksStorage storage $) {
-        assembly {
-            $.slot := TIMELOCKS_STORAGE_LOCATION
-        }
+    // A special value for the timelock, which denotes that there is no registered timelock for the given action.
+    uint256 private constant NOT_REGISTERED = 0;
+
+    /// @notice Use this modifier for functions which submit a timelocked action proposal.
+    modifier registersTimelockedAction(bytes32 actionHash, uint256 delay) {
+        _register(actionHash, delay);
+        _;
     }
 
-    /// @dev Utility function for addition which returns the maximal uint256 value if the result would overflow.
-    function _saturatingAdd(uint256 a, uint256 b) private pure returns (uint256 result) {
-        if (type(uint256).max - a < b) {
-            result = type(uint256).max;
-        } else {
-            result = a + b;
-        }
+    /// @notice Use this modifier for functions which execute a previously submitted action whose timelock
+    /// period has passed.
+    modifier executesUnlockedAction(bytes32 actionHash) {
+        _execute(actionHash);
+        _;
+    }
+
+    /// @notice Use this modifier to cancel a previously submitted action, so that it can't be executed.
+    modifier cancelsAction(bytes32 actionHash) {
+        _cancel(actionHash);
+        _;
     }
 
     /// @dev Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
@@ -71,22 +75,18 @@ abstract contract CommonTimelocks {
         delete $.registeredTimelocks[actionHash];
     }
 
-    /// @notice Use this modifier for functions which submit a timelocked action proposal.
-    modifier registersTimelockedAction(bytes32 actionHash, uint256 delay) {
-        _register(actionHash, delay);
-        _;
+    function _getTimelocksStorage() private pure returns (TimelocksStorage storage $) {
+        assembly {
+            $.slot := TIMELOCKS_STORAGE_LOCATION
+        }
     }
 
-    /// @notice Use this modifier for functions which execute a previously submitted action whose timelock
-    /// period has passed.
-    modifier executesUnlockedAction(bytes32 actionHash) {
-        _execute(actionHash);
-        _;
-    }
-
-    /// @notice Use this modifier to cancel a previously submitted action, so that it can't be executed.
-    modifier cancelsAction(bytes32 actionHash) {
-        _cancel(actionHash);
-        _;
+    /// @dev Utility function for addition which returns the maximal uint256 value if the result would overflow.
+    function _saturatingAdd(uint256 a, uint256 b) private pure returns (uint256 result) {
+        if (type(uint256).max - a < b) {
+            result = type(uint256).max;
+        } else {
+            result = a + b;
+        }
     }
 }
