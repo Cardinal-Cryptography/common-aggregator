@@ -80,6 +80,29 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     // ----- ERC4626 -----
 
+    /// @inheritdoc IERC4626
+    /// @notice Returns cached assets from the last holdings state update.
+    function totalAssets() public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        return $.rewardBuffer._getAssetsCached();
+    }
+
+    /// @dev Simulates holdings state update before conversion.
+    /// Handles `convertToAssets`, `previewRedeem`, `previewMint`, and `maxWithdraw`.
+    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), rounding);
+    }
+
+    /// @dev Simulates holdings state update before conversion.
+    /// Handles `convertToShares`, `previewDeposit`, and `previewMint`.
+    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, rounding);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Updates holdings state before depositing.
     function deposit(uint256 amount, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
         updateHoldingsState();
         uint256 result = super.deposit(amount, account);
@@ -146,16 +169,17 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     /// @notice Preview the holdings state update, without actually updating it.
     /// Returns `totalAssets` and `totalSupply` that there would be after the update.
-    function _previewUpdateHoldingsState() internal view returns (uint256 newAssets, uint256 newSupply) {
+    function _previewUpdateHoldingsState() internal view returns (uint256 newTotalAssets, uint256 newTotalSupply) {
         AggregatorStorage storage $ = _getAggregatorStorage();
-        newAssets = _totalAssetsNotCached();
+        newTotalAssets = _totalAssetsNotCached();
 
         if ($.rewardBuffer._getAssetsCached() == 0) {
-            return (newAssets, totalSupply());
+            return (newTotalAssets, totalSupply());
         }
-        (, uint256 sharesToMint, uint256 sharesToBurn) = $.rewardBuffer._simulateBufferUpdate(newAssets, totalSupply());
+        (, uint256 sharesToMint, uint256 sharesToBurn) =
+            $.rewardBuffer._simulateBufferUpdate(newTotalAssets, totalSupply());
         uint256 protocolFeeShares = sharesToBurn.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
-        return (newAssets, totalSupply() + sharesToMint - sharesToBurn + protocolFeeShares);
+        return (newTotalAssets, totalSupply() + sharesToMint - sharesToBurn + protocolFeeShares);
     }
 
     function _totalAssetsNotCached() internal view returns (uint256) {
