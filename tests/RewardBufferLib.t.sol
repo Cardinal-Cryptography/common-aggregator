@@ -18,25 +18,25 @@ contract RewardBufferTest is Test {
     }
 
     function testCachedAssetsAfterInit() public view {
-        assertEq(buffer._getAssetsCache(), STARTING_BALANCE);
+        assertEq(buffer._getAssetsCached(), STARTING_BALANCE);
     }
 
     function testCachedAssetsAfterBufferUpdate() public {
         buffer._updateBuffer(20, 200);
-        assertEq(buffer._getAssetsCache(), 20);
+        assertEq(buffer._getAssetsCached(), 20);
     }
 
     /// forge-config: default.allow_internal_expect_revert = true
     function testUpdateRevertsWhenZeroStartingAssets() public {
         buffer.assetsCached = 0;
-        vm.expectRevert(RewardBuffer.AssetCacheIsZero.selector);
+        vm.expectRevert(RewardBuffer.AssetsCachedIsZero.selector);
         buffer._updateBuffer(20, 1000);
     }
 
     function testCachedAssetsAfterBufferUpdateAndTimeElapsed() public {
         buffer._updateBuffer(20, 200);
         vm.warp(STARTING_TIMESTAMP + 10 days);
-        assertEq(buffer._getAssetsCache(), 20);
+        assertEq(buffer._getAssetsCached(), 20);
     }
 
     function testSharesReleasedAfterBufferUpdate() public {

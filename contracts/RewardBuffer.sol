@@ -8,7 +8,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 library RewardBuffer {
     using Math for uint256;
 
-    error AssetCacheIsZero();
+    error AssetsCachedIsZero();
 
     error AdditionOverflow(uint256 id);
     error MultiplicationOverflow(uint256 id);
@@ -29,12 +29,12 @@ library RewardBuffer {
     }
 
     function _newBuffer(uint256 initialAssets) internal view returns (Buffer memory buffer) {
-        if (initialAssets == 0) revert AssetCacheIsZero();
+        if (initialAssets == 0) revert AssetsCachedIsZero();
         return Buffer(initialAssets, 0, block.timestamp, block.timestamp);
     }
 
     /// @dev Use this to implement `totalAssets()`.
-    function _getAssetsCache(Buffer storage buffer) internal view returns (uint256 assets) {
+    function _getAssetsCached(Buffer storage buffer) internal view returns (uint256 assets) {
         return buffer.assetsCached;
     }
 
@@ -47,7 +47,7 @@ library RewardBuffer {
         internal
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
-        if (buffer.assetsCached == 0) revert AssetCacheIsZero();
+        if (buffer.assetsCached == 0) revert AssetsCachedIsZero();
 
         // -- Rewards unlock --
 
@@ -67,9 +67,9 @@ library RewardBuffer {
             buffer.bufferedShares = _checkedSub(buffer.bufferedShares, lossInShares, 4);
         }
 
-        uint256 _cancelledOut = sharesToBurn.min(sharesToMint);
-        sharesToBurn = _checkedSub(sharesToBurn, _cancelledOut, 5);
-        sharesToMint = _checkedSub(sharesToMint, _cancelledOut, 6);
+        uint256 cancelledOut = sharesToBurn.min(sharesToMint);
+        sharesToBurn = _checkedSub(sharesToBurn, cancelledOut, 5);
+        sharesToMint = _checkedSub(sharesToMint, cancelledOut, 6);
 
         buffer.assetsCached = totalAssets;
     }
