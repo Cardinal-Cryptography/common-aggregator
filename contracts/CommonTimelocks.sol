@@ -23,20 +23,20 @@ abstract contract CommonTimelocks {
     // A special value for the timelock, which denotes that there is no registered timelock for the given action.
     uint256 private constant NOT_REGISTERED = 0;
 
-    /// @notice Use this modifier for functions which submit a timelocked action proposal.
+    /// @dev Use this modifier for functions which submit a timelocked action proposal.
     modifier registersTimelockedAction(bytes32 actionHash, uint256 delay) {
         _register(actionHash, delay);
         _;
     }
 
-    /// @notice Use this modifier for functions which execute a previously submitted action whose timelock
+    /// @dev Use this modifier for functions which execute a previously submitted action whose timelock
     /// period has passed.
     modifier executesUnlockedAction(bytes32 actionHash) {
         _execute(actionHash);
         _;
     }
 
-    /// @notice Use this modifier to cancel a previously submitted action, so that it can't be executed.
+    /// @dev Use this modifier to cancel a previously submitted action, so that it can't be executed.
     modifier cancelsAction(bytes32 actionHash) {
         _cancel(actionHash);
         _;
