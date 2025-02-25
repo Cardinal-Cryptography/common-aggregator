@@ -59,6 +59,12 @@ contract RewardBufferTest is Test {
         assertEq(buffer._sharesToRelease(), 24);
     }
 
+    function testSharesReleasedAfterFullPeriodHasPassed() public {
+        buffer._updateBuffer(15, 100);
+        vm.warp(STARTING_TIMESTAMP + 20 days);
+        assertEq(buffer._sharesToRelease(), 50);
+    }
+
     function testBufferUpdateResultOnGain() public {
         (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(12, 100);
         assertEq(_toMint, 20);
