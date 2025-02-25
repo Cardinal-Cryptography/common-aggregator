@@ -87,7 +87,7 @@ library RewardBuffer {
 
         // -- Rewards unlock --
 
-        sharesToBurn = _sharesToRelease(buffer);
+        sharesToBurn = _sharesToBurn(buffer);
         buffer.bufferedShares = _checkedSub(buffer.bufferedShares, sharesToBurn, 1);
         buffer.lastUpdate = block.timestamp;
         buffer.currentBufferEnd = buffer.currentBufferEnd.max(block.timestamp);
@@ -112,7 +112,7 @@ library RewardBuffer {
 
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
     /// Use it to implement `totalSupply()`.
-    function _sharesToRelease(Buffer memory buffer) internal view returns (uint256 sharesReleased) {
+    function _sharesToBurn(Buffer memory buffer) internal view returns (uint256 sharesReleased) {
         uint256 timestampNow = block.timestamp;
         uint256 start = buffer.lastUpdate;
         uint256 end = buffer.currentBufferEnd;
