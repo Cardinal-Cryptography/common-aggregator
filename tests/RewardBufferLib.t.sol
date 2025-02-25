@@ -3,9 +3,12 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {RewardBuffer} from "../contracts/RewardBuffer.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {console} from "forge-std/console.sol";
 
 contract RewardBufferTest is Test {
     using RewardBuffer for RewardBuffer.Buffer;
+    using Math for uint256;
 
     uint256 constant STARTING_TIMESTAMP = 100;
     uint256 constant STARTING_BALANCE = 10;
@@ -125,6 +128,101 @@ contract RewardBufferTest is Test {
             _totalShares -= _toBurn;
 
             assertLe(buffer.lastUpdate, buffer.currentBufferEnd);
+        }
+    }
+
+    function testFuzz_MonotonicPricePerShare(
+        uint120[UPDATE_NUM] calldata _timeElapsed,
+        uint120[UPDATE_NUM] calldata _gain
+    ) public {
+        uint256 _currentTime = STARTING_TIMESTAMP;
+        uint256 _totalAssets = STARTING_BALANCE;
+        uint256 _totalShares = 100;
+
+        uint256 _lastAssets = _totalAssets;
+        uint256 _lastShares = _totalShares;
+
+        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
+            _currentTime += _timeElapsed[i];
+            vm.warp(_currentTime);
+
+            _totalAssets += _gain[i];
+            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares);
+
+            assertLe(_toBurn, _totalShares);
+
+            _totalShares += _toMint;
+            _totalShares -= _toBurn;
+
+            assertLe(_lastAssets * _totalShares, _totalAssets * _lastShares);
+
+            _lastAssets = _totalAssets;
+            _lastShares = _totalShares;
+        }
+    }
+
+    function testFuzz_BigValues(
+        uint120[UPDATE_NUM] calldata _timeElapsed,
+        uint128[UPDATE_NUM] calldata _gain,
+        uint120 _offset
+    ) public {
+        uint256 _totalGain = 0;
+        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
+            _totalGain += _gain[i];
+        }
+
+        vm.assume(_totalGain * _offset < (1 << 128));
+
+        uint256 _currentTime = STARTING_TIMESTAMP;
+        uint256 _totalAssets = STARTING_BALANCE;
+        uint256 _totalShares = STARTING_BALANCE * _offset;
+
+        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
+            _currentTime += _timeElapsed[i];
+            vm.warp(_currentTime);
+
+            _totalAssets += _gain[i];
+            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares);
+
+            assertLe(_toBurn, _totalShares);
+
+            _totalShares += _toMint;
+            _totalShares -= _toBurn;
+        }
+    }
+
+    function testFuzz_WithUserActions(
+        uint120[UPDATE_NUM] calldata _timeElapsed,
+        uint120[UPDATE_NUM] calldata _gain,
+        uint120[UPDATE_NUM] calldata _deposit,
+        uint120[UPDATE_NUM] calldata _withdraw
+    ) public {
+        uint256 _currentTime = STARTING_TIMESTAMP;
+        uint256 _totalAssets = STARTING_BALANCE;
+        uint256 _totalShares = 10000;
+
+        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
+            _currentTime += _timeElapsed[i];
+            vm.warp(_currentTime);
+
+            _totalAssets += _gain[i];
+            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares);
+
+            assertLe(_toBurn, _totalShares);
+
+            _totalShares += _toMint;
+            _totalShares -= _toBurn;
+
+            uint256 _depositShares = uint256(_deposit[i]).mulDiv(_totalShares, _totalAssets);
+            _totalAssets += _deposit[i];
+            _totalShares += _depositShares;
+            buffer.assetsCached += _deposit[i];
+
+            uint256 _withdrawShares = uint256(_withdraw[i]).mulDiv(_totalShares, _totalAssets);
+            vm.assume(_withdrawShares < _totalShares - buffer.bufferedShares);
+            _totalAssets -= _withdraw[i];
+            _totalShares -= _withdrawShares;
+            buffer.assetsCached -= _withdraw[i];
         }
     }
 }
