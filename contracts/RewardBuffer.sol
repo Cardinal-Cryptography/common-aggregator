@@ -47,6 +47,42 @@ library RewardBuffer {
         internal
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
+        Buffer memory memBuf = _toMemory(buffer);
+        (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, totalAssets, totalShares);
+        _toStorage(memBuf, buffer);
+    }
+
+    /// @dev Simulates buffer update, returning the memory representation of an updated buffer.
+    function _simulateBufferUpdate(Buffer storage buffer, uint256 totalAssets, uint256 totalShares)
+        internal
+        view
+        returns (Buffer memory updatedBuffer, uint256 sharesToMint, uint256 sharesToBurn)
+    {
+        updatedBuffer = _toMemory(buffer);
+        (sharesToMint, sharesToBurn) = __updateBuffer(updatedBuffer, totalAssets, totalShares);
+    }
+
+    /// @dev Creates a `memory` copy of a buffer.
+    function _toMemory(Buffer storage buffer) internal view returns (Buffer memory memBuffer) {
+        memBuffer.assetsCached = buffer.assetsCached;
+        memBuffer.bufferedShares = buffer.bufferedShares;
+        memBuffer.lastUpdate = buffer.lastUpdate;
+        memBuffer.currentBufferEnd = buffer.currentBufferEnd;
+    }
+
+    /// @dev Copies `memory` buffer into storage.
+    function _toStorage(Buffer memory buffer, Buffer storage storageBuffer) internal {
+        storageBuffer.assetsCached = buffer.assetsCached;
+        storageBuffer.bufferedShares = buffer.bufferedShares;
+        storageBuffer.lastUpdate = buffer.lastUpdate;
+        storageBuffer.currentBufferEnd = buffer.currentBufferEnd;
+    }
+
+    function __updateBuffer(Buffer memory buffer, uint256 totalAssets, uint256 totalShares)
+        private
+        view
+        returns (uint256 sharesToMint, uint256 sharesToBurn)
+    {
         if (buffer.assetsCached == 0) revert AssetsCachedIsZero();
 
         // -- Rewards unlock --
@@ -76,7 +112,7 @@ library RewardBuffer {
 
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
     /// Use it to implement `totalSupply()`.
-    function _sharesToRelease(Buffer storage buffer) internal view returns (uint256 sharesReleased) {
+    function _sharesToRelease(Buffer memory buffer) internal view returns (uint256 sharesReleased) {
         uint256 timestampNow = block.timestamp;
         uint256 start = buffer.lastUpdate;
         uint256 end = buffer.currentBufferEnd;
@@ -96,7 +132,7 @@ library RewardBuffer {
         }
     }
 
-    function _handleGain(Buffer storage buffer, uint256 totalShares, uint256 totalAssets)
+    function _handleGain(Buffer memory buffer, uint256 totalShares, uint256 totalAssets)
         private
         view
         returns (uint256 sharesToMint, uint256 newBufferEnd)
@@ -112,9 +148,9 @@ library RewardBuffer {
         newBufferEnd = _weightedAvg(buffer.currentBufferEnd, buffer.bufferedShares, newUnlockEnd, sharesToMint);
     }
 
-    function _handleLoss(Buffer storage buffer, uint256 totalShares, uint256 totalAssets)
+    function _handleLoss(Buffer memory buffer, uint256 totalShares, uint256 totalAssets)
         private
-        view
+        pure
         returns (uint256 sharesToBurn)
     {
         uint256 loss = _checkedSub(buffer.assetsCached, totalAssets, 11);
