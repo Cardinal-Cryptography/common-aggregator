@@ -28,6 +28,18 @@ library RewardBuffer {
         uint256 currentBufferEnd;
     }
 
+    /// @dev Increases the buffer's `assetsCached` field.
+    /// Used when deposit or mint has been made to the vault.
+    function _increaseAssets(Buffer storage buffer, uint256 assets) internal {
+        buffer.assetsCached += assets;
+    }
+
+    /// @dev Increases the buffer's `assetsCached` field.
+    /// Used when withdrawal or redemption has been made to the vault.
+    function _decreaseAssets(Buffer storage buffer, uint256 assets) internal {
+        buffer.assetsCached -= assets;
+    }
+
     function _newBuffer(uint256 initialAssets) internal view returns (Buffer memory buffer) {
         if (initialAssets == 0) revert AssetsCachedIsZero();
         return Buffer(initialAssets, 0, block.timestamp, block.timestamp);

@@ -6,12 +6,11 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20, ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
 import {
     IERC4626,
     ERC4626Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "./RewardBuffer.sol";
 
 contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUpgradeable, ERC4626Upgradeable {
@@ -103,29 +102,41 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     /// @inheritdoc IERC4626
     /// @notice Updates holdings state before depositing.
-    function deposit(uint256 amount, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function deposit(uint256 assets, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
         updateHoldingsState();
-        uint256 result = super.deposit(amount, account);
+        uint256 shares = super.deposit(assets, account);
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        $.rewardBuffer._increaseAssets(assets);
+
         updateHoldingsState();
-        return result;
+        return shares;
     }
 
     function mint(uint256 shares, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
         updateHoldingsState();
-        uint256 result = super.mint(shares, account);
+        uint256 assets = super.mint(shares, account);
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        $.rewardBuffer._increaseAssets(assets);
+
         updateHoldingsState();
-        return result;
+        return assets;
     }
 
-    function withdraw(uint256 amount, address account, address owner)
+    function withdraw(uint256 assets, address account, address owner)
         public
         override(ERC4626Upgradeable, IERC4626)
         returns (uint256)
     {
         updateHoldingsState();
-        uint256 result = super.withdraw(amount, account, owner);
+        uint256 shares = super.withdraw(assets, account, owner);
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        $.rewardBuffer._decreaseAssets(assets);
+
         updateHoldingsState();
-        return result;
+        return shares;
     }
 
     function redeem(uint256 shares, address account, address owner)
@@ -134,9 +145,13 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         returns (uint256)
     {
         updateHoldingsState();
-        uint256 result = super.redeem(shares, account, owner);
+        uint256 assets = super.redeem(shares, account, owner);
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        $.rewardBuffer._decreaseAssets(assets);
+
         updateHoldingsState();
-        return result;
+        return assets;
     }
 
     // ----- Reporting -----
@@ -153,7 +168,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
             //Instantly unlock all rewards.
             $.rewardBuffer = RewardBuffer._newBuffer(newAssets);
         } else {
-            (uint256 sharesToBurn, uint256 sharesToMint) = $.rewardBuffer._updateBuffer(newAssets, totalSupply());
+            (uint256 sharesToMint, uint256 sharesToBurn) = $.rewardBuffer._updateBuffer(newAssets, totalSupply());
             if (sharesToMint > 0) {
                 _mint(address(this), sharesToMint);
             }
@@ -198,7 +213,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     /// @inheritdoc ICommonAggregator
     function setProtocolFee(uint256 protocolFeeBps) external onlyRole(OWNER) {
-        require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, "CommonAggregator: protocol fee too high");
+        require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 oldProtocolFee = $.protocolFeeBps;
@@ -224,5 +239,5 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         _disableInitializers();
     }
 
-    function _authorizeUpgrade(address _newImplementation) internal override onlyRole(OWNER) {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER) {}
 }
