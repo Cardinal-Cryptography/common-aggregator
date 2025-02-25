@@ -42,24 +42,24 @@ contract RewardBufferTest is Test {
         assertEq(buffer._getAssetsCached(), 20);
     }
 
-    function testSharesBurndAfterBufferUpdate() public {
+    function testSharesBurntAfterBufferUpdate() public {
         buffer._updateBuffer(20, 100);
         assertEq(buffer._sharesToBurn(), 0);
     }
 
-    function testSharesBurndAfterBufferUpdateAndTimeElapsed() public {
+    function testSharesBurntAfterBufferUpdateAndTimeElapsed() public {
         buffer._updateBuffer(20, 100);
         vm.warp(STARTING_TIMESTAMP + 2 days);
         assertEq(buffer._sharesToBurn(), 10);
     }
 
-    function testSharesBurndAfterBufferUpdateAndTimeElapsed2() public {
+    function testSharesBurntAfterBufferUpdateAndTimeElapsed2() public {
         buffer._updateBuffer(17, 100);
         vm.warp(STARTING_TIMESTAMP + 7 days);
         assertEq(buffer._sharesToBurn(), 24);
     }
 
-    function testSharesBurndAfterFullPeriodHasPassed() public {
+    function testSharesBurntAfterFullPeriodHasPassed() public {
         buffer._updateBuffer(15, 100);
         vm.warp(STARTING_TIMESTAMP + 20 days);
         assertEq(buffer._sharesToBurn(), 50);
