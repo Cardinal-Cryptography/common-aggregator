@@ -80,42 +80,38 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     // ----- ERC4626 -----
 
-    function deposit(uint256 _amount, address _account)
+    function deposit(uint256 amount, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        updateHoldingsState();
+        uint256 result = super.deposit(amount, account);
+        updateHoldingsState();
+        return result;
+    }
+
+    function mint(uint256 shares, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        updateHoldingsState();
+        uint256 result = super.mint(shares, account);
+        updateHoldingsState();
+        return result;
+    }
+
+    function withdraw(uint256 amount, address account, address owner)
         public
         override(ERC4626Upgradeable, IERC4626)
         returns (uint256)
     {
         updateHoldingsState();
-        uint256 result = super.deposit(_amount, _account);
+        uint256 result = super.withdraw(amount, account, owner);
         updateHoldingsState();
         return result;
     }
 
-    function mint(uint256 _shares, address _account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        updateHoldingsState();
-        uint256 result = super.mint(_shares, _account);
-        updateHoldingsState();
-        return result;
-    }
-
-    function withdraw(uint256 _amount, address _account, address _owner)
+    function redeem(uint256 shares, address account, address owner)
         public
         override(ERC4626Upgradeable, IERC4626)
         returns (uint256)
     {
         updateHoldingsState();
-        uint256 result = super.withdraw(_amount, _account, _owner);
-        updateHoldingsState();
-        return result;
-    }
-
-    function redeem(uint256 _shares, address _account, address _owner)
-        public
-        override(ERC4626Upgradeable, IERC4626)
-        returns (uint256)
-    {
-        updateHoldingsState();
-        uint256 result = super.redeem(_shares, _account, _owner);
+        uint256 result = super.redeem(shares, account, owner);
         updateHoldingsState();
         return result;
     }
