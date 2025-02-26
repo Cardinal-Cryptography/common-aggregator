@@ -241,6 +241,12 @@ contract CommonAggregatorTest is Test {
         assertEq(commonAggregator.maxWithdraw(owner), ownerInitialEarning);
         assertEq(commonAggregator.maxWithdraw(alice), aliceInitialBalance);
 
+        // Protocol fee increases, but until new gain is reported, nothing changes.
+        vm.warp(STARTING_TIMESTAMP + 10 days);
+        vm.prank(owner);
+        commonAggregator.setProtocolFee(200);
+        commonAggregator.updateHoldingsState();
+
         vm.warp(STARTING_TIMESTAMP + 25 days);
         commonAggregator.updateHoldingsState();
 
@@ -254,5 +260,11 @@ contract CommonAggregatorTest is Test {
             commonAggregator.maxWithdraw(alice),
             aliceInitialBalance + airdropped - commonAggregator.maxWithdraw(owner) - 1
         );
+
+        // New airdrop, fee increases
+        uint256 ownerWithdrawalBefore = commonAggregator.maxWithdraw(owner);
+        asset.mint(address(commonAggregator), airdropped);
+        commonAggregator.updateHoldingsState();
+        assertEq(commonAggregator.maxWithdraw(owner) - ownerWithdrawalBefore, airdropped / 50);
     }
 }
