@@ -267,4 +267,58 @@ contract CommonAggregatorTest is Test {
         commonAggregator.updateHoldingsState();
         assertEq(commonAggregator.maxWithdraw(owner) - ownerWithdrawalBefore, airdropped / 50);
     }
+
+    function testSmallLossNoProtocolFee() public {
+        asset.mint(alice, 1000);
+        asset.mint(bob, 500);
+
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 1000);
+        vm.prank(alice);
+        commonAggregator.deposit(1000, alice);
+
+        vm.prank(bob);
+        asset.approve(address(commonAggregator), 500);
+        vm.prank(bob);
+        commonAggregator.deposit(500, bob);
+
+        // Gain 20%
+        asset.mint(address(commonAggregator), 300);
+        commonAggregator.updateHoldingsState();
+
+        // But then lose 10%. Should be taken from the buffer only
+        asset.burn(address(commonAggregator), 180);
+        commonAggregator.updateHoldingsState();
+
+        assertEq(commonAggregator.totalAssets(), 1800 * 9 / 10);
+        assertEq(commonAggregator.maxWithdraw(alice), 1000);
+        assertEq(commonAggregator.maxWithdraw(bob), 500);
+    }
+
+    function testLargeLossNoProtocolFee() public {
+        asset.mint(alice, 1000);
+        asset.mint(bob, 500);
+
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 1000);
+        vm.prank(alice);
+        commonAggregator.deposit(1000, alice);
+
+        vm.prank(bob);
+        asset.approve(address(commonAggregator), 500);
+        vm.prank(bob);
+        commonAggregator.deposit(500, bob);
+
+        // Gain 20%
+        asset.mint(address(commonAggregator), 300);
+        commonAggregator.updateHoldingsState();
+
+        // But then lose 75%
+        asset.burn(address(commonAggregator), 1800 * 3 / 4);
+        commonAggregator.updateHoldingsState();
+
+        assertEq(commonAggregator.totalAssets(), 450);
+        assertEq(commonAggregator.maxWithdraw(alice), 300);
+        assertEq(commonAggregator.maxWithdraw(bob), 150);
+    }
 }
