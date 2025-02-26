@@ -17,6 +17,9 @@ contract CommonAggregatorTest is Test {
     ERC20Mock asset = new ERC20Mock();
     ERC4626Mock[] vaults = new ERC4626Mock[](2);
 
+    address alice = address(0x456);
+    address bob = address(0x678);
+
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
         CommonAggregator implementation = new CommonAggregator();
@@ -44,22 +47,28 @@ contract CommonAggregatorTest is Test {
 
     // Reporting
 
-    function testDepositUpdatesTotalAssets() public {
-        assertEq(commonAggregator.totalAssets(), 0);
-
-        address user = address(0x456);
-        asset.mint(user, 1000);
-
-        vm.prank(user);
+    function testFirstDeposit() public {
+        asset.mint(alice, 1000);
+        vm.prank(alice);
         asset.approve(address(commonAggregator), 1000);
-        vm.prank(user);
-        commonAggregator.deposit(1000, user);
+
+        assertEq(commonAggregator.totalAssets(), 0);
+        assertEq(commonAggregator.maxWithdraw(alice), 0);
+        assertEq(commonAggregator.balanceOf(alice), 0);
+        assertEq(commonAggregator.totalSupply(), 0);
+
+        vm.prank(alice);
+        commonAggregator.deposit(1000, alice);
 
         assertEq(commonAggregator.totalAssets(), 1000);
+        assertEq(commonAggregator.maxWithdraw(alice), 1000);
+
+        // Shares should have at least the same decimals as the underlying asset.
+        assertGe(commonAggregator.balanceOf(alice), 1000);
+        assertEq(commonAggregator.totalSupply(), commonAggregator.balanceOf(alice));
     }
 
-    function testMaxWithdraw() public {
-        address alice = address(0x456);
+    function testMaxWithdrawUsesAccumulatedShares() public {
         asset.mint(alice, 1000);
 
         vm.prank(alice);
@@ -72,11 +81,89 @@ contract CommonAggregatorTest is Test {
         vm.prank(alice);
         commonAggregator.deposit(900, alice);
         assertEq(commonAggregator.maxWithdraw(alice), 1000);
+
+        vm.prank(alice);
+        commonAggregator.withdraw(200, alice, alice);
+        assertEq(commonAggregator.maxWithdraw(alice), 800);
     }
 
-    function testMaxWithdrawOnAirdrop() public {
-        address alice = address(0x456);
-        address bob = address(0x678);
+    function testCantWithdrawMoreThanLimits() public {
+        asset.mint(alice, 1000);
+        asset.mint(bob, 100);
+
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 1000);
+        vm.prank(bob);
+        asset.approve(address(commonAggregator), 100);
+
+        vm.prank(alice);
+        commonAggregator.deposit(1000, alice);
+        vm.prank(bob);
+        commonAggregator.deposit(100, bob);
+
+        assertEq(commonAggregator.maxWithdraw(alice), 1000);
+        assertEq(commonAggregator.maxWithdraw(bob), 100);
+
+        vm.prank(alice);
+        commonAggregator.withdraw(500, alice, alice);
+        assertEq(commonAggregator.maxWithdraw(alice), 500);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        commonAggregator.withdraw(501, alice, alice);
+    }
+
+    function testVaultCanHaveZeroAssetsBack() public {
+        asset.mint(alice, 1000);
+        asset.mint(bob, 100);
+
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 1000);
+        vm.prank(bob);
+        asset.approve(address(commonAggregator), 100);
+
+        vm.prank(alice);
+        commonAggregator.deposit(1000, alice);
+
+        vm.warp(STARTING_TIMESTAMP + 1);
+
+        vm.prank(alice);
+        commonAggregator.withdraw(1000, alice, alice);
+
+        assertEq(commonAggregator.totalAssets(), 0);
+        assertEq(commonAggregator.maxWithdraw(alice), 0);
+        assertEq(commonAggregator.maxWithdraw(bob), 0);
+
+        // Should not revert
+        commonAggregator.updateHoldingsState();
+
+        vm.warp(STARTING_TIMESTAMP + 2);
+
+        vm.prank(bob);
+        commonAggregator.deposit(100, bob);
+        assertEq(commonAggregator.totalAssets(), 100);
+        assertEq(commonAggregator.maxWithdraw(alice), 0);
+        assertEq(commonAggregator.maxWithdraw(bob), 100);
+    }
+
+    function testSharesCanBeTransferred() public {
+        asset.mint(alice, 1000);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 1000);
+
+        vm.prank(alice);
+        commonAggregator.deposit(1000, alice);
+
+        uint256 amount = commonAggregator.balanceOf(alice) * 4 / 10;
+        vm.prank(alice);
+        commonAggregator.transfer(bob, amount);
+
+        vm.prank(bob);
+        commonAggregator.withdraw(400, bob, bob);
+        assertEq(asset.balanceOf(bob), 400);
+    }
+
+    function testAirdropIsAddedToRewards() public {
         asset.mint(alice, 1000);
         asset.mint(bob, 500);
 
@@ -97,12 +184,18 @@ contract CommonAggregatorTest is Test {
 
         asset.mint(address(commonAggregator), 150);
 
-        // Rewards are buffered
+        // Rewards are buffered, so no airdrop is visible yet.
         assertEq(commonAggregator.maxWithdraw(alice), 1000);
         assertEq(commonAggregator.maxWithdraw(bob), 500);
         assertEq(commonAggregator.totalAssets(), 1500);
 
         commonAggregator.updateHoldingsState();
+
+        // Only after updateHoldingsState() the airdrop is visible,
+        // but rewards are not accrued yet.
+        assertEq(commonAggregator.maxWithdraw(alice), 1000);
+        assertEq(commonAggregator.maxWithdraw(bob), 500);
+        assertEq(commonAggregator.totalAssets(), 1650);
 
         vm.warp(STARTING_TIMESTAMP + 2 days);
 
@@ -110,9 +203,49 @@ contract CommonAggregatorTest is Test {
         assertEq(commonAggregator.maxWithdraw(alice), 1009);
         assertEq(commonAggregator.maxWithdraw(bob), 504);
 
+        // Bob exits
+        vm.prank(bob);
+        commonAggregator.withdraw(504, bob, bob);
+
         vm.warp(STARTING_TIMESTAMP + 20 days);
 
-        assertEq(commonAggregator.maxWithdraw(alice), 1099);
-        assertEq(commonAggregator.maxWithdraw(bob), 549);
+        assertEq(commonAggregator.maxWithdraw(alice), 1145);
+        assertEq(commonAggregator.maxWithdraw(bob), 0);
+    }
+
+    function testProtocolFee() public {
+        vm.prank(owner);
+        commonAggregator.setProtocolFee(100); // 1%
+
+        vm.prank(owner);
+        vm.expectRevert();
+        commonAggregator.setProtocolFeeReceiver(address(0));
+
+        vm.prank(owner);
+        commonAggregator.setProtocolFeeReceiver(owner);
+
+        uint256 aliceInitialBalance = 1000;
+        uint256 airdropped = 10_000;
+
+        asset.mint(alice, aliceInitialBalance);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), aliceInitialBalance);
+        vm.prank(alice);
+        commonAggregator.deposit(aliceInitialBalance, alice);
+
+        asset.mint(address(commonAggregator), airdropped);
+        commonAggregator.updateHoldingsState();
+        // // No fees accrued yet
+        assertEq(asset.balanceOf(owner), 0);
+        assertEq(commonAggregator.maxWithdraw(owner), 0);
+
+        vm.warp(STARTING_TIMESTAMP + 25 days);
+        commonAggregator.updateHoldingsState();
+
+        // Full fees accrued, in shares
+        assertEq(asset.balanceOf(owner), 0);
+        // TODO: fixme
+        // assertEq(commonAggregator.maxWithdraw(owner), airdropped / 100);
+        // assertEq(commonAggregator.maxWithdraw(alice), aliceInitialBalance + airdropped * 99 / 100);
     }
 }

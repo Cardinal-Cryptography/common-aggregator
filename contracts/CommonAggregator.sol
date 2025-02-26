@@ -63,7 +63,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         }
 
         $.protocolFeeBps = 0;
-        $.protocolFeeReceiver = address(0);
+        $.protocolFeeReceiver = address(1);
     }
 
     function _ensureVaultCanBeAdded(IERC4626 vault) private view {
@@ -78,6 +78,10 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     }
 
     // ----- ERC4626 -----
+
+    function _decimalsOffset() internal pure override returns (uint8) {
+        return 4;
+    }
 
     /// @inheritdoc IERC4626
     /// @notice Returns cached assets from the last holdings state update.
@@ -156,17 +160,17 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     // ----- Reporting -----
 
+    /// @notice Updates holdinds state, by reporting on every vault how many assets it has.
+    /// Profits are smoothed out by the reward buffer, and ditributed to the holders.
+    /// Protocol fee is taken from the profits. Potential losses are first covered by the buffer.
     function updateHoldingsState() public override {
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 oldCachedAssets = $.rewardBuffer._getAssetsCached();
         uint256 newAssets = _totalAssetsNotCached();
 
         if (oldCachedAssets == 0) {
-            if (newAssets == 0) {
-                return;
-            }
-            //Instantly unlock all rewards.
-            $.rewardBuffer = RewardBuffer._newBuffer(newAssets);
+            // We have to wait for the deposit to happen
+            return;
         } else {
             (uint256 sharesToMint, uint256 sharesToBurn) = $.rewardBuffer._updateBuffer(newAssets, totalSupply());
             if (sharesToMint > 0) {
@@ -175,7 +179,9 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
             if (sharesToBurn > 0) {
                 uint256 protocolFeeShares = sharesToBurn.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
                 _burn(address(this), sharesToBurn - protocolFeeShares);
-                _transfer(address(this), $.protocolFeeReceiver, protocolFeeShares);
+                if (protocolFeeShares > 0) {
+                    _transfer(address(this), $.protocolFeeReceiver, protocolFeeShares);
+                }
             }
         }
 
@@ -226,6 +232,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     /// @inheritdoc ICommonAggregator
     function setProtocolFeeReceiver(address protocolFeeReceiver) external onlyRole(OWNER) {
         require(protocolFeeReceiver != address(this), "CommonAggregator: self protocol fee receiver");
+        require(protocolFeeReceiver != address(0), "CommonAggregator: address(0) protocol fee receiver");
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         address oldProtocolFeeReceiver = $.protocolFeeReceiver;
