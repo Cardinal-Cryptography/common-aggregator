@@ -113,7 +113,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.rewardBuffer._increaseAssets(assets);
 
-        updateHoldingsState();
         return shares;
     }
 
@@ -124,7 +123,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.rewardBuffer._increaseAssets(assets);
 
-        updateHoldingsState();
         return assets;
     }
 
@@ -139,7 +137,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.rewardBuffer._decreaseAssets(assets);
 
-        updateHoldingsState();
         return shares;
     }
 
@@ -154,7 +151,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.rewardBuffer._decreaseAssets(assets);
 
-        updateHoldingsState();
         return assets;
     }
 
@@ -172,16 +168,15 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
             // We have to wait for the deposit to happen
             return;
         } else {
-            (uint256 sharesToMint, uint256 sharesToBurn) = $.rewardBuffer._updateBuffer(newAssets, totalSupply());
+            (uint256 sharesToMint, uint256 sharesToBurn) =
+                $.rewardBuffer._updateBuffer(newAssets, totalSupply(), $.protocolFeeBps);
             if (sharesToMint > 0) {
-                _mint(address(this), sharesToMint);
+                uint256 feePartOfMintedShares = (sharesToMint * $.protocolFeeBps).ceilDiv(MAX_BPS);
+                _mint(address(this), sharesToMint - feePartOfMintedShares);
+                _mint($.protocolFeeReceiver, feePartOfMintedShares);
             }
             if (sharesToBurn > 0) {
-                uint256 protocolFeeShares = sharesToBurn.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
-                _burn(address(this), sharesToBurn - protocolFeeShares);
-                if (protocolFeeShares > 0) {
-                    _transfer(address(this), $.protocolFeeReceiver, protocolFeeShares);
-                }
+                _burn(address(this), sharesToBurn);
             }
         }
 
@@ -198,9 +193,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
             return (newTotalAssets, totalSupply());
         }
         (, uint256 sharesToMint, uint256 sharesToBurn) =
-            $.rewardBuffer._simulateBufferUpdate(newTotalAssets, totalSupply());
-        uint256 protocolFeeShares = sharesToBurn.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
-        return (newTotalAssets, totalSupply() + sharesToMint - sharesToBurn + protocolFeeShares);
+            $.rewardBuffer._simulateBufferUpdate(newTotalAssets, totalSupply(), $.protocolFeeBps);
+        return (newTotalAssets, totalSupply() + sharesToMint - sharesToBurn);
     }
 
     function _totalAssetsNotCached() internal view returns (uint256) {

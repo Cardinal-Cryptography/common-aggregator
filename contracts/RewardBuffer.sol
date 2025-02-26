@@ -55,23 +55,27 @@ library RewardBuffer {
     ///
     /// Alternatively (or additionally), it may be called by an off-chain component at times
     /// when difference between `assetsCached` and `totalAssets()` becomes significant.
-    function _updateBuffer(Buffer storage buffer, uint256 totalAssets, uint256 totalShares)
+    /// @return sharesToMint Amount of shares to mint to account for new rewards, and protocol fee.
+    /// (sharesToMint * feeBps).ceilDiv(10000) of these shares should be minted to the protocol fee receiver,
+    /// and the rest to the aggergator.
+    /// @return sharesToBurn Amount of shares to burn to account for rewards that have been released.
+    function _updateBuffer(Buffer storage buffer, uint256 totalAssets, uint256 totalShares, uint256 feeBps)
         internal
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
         Buffer memory memBuf = _toMemory(buffer);
-        (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, totalAssets, totalShares);
+        (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, totalAssets, totalShares, feeBps);
         _toStorage(memBuf, buffer);
     }
 
     /// @dev Simulates buffer update, returning the memory representation of an updated buffer.
-    function _simulateBufferUpdate(Buffer storage buffer, uint256 totalAssets, uint256 totalShares)
+    function _simulateBufferUpdate(Buffer storage buffer, uint256 totalAssets, uint256 totalShares, uint256 feeBps)
         internal
         view
         returns (Buffer memory updatedBuffer, uint256 sharesToMint, uint256 sharesToBurn)
     {
         updatedBuffer = _toMemory(buffer);
-        (sharesToMint, sharesToBurn) = __updateBuffer(updatedBuffer, totalAssets, totalShares);
+        (sharesToMint, sharesToBurn) = __updateBuffer(updatedBuffer, totalAssets, totalShares, feeBps);
     }
 
     /// @dev Creates a `memory` copy of a buffer.
@@ -90,7 +94,7 @@ library RewardBuffer {
         storageBuffer.currentBufferEnd = buffer.currentBufferEnd;
     }
 
-    function __updateBuffer(Buffer memory buffer, uint256 totalAssets, uint256 totalShares)
+    function __updateBuffer(Buffer memory buffer, uint256 totalAssets, uint256 totalShares, uint256 feeBps)
         private
         view
         returns (uint256 sharesToMint, uint256 sharesToBurn)
@@ -118,6 +122,9 @@ library RewardBuffer {
         uint256 cancelledOut = sharesToBurn.min(sharesToMint);
         sharesToBurn = _checkedSub(sharesToBurn, cancelledOut, 5);
         sharesToMint = _checkedSub(sharesToMint, cancelledOut, 6);
+        if (sharesToMint > 0) {
+            buffer.bufferedShares -= (sharesToMint * feeBps).ceilDiv(10000);
+        }
 
         buffer.assetsCached = totalAssets;
     }

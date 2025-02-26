@@ -63,8 +63,8 @@ contract CommonAggregatorTest is Test {
         assertEq(commonAggregator.totalAssets(), 1000);
         assertEq(commonAggregator.maxWithdraw(alice), 1000);
 
-        // Shares should have at least the same decimals as the underlying asset.
-        assertGe(commonAggregator.balanceOf(alice), 1000);
+        // Shares should have 4 more decimals than the asset
+        assertEq(commonAggregator.balanceOf(alice), 1000 * 10000);
         assertEq(commonAggregator.totalSupply(), commonAggregator.balanceOf(alice));
     }
 
@@ -224,7 +224,7 @@ contract CommonAggregatorTest is Test {
         vm.prank(owner);
         commonAggregator.setProtocolFeeReceiver(owner);
 
-        uint256 aliceInitialBalance = 1000;
+        uint256 aliceInitialBalance = 100_000;
         uint256 airdropped = 10_000;
 
         asset.mint(alice, aliceInitialBalance);
@@ -235,17 +235,24 @@ contract CommonAggregatorTest is Test {
 
         asset.mint(address(commonAggregator), airdropped);
         commonAggregator.updateHoldingsState();
-        // // No fees accrued yet
+
         assertEq(asset.balanceOf(owner), 0);
-        assertEq(commonAggregator.maxWithdraw(owner), 0);
+        uint256 ownerInitialEarning = airdropped / 100; // Protocol earns 1 %
+        assertEq(commonAggregator.maxWithdraw(owner), ownerInitialEarning);
+        assertEq(commonAggregator.maxWithdraw(alice), aliceInitialBalance);
 
         vm.warp(STARTING_TIMESTAMP + 25 days);
         commonAggregator.updateHoldingsState();
 
-        // Full fees accrued, in shares
         assertEq(asset.balanceOf(owner), 0);
-        // TODO: fixme
-        // assertEq(commonAggregator.maxWithdraw(owner), airdropped / 100);
-        // assertEq(commonAggregator.maxWithdraw(alice), aliceInitialBalance + airdropped * 99 / 100);
+        assertEq(commonAggregator.totalAssets(), aliceInitialBalance + airdropped);
+        assertEq(
+            commonAggregator.maxWithdraw(owner),
+            ownerInitialEarning + ownerInitialEarning * airdropped / (aliceInitialBalance + airdropped)
+        );
+        assertEq(
+            commonAggregator.maxWithdraw(alice),
+            aliceInitialBalance + airdropped - commonAggregator.maxWithdraw(owner) - 1
+        );
     }
 }

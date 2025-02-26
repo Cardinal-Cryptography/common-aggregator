@@ -25,7 +25,7 @@ contract RewardBufferTest is Test {
     }
 
     function testCachedAssetsAfterBufferUpdate() public {
-        buffer._updateBuffer(20, 200);
+        buffer._updateBuffer(20, 200, 0);
         assertEq(buffer._getAssetsCached(), 20);
     }
 
@@ -33,80 +33,80 @@ contract RewardBufferTest is Test {
     function testUpdateRevertsWhenZeroStartingAssets() public {
         buffer.assetsCached = 0;
         vm.expectRevert(RewardBuffer.AssetsCachedIsZero.selector);
-        buffer._updateBuffer(20, 1000);
+        buffer._updateBuffer(20, 1000, 0);
     }
 
     function testCachedAssetsAfterBufferUpdateAndTimeElapsed() public {
-        buffer._updateBuffer(20, 200);
+        buffer._updateBuffer(20, 200, 0);
         vm.warp(STARTING_TIMESTAMP + 10 days);
         assertEq(buffer._getAssetsCached(), 20);
     }
 
     function testSharesBurntAfterBufferUpdate() public {
-        buffer._updateBuffer(20, 100);
+        buffer._updateBuffer(20, 100, 0);
         assertEq(buffer._sharesToBurn(), 0);
     }
 
     function testSharesBurntAfterBufferUpdateAndTimeElapsed() public {
-        buffer._updateBuffer(20, 100);
+        buffer._updateBuffer(20, 100, 0);
         vm.warp(STARTING_TIMESTAMP + 2 days);
         assertEq(buffer._sharesToBurn(), 10);
     }
 
     function testSharesBurntAfterBufferUpdateAndTimeElapsed2() public {
-        buffer._updateBuffer(17, 100);
+        buffer._updateBuffer(17, 100, 0);
         vm.warp(STARTING_TIMESTAMP + 7 days);
         assertEq(buffer._sharesToBurn(), 24);
     }
 
     function testSharesBurntAfterFullPeriodHasPassed() public {
-        buffer._updateBuffer(15, 100);
+        buffer._updateBuffer(15, 100, 0);
         vm.warp(STARTING_TIMESTAMP + 20 days);
         assertEq(buffer._sharesToBurn(), 50);
     }
 
     function testBufferUpdateResultOnGain() public {
-        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(12, 100);
+        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(12, 100, 0);
         assertEq(_toMint, 20);
         assertEq(_toBurn, 0);
     }
 
     function testBufferUpdateResultOnLoss() public {
-        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(4, 100);
+        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(4, 100, 0);
         assertEq(_toMint, 0);
         assertEq(_toBurn, 0);
     }
 
     function testBufferUpdateResultOnLoss2() public {
-        buffer._updateBuffer(100, 100);
-        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(70, 1000);
+        buffer._updateBuffer(100, 100, 0);
+        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(70, 1000, 0);
         assertEq(_toMint, 0);
         assertEq(_toBurn, 300);
     }
 
     function testBufferEndFirstUpdate() public {
-        buffer._updateBuffer(100, 100);
+        buffer._updateBuffer(100, 100, 0);
         assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 20 days);
     }
 
     function testBufferEndSecondUpdateOldActive() public {
-        buffer._updateBuffer(20, 100);
+        buffer._updateBuffer(20, 100, 0);
         vm.warp(STARTING_TIMESTAMP + 4 days);
-        buffer._updateBuffer(40, 200);
+        buffer._updateBuffer(40, 200, 0);
 
         assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 4 days + uint256((16 days * 2 + 20 days * 5)) / 7);
     }
 
     function testBufferEndSecondUpdateElapsed() public {
-        buffer._updateBuffer(20, 100);
+        buffer._updateBuffer(20, 100, 0);
         vm.warp(STARTING_TIMESTAMP + 40 days);
-        buffer._updateBuffer(40, 200);
+        buffer._updateBuffer(40, 200, 0);
 
         assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 40 days + 20 days);
     }
 
     function testBigNumbers() public {
-        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(10 + (1 << 120), (1 << 5));
+        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(10 + (1 << 120), (1 << 5), 0);
         assertEq(_toMint, uint256(1 << 125) / 10);
         assertEq(_toBurn, 0);
     }
@@ -126,7 +126,7 @@ contract RewardBufferTest is Test {
             vm.warp(_currentTime);
 
             _totalAssets += _gain[i];
-            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares);
+            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares, 0);
 
             assertLe(_toBurn, _totalShares);
 
@@ -153,7 +153,7 @@ contract RewardBufferTest is Test {
             vm.warp(_currentTime);
 
             _totalAssets += _gain[i];
-            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares);
+            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares, 0);
 
             assertLe(_toBurn, _totalShares);
 
@@ -188,7 +188,7 @@ contract RewardBufferTest is Test {
             vm.warp(_currentTime);
 
             _totalAssets += _gain[i];
-            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares);
+            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares, 0);
 
             assertLe(_toBurn, _totalShares);
 
@@ -212,7 +212,7 @@ contract RewardBufferTest is Test {
             vm.warp(_currentTime);
 
             _totalAssets += _gain[i];
-            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares);
+            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares, 0);
 
             assertLe(_toBurn, _totalShares);
 
