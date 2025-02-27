@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {weightedAvg, MAX_BPS} from "./Math.sol";
 
 /// @title Buffer structure implementation for gradual reward release.
 /// Intended for usage within ERC-4626 vault implementations.
@@ -56,8 +57,8 @@ library RewardBuffer {
     /// Alternatively (or additionally), it may be called by an off-chain component at times
     /// when difference between `assetsCached` and `totalAssets()` becomes significant.
     /// @return sharesToMint Amount of shares to mint to account for new rewards, and protocol fee.
-    /// (sharesToMint * feeBps).ceilDiv(10000) of these shares should be minted to the protocol fee receiver,
-    /// and the rest to the aggergator.
+    /// Out of these shares, `sharesToMint.mulDiv(feeBps, 10_000, Math.Rounding.Ceil)` should be minted to
+    /// the fee receiver, and the rest to the aggergator.
     /// @return sharesToBurn Amount of shares to burn to account for rewards that have been released.
     function _updateBuffer(Buffer storage buffer, uint256 totalAssets, uint256 totalShares, uint256 feeBps)
         internal
@@ -68,13 +69,13 @@ library RewardBuffer {
         _toStorage(memBuf, buffer);
     }
 
-    /// @dev Simulates buffer update, returning the memory representation of an updated buffer.
+    /// @dev Simulates buffer update.
     function _simulateBufferUpdate(Buffer storage buffer, uint256 totalAssets, uint256 totalShares, uint256 feeBps)
         internal
         view
-        returns (Buffer memory updatedBuffer, uint256 sharesToMint, uint256 sharesToBurn)
+        returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
-        updatedBuffer = _toMemory(buffer);
+        Buffer memory updatedBuffer = _toMemory(buffer);
         (sharesToMint, sharesToBurn) = __updateBuffer(updatedBuffer, totalAssets, totalShares, feeBps);
     }
 
@@ -123,7 +124,7 @@ library RewardBuffer {
         sharesToBurn = _checkedSub(sharesToBurn, cancelledOut, 5);
         sharesToMint = _checkedSub(sharesToMint, cancelledOut, 6);
         if (sharesToMint > 0) {
-            buffer.bufferedShares -= (sharesToMint * feeBps).ceilDiv(10000);
+            buffer.bufferedShares -= sharesToMint.mulDiv(feeBps, MAX_BPS, Math.Rounding.Ceil);
         }
 
         buffer.assetsCached = totalAssets;
@@ -164,7 +165,7 @@ library RewardBuffer {
         }
 
         uint256 newUnlockEnd = _checkedAdd(block.timestamp, DEFAULT_BUFFERING_DURATION, 10);
-        newBufferEnd = _weightedAvg(buffer.currentBufferEnd, buffer.bufferedShares, newUnlockEnd, sharesToMint);
+        newBufferEnd = weightedAvg(buffer.currentBufferEnd, buffer.bufferedShares, newUnlockEnd, sharesToMint);
     }
 
     function _handleLoss(Buffer memory buffer, uint256 totalShares, uint256 totalAssets)
@@ -182,29 +183,6 @@ library RewardBuffer {
         // If we need to burn more than `buffer.bufferedShares` shares to retain price-per-share,
         // then it's impossible to cover that from the buffer, and sharp PPS drop is to be expected.
         sharesToBurn = lossInShares.min(buffer.bufferedShares);
-    }
-
-    function _weightedAvg(uint256 v1, uint256 w1, uint256 v2, uint256 w2) private pure returns (uint256 result) {
-        uint256 weightSum = _checkedAdd(w1, w2, 12);
-
-        (uint256 a, uint256 rA) = mulDivWithRest(v1, w1, weightSum);
-        (uint256 b, uint256 rB) = mulDivWithRest(v2, w2, weightSum);
-
-        result = _checkedAdd(a, b, 13);
-
-        if (_checkedSub(weightSum, rA, 14) <= rB) {
-            result = _checkedAdd(result, 1, 15);
-        }
-    }
-
-    /// @notice Computes a.mulDiv(b,c) and returns also the remainder.
-    function mulDivWithRest(uint256 a, uint256 b, uint256 c) private pure returns (uint256 result, uint256 rest) {
-        result = a.mulDiv(b, c);
-        unchecked {
-            uint256 x = a * b;
-            uint256 y = result * c;
-            rest = x - y;
-        }
     }
 
     function _checkedAdd(uint256 a, uint256 b, uint256 id) private pure returns (uint256 result) {

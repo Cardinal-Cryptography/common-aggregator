@@ -11,6 +11,7 @@ import {
     ERC4626Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {MAX_BPS} from "./Math.sol";
 import "./RewardBuffer.sol";
 
 contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUpgradeable, ERC4626Upgradeable {
@@ -23,8 +24,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
 
     uint256 public constant MAX_VAULTS = 5;
-    uint256 public constant MAX_BPS = 10000;
-    uint256 public constant MAX_PROTOCOL_FEE_BPS = 5000; // 50%
+    uint256 public constant MAX_PROTOCOL_FEE_BPS = MAX_BPS / 2;
 
     /// @custom:storage-location erc7201:common.storage.aggregator
     struct AggregatorStorage {
@@ -90,27 +90,31 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         return $.rewardBuffer._getAssetsCached();
     }
 
-    /// @dev Simulates holdings state update before conversion.
-    /// Handles `convertToAssets`, `previewRedeem`, and `previewMint`.
-    /// `maxWithdraw` is handled separately, as it must not overflow.
-    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState(true);
-        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), rounding);
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewDeposit(uint256 assets) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Floor);
     }
 
-    /// @dev Simulates holdings state update before conversion.
-    /// Handles `convertToShares`, `previewDeposit`, and `previewMint`.
-    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState(true);
-        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, rounding);
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
     }
 
-    /// @dev Simulates holdings state update before conversion in case there a loss is detected. In case of
-    /// gain, the function returns the cached state, resulting in slightly smaller withdrawable amount.
-    /// For exact amount, use `previewWithdraw`.
-    function maxWithdraw(address account) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState(false);
-        uint256 shares = balanceOf(account);
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewWithdraw(uint256 assets) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Ceil);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewRedeem(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
         return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Floor);
     }
 
@@ -181,7 +185,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
             (uint256 sharesToMint, uint256 sharesToBurn) =
                 $.rewardBuffer._updateBuffer(newAssets, totalSupply(), $.protocolFeeBps);
             if (sharesToMint > 0) {
-                uint256 feePartOfMintedShares = (sharesToMint * $.protocolFeeBps).ceilDiv(MAX_BPS);
+                uint256 feePartOfMintedShares = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
                 _mint(address(this), sharesToMint - feePartOfMintedShares);
                 _mint($.protocolFeeReceiver, feePartOfMintedShares);
             }
@@ -194,21 +198,14 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     /// @notice Preview the holdings state update, without actually updating it.
     /// Returns `totalAssets` and `totalSupply` that there would be after the update.
-    function _previewUpdateHoldingsState(bool updateOnGain)
-        internal
-        view
-        returns (uint256 newTotalAssets, uint256 newTotalSupply)
-    {
+    function _previewUpdateHoldingsState() internal view returns (uint256 newTotalAssets, uint256 newTotalSupply) {
         AggregatorStorage storage $ = _getAggregatorStorage();
         if ($.rewardBuffer._getAssetsCached() == 0) {
             return (0, totalSupply());
         }
 
         newTotalAssets = _totalAssetsNotCached();
-        if (!updateOnGain && newTotalAssets > totalAssets()) {
-            return (totalAssets(), totalSupply());
-        }
-        (, uint256 sharesToMint, uint256 sharesToBurn) =
+        (uint256 sharesToMint, uint256 sharesToBurn) =
             $.rewardBuffer._simulateBufferUpdate(newTotalAssets, totalSupply(), $.protocolFeeBps);
         return (newTotalAssets, totalSupply() + sharesToMint - sharesToBurn);
     }
