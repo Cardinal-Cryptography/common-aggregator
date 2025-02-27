@@ -10,7 +10,7 @@ import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
 contract CommonAggregatorTest is Test {
-    uint256 constant STARTING_TIMESTAMP = 100;
+    uint256 constant STARTING_TIMESTAMP = 100_000_000;
 
     CommonAggregator commonAggregator;
     address owner = address(0x123);
@@ -269,30 +269,42 @@ contract CommonAggregatorTest is Test {
     }
 
     function testSmallLossNoProtocolFee() public {
-        asset.mint(alice, 1000);
-        asset.mint(bob, 500);
+        asset.mint(alice, 10000);
+        asset.mint(bob, 5000);
 
         vm.prank(alice);
-        asset.approve(address(commonAggregator), 1000);
+        asset.approve(address(commonAggregator), 10000);
         vm.prank(alice);
-        commonAggregator.deposit(1000, alice);
+        commonAggregator.deposit(10000, alice);
 
         vm.prank(bob);
-        asset.approve(address(commonAggregator), 500);
+        asset.approve(address(commonAggregator), 5000);
         vm.prank(bob);
-        commonAggregator.deposit(500, bob);
+        commonAggregator.deposit(5000, bob);
 
         // Gain 20%
-        asset.mint(address(commonAggregator), 300);
+        asset.mint(address(commonAggregator), 3000);
         commonAggregator.updateHoldingsState();
 
         // But then lose 10%. Should be taken from the buffer only
-        asset.burn(address(commonAggregator), 180);
+        asset.burn(address(commonAggregator), 1800);
         commonAggregator.updateHoldingsState();
 
-        assertEq(commonAggregator.totalAssets(), 1800 * 9 / 10);
-        assertEq(commonAggregator.maxWithdraw(alice), 1000);
-        assertEq(commonAggregator.maxWithdraw(bob), 500);
+        assertEq(commonAggregator.totalAssets(), 16200);
+        assertEq(commonAggregator.maxWithdraw(alice), 10000);
+        assertEq(commonAggregator.maxWithdraw(bob), 5000);
+
+        // Shares left are released linearly
+        vm.warp(STARTING_TIMESTAMP + 10 days);
+        commonAggregator.updateHoldingsState();
+
+        assertEq(commonAggregator.maxWithdraw(alice), 10384);
+        assertEq(commonAggregator.maxWithdraw(bob), 5192);
+
+        vm.warp(STARTING_TIMESTAMP + 20 days);
+        commonAggregator.updateHoldingsState();
+        assertEq(commonAggregator.maxWithdraw(alice), 10799);
+        assertEq(commonAggregator.maxWithdraw(bob), 5399);
     }
 
     function testLargeLossNoProtocolFee() public {
