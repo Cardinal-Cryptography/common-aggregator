@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {RewardBuffer} from "../contracts/RewardBuffer.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {console} from "forge-std/console.sol";
+import {MAX_BPS} from "../contracts/Math.sol";
 
 contract RewardBufferTest is Test {
     using RewardBuffer for RewardBuffer.Buffer;
@@ -80,6 +80,24 @@ contract RewardBufferTest is Test {
     function testBufferUpdateResultOnLoss2() public {
         buffer._updateBuffer(100, 100, 0);
         (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(70, 1000, 0);
+        assertEq(_toMint, 0);
+        assertEq(_toBurn, 300);
+    }
+
+    function testFeeOnGain() public {
+        (uint256 _toMint,) = buffer._updateBuffer(12, 100, MAX_BPS / 10);
+        assertEq(_toMint, 20);
+
+        uint256 mintedMinusFee = 18;
+
+        vm.warp(STARTING_TIMESTAMP + 20 days);
+        (, uint256 _toBurn) = buffer._updateBuffer(12, 100 + mintedMinusFee, MAX_BPS / 10);
+        assertEq(_toBurn, 18);
+    }
+
+    function testFeeOnLoss() public {
+        buffer._updateBuffer(100, 100, MAX_BPS / 10);
+        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(70, 1000, MAX_BPS / 10);
         assertEq(_toMint, 0);
         assertEq(_toBurn, 300);
     }
