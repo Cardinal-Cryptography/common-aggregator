@@ -2,6 +2,10 @@
 pragma solidity ^0.8.28;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {checkedAdd, checkedDiv, checkedMul, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
+
+/// @dev Id for checked function identification: uint256(keccak256("RewardBuffer"));
+uint256 constant FILE_ID = 100448831994295041095109645825544697016842216820228479017213834858332751627035;
 
 /// @title Buffer structure implementation for gradual reward release.
 /// Intended for usage within ERC-4626 vault implementations.
@@ -9,11 +13,6 @@ library RewardBuffer {
     using Math for uint256;
 
     error AssetsCachedIsZero();
-
-    error AdditionOverflow(uint256 id);
-    error MultiplicationOverflow(uint256 id);
-    error DivisionByZero(uint256 id);
-    error SubtractionOverflow(uint256 id);
 
     uint256 public constant DEFAULT_BUFFERING_DURATION = 20 days;
 
@@ -26,6 +25,18 @@ library RewardBuffer {
         uint256 bufferedShares;
         uint256 lastUpdate;
         uint256 currentBufferEnd;
+    }
+
+    /// @dev Increases the buffer's `assetsCached` field.
+    /// Used when deposit or mint has been made to the vault.
+    function _increaseAssets(Buffer storage buffer, uint256 assets) internal {
+        buffer.assetsCached += assets;
+    }
+
+    /// @dev Increases the buffer's `assetsCached` field.
+    /// Used when withdrawal or redemption has been made to the vault.
+    function _decreaseAssets(Buffer storage buffer, uint256 assets) internal {
+        buffer.assetsCached -= assets;
     }
 
     function _newBuffer(uint256 initialAssets) internal view returns (Buffer memory buffer) {
@@ -43,23 +54,27 @@ library RewardBuffer {
     ///
     /// Alternatively (or additionally), it may be called by an off-chain component at times
     /// when difference between `assetsCached` and `totalAssets()` becomes significant.
-    function _updateBuffer(Buffer storage buffer, uint256 totalAssets, uint256 totalShares)
+    /// @return sharesToMint Amount of shares to mint to account for new rewards, and protocol fee.
+    /// Out of these shares, `sharesToMint.mulDiv(feeBps, 10_000, Math.Rounding.Ceil)` should be minted to
+    /// the fee receiver, and the rest to the aggergator.
+    /// @return sharesToBurn Amount of shares to burn to account for rewards that have been released.
+    function _updateBuffer(Buffer storage buffer, uint256 totalAssets, uint256 totalShares, uint256 feeBps)
         internal
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
         Buffer memory memBuf = _toMemory(buffer);
-        (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, totalAssets, totalShares);
+        (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, totalAssets, totalShares, feeBps);
         _toStorage(memBuf, buffer);
     }
 
-    /// @dev Simulates buffer update, returning the memory representation of an updated buffer.
-    function _simulateBufferUpdate(Buffer storage buffer, uint256 totalAssets, uint256 totalShares)
+    /// @dev Simulates buffer update.
+    function _simulateBufferUpdate(Buffer storage buffer, uint256 totalAssets, uint256 totalShares, uint256 feeBps)
         internal
         view
-        returns (Buffer memory updatedBuffer, uint256 sharesToMint, uint256 sharesToBurn)
+        returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
-        updatedBuffer = _toMemory(buffer);
-        (sharesToMint, sharesToBurn) = __updateBuffer(updatedBuffer, totalAssets, totalShares);
+        Buffer memory updatedBuffer = _toMemory(buffer);
+        (sharesToMint, sharesToBurn) = __updateBuffer(updatedBuffer, totalAssets, totalShares, feeBps);
     }
 
     /// @dev Creates a `memory` copy of a buffer.
@@ -78,7 +93,7 @@ library RewardBuffer {
         storageBuffer.currentBufferEnd = buffer.currentBufferEnd;
     }
 
-    function __updateBuffer(Buffer memory buffer, uint256 totalAssets, uint256 totalShares)
+    function __updateBuffer(Buffer memory buffer, uint256 totalAssets, uint256 totalShares, uint256 feeBps)
         private
         view
         returns (uint256 sharesToMint, uint256 sharesToBurn)
@@ -88,7 +103,7 @@ library RewardBuffer {
         // -- Rewards unlock --
 
         sharesToBurn = _sharesToBurn(buffer);
-        buffer.bufferedShares = _checkedSub(buffer.bufferedShares, sharesToBurn, 1);
+        buffer.bufferedShares = checkedSub(buffer.bufferedShares, sharesToBurn, FILE_ID, 1);
         buffer.lastUpdate = block.timestamp;
         buffer.currentBufferEnd = buffer.currentBufferEnd.max(block.timestamp);
 
@@ -96,16 +111,19 @@ library RewardBuffer {
 
         if (buffer.assetsCached <= totalAssets) {
             (sharesToMint, buffer.currentBufferEnd) = _handleGain(buffer, totalShares, totalAssets);
-            buffer.bufferedShares = _checkedAdd(buffer.bufferedShares, sharesToMint, 2);
+            buffer.bufferedShares = checkedAdd(buffer.bufferedShares, sharesToMint, FILE_ID, 2);
         } else {
             uint256 lossInShares = _handleLoss(buffer, totalShares, totalAssets);
-            sharesToBurn = _checkedAdd(sharesToBurn, lossInShares, 3);
-            buffer.bufferedShares = _checkedSub(buffer.bufferedShares, lossInShares, 4);
+            sharesToBurn = checkedAdd(sharesToBurn, lossInShares, FILE_ID, 3);
+            buffer.bufferedShares = checkedSub(buffer.bufferedShares, lossInShares, FILE_ID, 4);
         }
 
         uint256 cancelledOut = sharesToBurn.min(sharesToMint);
-        sharesToBurn = _checkedSub(sharesToBurn, cancelledOut, 5);
-        sharesToMint = _checkedSub(sharesToMint, cancelledOut, 6);
+        sharesToBurn = checkedSub(sharesToBurn, cancelledOut, FILE_ID, 5);
+        sharesToMint = checkedSub(sharesToMint, cancelledOut, FILE_ID, 6);
+        if (sharesToMint > 0) {
+            buffer.bufferedShares -= sharesToMint.mulDiv(feeBps, MAX_BPS, Math.Rounding.Ceil);
+        }
 
         buffer.assetsCached = totalAssets;
     }
@@ -122,8 +140,8 @@ library RewardBuffer {
             return 0;
         }
 
-        uint256 duration = _checkedSub(end, start, 7);
-        uint256 elapsed = _checkedSub(timestampNow, start, 8);
+        uint256 duration = checkedSub(end, start, FILE_ID, 7);
+        uint256 elapsed = checkedSub(timestampNow, start, FILE_ID, 8);
 
         if (elapsed >= duration) {
             sharesReleased = bufferedShares;
@@ -137,15 +155,15 @@ library RewardBuffer {
         view
         returns (uint256 sharesToMint, uint256 newBufferEnd)
     {
-        uint256 gain = _checkedSub(totalAssets, buffer.assetsCached, 9);
+        uint256 gain = checkedSub(totalAssets, buffer.assetsCached, FILE_ID, 9);
         sharesToMint = gain.mulDiv(totalShares, buffer.assetsCached);
 
         if (sharesToMint == 0) {
             return (0, buffer.currentBufferEnd);
         }
 
-        uint256 newUnlockEnd = _checkedAdd(block.timestamp, DEFAULT_BUFFERING_DURATION, 10);
-        newBufferEnd = _weightedAvg(buffer.currentBufferEnd, buffer.bufferedShares, newUnlockEnd, sharesToMint);
+        uint256 newUnlockEnd = checkedAdd(block.timestamp, DEFAULT_BUFFERING_DURATION, FILE_ID, 10);
+        newBufferEnd = weightedAvg(buffer.currentBufferEnd, buffer.bufferedShares, newUnlockEnd, sharesToMint);
     }
 
     function _handleLoss(Buffer memory buffer, uint256 totalShares, uint256 totalAssets)
@@ -153,7 +171,7 @@ library RewardBuffer {
         pure
         returns (uint256 sharesToBurn)
     {
-        uint256 loss = _checkedSub(buffer.assetsCached, totalAssets, 11);
+        uint256 loss = checkedSub(buffer.assetsCached, totalAssets, FILE_ID, 11);
         if (loss == 0) {
             return 0;
         }
@@ -163,39 +181,5 @@ library RewardBuffer {
         // If we need to burn more than `buffer.bufferedShares` shares to retain price-per-share,
         // then it's impossible to cover that from the buffer, and sharp PPS drop is to be expected.
         sharesToBurn = lossInShares.min(buffer.bufferedShares);
-    }
-
-    function _weightedAvg(uint256 v1, uint256 w1, uint256 v2, uint256 w2) private pure returns (uint256 result) {
-        uint256 weightedVal1 = _checkedMul(w1, v1, 12);
-        uint256 weightedVal2 = _checkedMul(w2, v2, 13);
-
-        uint256 weightedSum = _checkedAdd(weightedVal1, weightedVal2, 14);
-        uint256 weightSum = _checkedAdd(w1, w2, 15);
-
-        result = _checkedDiv(weightedSum, weightSum, 16);
-    }
-
-    function _checkedAdd(uint256 a, uint256 b, uint256 id) private pure returns (uint256 result) {
-        bool success;
-        (success, result) = a.tryAdd(b);
-        if (!success) revert AdditionOverflow(id);
-    }
-
-    function _checkedMul(uint256 a, uint256 b, uint256 id) private pure returns (uint256 result) {
-        bool success;
-        (success, result) = a.tryMul(b);
-        if (!success) revert MultiplicationOverflow(id);
-    }
-
-    function _checkedDiv(uint256 a, uint256 b, uint256 id) private pure returns (uint256 result) {
-        bool success;
-        (success, result) = a.tryDiv(b);
-        if (!success) revert DivisionByZero(id);
-    }
-
-    function _checkedSub(uint256 a, uint256 b, uint256 id) private pure returns (uint256 result) {
-        bool success;
-        (success, result) = a.trySub(b);
-        if (!success) revert SubtractionOverflow(id);
     }
 }
