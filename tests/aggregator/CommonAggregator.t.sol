@@ -63,8 +63,8 @@ contract CommonAggregatorTest is Test {
         assertEq(commonAggregator.totalAssets(), 1000);
         assertEq(commonAggregator.maxWithdraw(alice), 1000);
 
-        // Shares should have 4 more decimals than the asset
-        assertEq(commonAggregator.balanceOf(alice), 1000 * 10000);
+        uint256 decimalOffset = commonAggregator.decimals() - asset.decimals();
+        assertEq(commonAggregator.balanceOf(alice), 1000 * (10 ** decimalOffset));
         assertEq(commonAggregator.totalSupply(), commonAggregator.balanceOf(alice));
     }
 

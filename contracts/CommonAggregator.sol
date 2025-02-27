@@ -91,17 +91,27 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     }
 
     /// @dev Simulates holdings state update before conversion.
-    /// Handles `convertToAssets`, `previewRedeem`, `previewMint`, and `maxWithdraw`.
+    /// Handles `convertToAssets`, `previewRedeem`, and `previewMint`.
+    /// `maxWithdraw` is handled separately, as it must not overflow.
     function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState(true);
         return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), rounding);
     }
 
     /// @dev Simulates holdings state update before conversion.
     /// Handles `convertToShares`, `previewDeposit`, and `previewMint`.
     function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState(true);
         return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, rounding);
+    }
+
+    /// @dev Simulates holdings state update before conversion in case there a loss is detected. In case of
+    /// gain, the function returns the cached state, resulting in slightly smaller withdrawable amount.
+    /// For exact amount, use `previewWithdraw`.
+    function maxWithdraw(address account) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState(false);
+        uint256 shares = balanceOf(account);
+        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Floor);
     }
 
     /// @inheritdoc IERC4626
@@ -162,12 +172,12 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     function updateHoldingsState() public override {
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 oldCachedAssets = $.rewardBuffer._getAssetsCached();
-        uint256 newAssets = _totalAssetsNotCached();
 
         if (oldCachedAssets == 0) {
             // We have to wait for the deposit to happen
             return;
         } else {
+            uint256 newAssets = _totalAssetsNotCached();
             (uint256 sharesToMint, uint256 sharesToBurn) =
                 $.rewardBuffer._updateBuffer(newAssets, totalSupply(), $.protocolFeeBps);
             if (sharesToMint > 0) {
@@ -178,19 +188,25 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
             if (sharesToBurn > 0) {
                 _burn(address(this), sharesToBurn);
             }
+            emit HoldingsStateUpdated(oldCachedAssets, newAssets);
         }
-
-        emit HoldingsStateUpdated(oldCachedAssets, newAssets);
     }
 
     /// @notice Preview the holdings state update, without actually updating it.
     /// Returns `totalAssets` and `totalSupply` that there would be after the update.
-    function _previewUpdateHoldingsState() internal view returns (uint256 newTotalAssets, uint256 newTotalSupply) {
+    function _previewUpdateHoldingsState(bool updateOnGain)
+        internal
+        view
+        returns (uint256 newTotalAssets, uint256 newTotalSupply)
+    {
         AggregatorStorage storage $ = _getAggregatorStorage();
-        newTotalAssets = _totalAssetsNotCached();
-
         if ($.rewardBuffer._getAssetsCached() == 0) {
-            return (newTotalAssets, totalSupply());
+            return (0, totalSupply());
+        }
+
+        newTotalAssets = _totalAssetsNotCached();
+        if (!updateOnGain && newTotalAssets > totalAssets()) {
+            return (totalAssets(), totalSupply());
         }
         (, uint256 sharesToMint, uint256 sharesToBurn) =
             $.rewardBuffer._simulateBufferUpdate(newTotalAssets, totalSupply(), $.protocolFeeBps);
