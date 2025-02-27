@@ -185,13 +185,26 @@ library RewardBuffer {
     }
 
     function _weightedAvg(uint256 v1, uint256 w1, uint256 v2, uint256 w2) private pure returns (uint256 result) {
-        uint256 weightedVal1 = _checkedMul(w1, v1, 12);
-        uint256 weightedVal2 = _checkedMul(w2, v2, 13);
+        uint256 weightSum = _checkedAdd(w1, w2, 12);
 
-        uint256 weightedSum = _checkedAdd(weightedVal1, weightedVal2, 14);
-        uint256 weightSum = _checkedAdd(w1, w2, 15);
+        (uint256 a, uint256 rA) = mulDivWithRest(v1, w1, weightSum);
+        (uint256 b, uint256 rB) = mulDivWithRest(v2, w2, weightSum);
 
-        result = _checkedDiv(weightedSum, weightSum, 16);
+        result = _checkedAdd(a, b, 13);
+
+        if (_checkedSub(weightSum, rA, 14) <= rB) {
+            result = _checkedAdd(result, 1, 15);
+        }
+    }
+
+    /// @notice Computes a.mulDiv(b,c) and returns also the remainder.
+    function mulDivWithRest(uint256 a, uint256 b, uint256 c) private pure returns (uint256 result, uint256 rest) {
+        result = a.mulDiv(b, c);
+        unchecked {
+            uint256 x = a * b;
+            uint256 y = result * c;
+            rest = x - y;
+        }
     }
 
     function _checkedAdd(uint256 a, uint256 b, uint256 id) private pure returns (uint256 result) {
