@@ -163,55 +163,57 @@ contract CommonAggregatorTest is Test {
         assertEq(asset.balanceOf(bob), 400);
     }
 
-    // function testAirdropIsAddedToRewards() public {
-    //     asset.mint(alice, 1000);
-    //     asset.mint(bob, 500);
+    function testAirdropIsAddedToRewards() public {
+        asset.mint(alice, 1000);
+        asset.mint(bob, 500);
 
-    //     vm.prank(alice);
-    //     asset.approve(address(commonAggregator), 1000);
-    //     vm.prank(alice);
-    //     commonAggregator.deposit(1000, alice);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 1000);
+        vm.prank(alice);
+        commonAggregator.deposit(1000, alice);
 
-    //     vm.prank(bob);
-    //     asset.approve(address(commonAggregator), 500);
-    //     vm.prank(bob);
-    //     commonAggregator.deposit(500, bob);
+        vm.prank(bob);
+        asset.approve(address(commonAggregator), 500);
+        vm.prank(bob);
+        commonAggregator.deposit(500, bob);
 
-    //     // Initial amounts
-    //     assertEq(commonAggregator.maxWithdraw(alice), 1000);
-    //     assertEq(commonAggregator.maxWithdraw(bob), 500);
-    //     assertEq(commonAggregator.totalAssets(), 1500);
+        // Initial amounts
+        assertEq(commonAggregator.maxWithdraw(alice), 1000);
+        assertEq(commonAggregator.maxWithdraw(bob), 500);
+        assertEq(commonAggregator.totalAssets(), 1500);
 
-    //     asset.mint(address(commonAggregator), 150);
+        asset.mint(address(commonAggregator), 150);
 
-    //     // Rewards are buffered, so no airdrop is visible yet.
-    //     assertEq(commonAggregator.maxWithdraw(alice), 1000);
-    //     assertEq(commonAggregator.maxWithdraw(bob), 500);
-    //     assertEq(commonAggregator.totalAssets(), 1500);
+        // Rewards are buffered, so no airdrop is visible yet.
+        assertEq(commonAggregator.maxWithdraw(alice), 1000);
+        assertEq(commonAggregator.maxWithdraw(bob), 500);
+        assertEq(commonAggregator.totalAssets(), 1500);
 
-    //     commonAggregator.updateHoldingsState();
+        commonAggregator.updateHoldingsState();
 
-    //     // Only after updateHoldingsState() the airdrop is visible,
-    //     // but rewards are not accrued yet.
-    //     assertEq(commonAggregator.maxWithdraw(alice), 1000);
-    //     assertEq(commonAggregator.maxWithdraw(bob), 500);
-    //     assertEq(commonAggregator.totalAssets(), 1650);
+        // Only after updateHoldingsState() the airdrop is visible,
+        // but rewards are not accrued yet.
+        assertEq(commonAggregator.maxWithdraw(alice), 1000);
+        assertEq(commonAggregator.maxWithdraw(bob), 500);
+        assertEq(commonAggregator.totalAssets(), 1650);
 
-    //     vm.warp(STARTING_TIMESTAMP + 2 days);
+        vm.warp(STARTING_TIMESTAMP + 2 days);
 
-    //     // after 10% of buffering time
-    //     assertEq(commonAggregator.maxWithdraw(alice), 1009);
-    //     assertEq(commonAggregator.maxWithdraw(bob), 504);
+        // after 10% of buffering time
+        commonAggregator.updateHoldingsState();
+        assertEq(commonAggregator.maxWithdraw(alice), 1009);
+        assertEq(commonAggregator.maxWithdraw(bob), 504);
 
-    //     // Bob exits
-    //     vm.prank(bob);
-    //     commonAggregator.withdraw(504, bob, bob);
+        // Bob exits
+        vm.prank(bob);
+        commonAggregator.withdraw(504, bob, bob);
 
-    //     vm.warp(STARTING_TIMESTAMP + 20 days);
+        vm.warp(STARTING_TIMESTAMP + 20 days);
 
-    //     assertEq(commonAggregator.maxWithdraw(alice), 1145);
-    //     assertEq(commonAggregator.maxWithdraw(bob), 0);
-    // }
+        commonAggregator.updateHoldingsState();
+        assertEq(commonAggregator.maxWithdraw(alice), 1145);
+        assertEq(commonAggregator.maxWithdraw(bob), 0);
+    }
 
     function testProtocolFee() public {
         vm.prank(owner);

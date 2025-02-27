@@ -168,6 +168,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         return assets;
     }
 
+    // TODO: make sure deposits / withdrawals from protocolReceiver are handled correctly
+
     // ----- Reporting -----
 
     /// @notice Updates holdinds state, by reporting on every vault how many assets it has.
