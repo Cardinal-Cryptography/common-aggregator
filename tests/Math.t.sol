@@ -8,7 +8,7 @@ import {mulDivWithRemainder, weightedAvg} from "../contracts/Math.sol";
 contract MathTest is Test {
     using Math for uint256;
 
-    function testFuzz_mulDivWithRest(uint256 a, uint256 b, uint256 c) public pure {
+    function testFuzz_mulDivWithRemainder(uint256 a, uint256 b, uint256 c) public pure {
         c = bound(c, 1, (1 << 128));
         vm.assumeNoRevert();
         (uint256 result, uint256 remainder) = mulDivWithRemainder(a, b, c);
@@ -17,7 +17,7 @@ contract MathTest is Test {
         assertEq(remainder, ((a % c) * (b % c)) % c);
     }
 
-    function testMulDivWithRestLargeC() public pure {
+    function testMulDivWithRemainderLargeC() public pure {
         uint256 a = 4732897652781643758234093141043853274932473125407432865;
         uint256 b = 728459023840348932574398734983274893580249038523047231493720402341441241;
         uint256 c = 10479995995237589649817928471289472894736782356287583657831;
