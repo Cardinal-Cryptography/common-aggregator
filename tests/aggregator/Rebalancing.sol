@@ -119,6 +119,54 @@ contract CommonAggregatorTest is Test {
         assertEq(asset.balanceOf(address(vaults[0])), 551);
     }
 
+    function testZeroFunds() public {
+        vm.prank(rebalancer);
+        commonAggregator.pushFunds(0, address(vaults[0]));
+        vm.prank(rebalancer);
+        commonAggregator.pullFunds(0, address(vaults[0]));
+        vm.prank(rebalancer);
+        commonAggregator.pullFundsByShares(0, address(vaults[0]));
+        vm.expectRevert();
+        vm.prank(rebalancer);
+        commonAggregator.pushFunds(1, address(vaults[0]));
+        vm.expectRevert();
+        vm.prank(rebalancer);
+        commonAggregator.pullFunds(1, address(vaults[0]));
+        vm.expectRevert();
+        vm.prank(rebalancer);
+        commonAggregator.pullFundsByShares(1, address(vaults[0]));
+
+        uint256 amount = 100;
+        asset.mint(alice, amount);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), amount);
+        vm.prank(alice);
+        commonAggregator.deposit(amount, alice);
+
+        vm.prank(rebalancer);
+        commonAggregator.pushFunds(0, address(vaults[0]));
+        vm.prank(rebalancer);
+        commonAggregator.pullFunds(0, address(vaults[0]));
+        vm.prank(rebalancer);
+        commonAggregator.pullFundsByShares(0, address(vaults[0]));
+        vm.expectRevert();
+        vm.prank(rebalancer);
+        commonAggregator.pullFunds(1, address(vaults[0]));
+        vm.expectRevert();
+        vm.prank(rebalancer);
+        commonAggregator.pullFundsByShares(1, address(vaults[0]));
+
+        vm.prank(rebalancer);
+        commonAggregator.pushFunds(amount, address(vaults[0]));
+
+        vm.prank(rebalancer);
+        commonAggregator.pushFunds(0, address(vaults[0]));
+        vm.prank(rebalancer);
+        commonAggregator.pullFunds(0, address(vaults[0]));
+        vm.prank(rebalancer);
+        commonAggregator.pullFundsByShares(0, address(vaults[0]));
+    }
+
     function testVaultPresentOnTheListCheck() public {
         uint256 amount = 100;
         asset.mint(alice, amount);
