@@ -238,7 +238,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     /// @inheritdoc ICommonAggregator
     function pullFunds(uint256 assets, address vault) external onlyRebalancerOrHigherRole {
-        updateHoldingsState();
         require(_isVaultOnTheList(vault), "CommonAggregator: vault not on the list");
 
         IERC4626(vault).withdraw(assets, address(this), address(this));
@@ -248,7 +247,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     /// @inheritdoc ICommonAggregator
     function pullFundsByShares(uint256 shares, address vault) external onlyRebalancerOrHigherRole {
-        updateHoldingsState();
         require(_isVaultOnTheList(vault), "CommonAggregator: vault not on the list");
 
         uint256 assets = IERC4626(vault).redeem(shares, address(this), address(this));
