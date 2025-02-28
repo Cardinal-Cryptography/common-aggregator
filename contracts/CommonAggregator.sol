@@ -125,21 +125,40 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         uint256 shares = super.deposit(assets, account);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
+        _distributeToVaults(assets);
         $.rewardBuffer._increaseAssets(assets);
 
         return shares;
     }
 
+    /// @inheritdoc IERC4626
+    /// @notice Updates holdings state before minting.
     function mint(uint256 shares, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
         updateHoldingsState();
         uint256 assets = super.mint(shares, account);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
+        _distributeToVaults(assets);
         $.rewardBuffer._increaseAssets(assets);
 
         return assets;
     }
 
+    function _distributeToVaults(uint256 assets) internal {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        uint256 cachedTotalAssets = totalAssets();
+        if (cachedTotalAssets > 0) {
+            for (uint256 i = 0; i < $.vaults.length; ++i) {
+                IERC4626 vault = $.vaults[i];
+                uint256 assetsToDepositToVault = assets.mulDiv(_aggregatedVaultAssets(vault), cachedTotalAssets);
+                IERC20(asset()).approve(address(vault), assetsToDepositToVault);
+                vault.deposit(assetsToDepositToVault, address(this));
+            }
+        }
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Updates holdings state before withdrawing.
     function withdraw(uint256 assets, address account, address owner)
         public
         override(ERC4626Upgradeable, IERC4626)
@@ -154,6 +173,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         return shares;
     }
 
+    /// @inheritdoc IERC4626
+    /// @notice Updates holdings state before redeeming.
     function redeem(uint256 shares, address account, address owner)
         public
         override(ERC4626Upgradeable, IERC4626)
@@ -217,11 +238,14 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
         uint256 assets = IERC20(asset()).balanceOf(address(this));
         for (uint256 i = 0; i < $.vaults.length; i++) {
-            IERC4626 vault = $.vaults[i];
-            uint256 shares = vault.balanceOf(address(this));
-            assets += vault.convertToAssets(shares);
+            assets += _aggregatedVaultAssets(IERC4626($.vaults[i]));
         }
         return assets;
+    }
+
+    function _aggregatedVaultAssets(IERC4626 vault) internal view returns (uint256) {
+        uint256 shares = vault.balanceOf(address(this));
+        return vault.convertToAssets(shares);
     }
 
     // ----- Fee management -----
