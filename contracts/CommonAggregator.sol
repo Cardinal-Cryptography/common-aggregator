@@ -30,7 +30,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     struct AggregatorStorage {
         RewardBuffer.Buffer rewardBuffer;
         IERC4626[] vaults; // Both for iterating and a fallback queue.
-        mapping(address vault => uint256 limit) allocationLimit;
+        mapping(address vault => uint256 limit) allocationLimitBps;
         uint256 protocolFeeBps;
         address protocolFeeReceiver;
     }
@@ -59,7 +59,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         for (uint256 i = 0; i < vaults.length; i++) {
             _ensureVaultCanBeAdded(vaults[i]);
             $.vaults.push(vaults[i]);
-            $.allocationLimit[address(vaults[i])] = MAX_BPS;
+            $.allocationLimitBps[address(vaults[i])] = MAX_BPS;
         }
 
         $.protocolFeeBps = 0;
@@ -72,9 +72,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         require($.vaults.length < MAX_VAULTS, "CommonAggregator: too many vaults");
-        for (uint256 i = 0; i < $.vaults.length; i++) {
-            require(address($.vaults[i]) != address(vault), "CommonAggregator: vault already exists");
-        }
+        require(!_isVaultOnTheList(address(vault)), "CommonAggregator: vault already on the list");
     }
 
     // ----- ERC4626 -----
@@ -224,6 +222,57 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         return assets;
     }
 
+    // ----- Rebalancing -----
+
+    /// @inheritdoc ICommonAggregator
+    function pushFunds(uint256 assets, address vault) external onlyRebalancerOrHigherRole {
+        updateHoldingsState();
+        require(_isVaultOnTheList(vault), "CommonAggregator: vault not on the list");
+
+        IERC20(asset()).approve(vault, assets);
+        IERC4626(vault).deposit(assets, address(this));
+        _checkLimits();
+
+        emit AssetsRebalanced(address(this), vault, assets);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function pullFunds(uint256 assets, address vault) external onlyRebalancerOrHigherRole {
+        updateHoldingsState();
+        require(_isVaultOnTheList(vault), "CommonAggregator: vault not on the list");
+
+        IERC4626(vault).withdraw(assets, address(this), address(this));
+
+        emit AssetsRebalanced(vault, address(this), assets);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function pullFundsByShares(uint256 shares, address vault) external onlyRebalancerOrHigherRole {
+        updateHoldingsState();
+        require(_isVaultOnTheList(vault), "CommonAggregator: vault not on the list");
+
+        uint256 assets = IERC4626(vault).redeem(shares, address(this), address(this));
+
+        emit AssetsRebalanced(vault, address(this), assets);
+    }
+
+    // ----- Allocation Limits -----
+
+    /// @inheritdoc ICommonAggregator
+    /// @notice Doesn't rebalance the assets, after the action limits may be exceeded.
+    function setLimit(address vault, uint256 newLimitBps) external override onlyRole(OWNER) {
+        require(newLimitBps <= MAX_BPS, "CommonAggregator: limit too high");
+        require(_isVaultOnTheList(vault), "CommonAggregator: vault not on the list");
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        uint256 oldLimit = $.allocationLimitBps[vault];
+
+        if (oldLimit == newLimitBps) return;
+
+        $.allocationLimitBps[vault] = newLimitBps;
+        emit AllocationLimitSet(vault, newLimitBps);
+    }
+
     // ----- Fee management -----
 
     /// @inheritdoc ICommonAggregator
@@ -251,9 +300,47 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 
+    function _isVaultOnTheList(address vault) internal view returns (bool onTheList) {
+        (onTheList,) = _getVaultIndex(vault);
+    }
+
+    function _getVaultIndex(address vault) internal view returns (bool onTheList, uint256 index) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+
+        for (uint256 i = 0; i < $.vaults.length; i++) {
+            if (address($.vaults[i]) == vault) {
+                return (true, i);
+            }
+        }
+        return (false, 0);
+    }
+
+    /// @notice Checks if the allocation limits are not exceeded.
+    /// Doesn't update the holdings state - the caller should decide when to do it.
+    function _checkLimits() internal view {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        uint256 total = totalAssets();
+
+        for (uint256 i = 0; i < $.vaults.length; i++) {
+            IERC4626 vault = $.vaults[i];
+            uint256 assets = vault.convertToAssets(vault.balanceOf(address(this)));
+            require(
+                assets <= total.mulDiv($.allocationLimitBps[address(vault)], MAX_BPS, Math.Rounding.Floor),
+                "CommonAggregator: allocation limit exceeded"
+            );
+        }
+    }
+
     constructor() {
         _disableInitializers();
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER) {}
+
+    modifier onlyRebalancerOrHigherRole() {
+        if (!hasRole(REBALANCER, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
+            revert("CommonAggregator: rebalancer, manager or owner role required");
+        }
+        _;
+    }
 }
