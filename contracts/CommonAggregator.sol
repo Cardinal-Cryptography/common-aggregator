@@ -231,7 +231,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
         IERC20(asset()).approve(vault, assets);
         IERC4626(vault).deposit(assets, address(this));
-        _checkLimits();
+        _checkLimit(IERC4626(vault));
 
         emit AssetsRebalanced(address(this), vault, assets);
     }
@@ -313,20 +313,18 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         return (false, 0);
     }
 
-    /// @notice Checks if the allocation limits are not exceeded.
+    /// @notice Checks if the allocation limit is not exceeded for the given vault.
     /// Doesn't update the holdings state - the caller should decide when to do it.
-    function _checkLimits() internal view {
+    /// @dev Results in undefined behavior if the vault is not on the list.
+    function _checkLimit(IERC4626 vault) internal view {
         AggregatorStorage storage $ = _getAggregatorStorage();
+        uint256 assets = vault.convertToAssets(vault.balanceOf(address(this)));
         uint256 total = totalAssets();
 
-        for (uint256 i = 0; i < $.vaults.length; i++) {
-            IERC4626 vault = $.vaults[i];
-            uint256 assets = vault.convertToAssets(vault.balanceOf(address(this)));
-            require(
-                assets <= total.mulDiv($.allocationLimitBps[address(vault)], MAX_BPS, Math.Rounding.Floor),
-                "CommonAggregator: allocation limit exceeded"
-            );
-        }
+        require(
+            assets <= total.mulDiv($.allocationLimitBps[address(vault)], MAX_BPS),
+            "CommonAggregator: allocation limit exceeded"
+        );
     }
 
     constructor() {

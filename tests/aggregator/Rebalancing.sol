@@ -74,6 +74,23 @@ contract CommonAggregatorTest is Test {
         assertEq(asset.balanceOf(address(vaults[0])), maxToPush);
     }
 
+    function testPushFundsObeyOnlyLimitForTarget() public {
+        uint256 amount = 100;
+        asset.mint(alice, amount);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), amount);
+        vm.prank(alice);
+        commonAggregator.deposit(amount, alice);
+
+        vm.prank(rebalancer);
+        commonAggregator.pushFunds(50, address(vaults[0]));
+        vm.prank(owner);
+        commonAggregator.setLimit(address(vaults[0]), 0);
+
+        vm.prank(rebalancer);
+        commonAggregator.pushFunds(50, address(vaults[1]));
+    }
+
     function testPullFunds() public {
         uint256 assets = 110;
         uint256 shares = 100;
