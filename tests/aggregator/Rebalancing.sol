@@ -120,15 +120,22 @@ contract CommonAggregatorTest is Test {
 
         for (uint256 i = 0; i < notAddedAddresses.length; i++) {
             address a = notAddedAddresses[i];
+
             vm.expectRevert();
             vm.prank(rebalancer);
             commonAggregator.pushFunds(1, a);
+
             vm.expectRevert();
             vm.prank(rebalancer);
             commonAggregator.pullFunds(1, a);
+
             vm.expectRevert();
             vm.prank(rebalancer);
             commonAggregator.pullFundsByShares(1, a);
+
+            vm.expectRevert();
+            vm.prank(owner);
+            commonAggregator.setLimit(a, 0);
         }
     }
 
@@ -208,5 +215,11 @@ contract CommonAggregatorTest is Test {
         vm.expectRevert();
         vm.prank(rebalancer);
         commonAggregator.setLimit(address(vaults[0]), MAX_BPS);
+    }
+
+    function testSetLimitMaxLimit() public {
+        vm.expectRevert();
+        vm.prank(owner);
+        commonAggregator.setLimit(address(vaults[0]), MAX_BPS + 1);
     }
 }
