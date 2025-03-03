@@ -113,7 +113,7 @@ contract CommonAggregatorTest is Test {
         assertEq(_vaultsAllocation(vaults[2]), 1);
     }
 
-    function testFuzz_ProportionalMint(uint16[VAULT_COUNT] calldata initialDistribution, uint16 mintSize) public {
+    function testFuzz_ProportionalMint(uint16[VAULT_COUNT] calldata initialDistribution, uint128 mintSize) public {
         uint256 initDistributionSum = 0;
         for (uint256 i = 0; i < VAULT_COUNT; ++i) {
             initDistributionSum += initialDistribution[i];
@@ -135,8 +135,7 @@ contract CommonAggregatorTest is Test {
         for (uint256 i = 0; i < VAULT_COUNT; ++i) {
             assertEq(
                 _vaultsAllocation(vaults[i]),
-                commonAggregator.convertToAssets(mintSize).mulDiv(initialDistribution[i], 10000)
-                    + initialDistribution[i]
+                commonAggregator.previewMint(mintSize).mulDiv(initialDistribution[i], 10000) + initialDistribution[i]
             );
         }
     }
