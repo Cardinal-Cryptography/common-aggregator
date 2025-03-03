@@ -168,6 +168,44 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     // TODO: make sure deposits / withdrawals from protocolReceiver are handled correctly
 
+    // ----- Emergency redeem -----
+
+    /// @inheritdoc ICommonAggregator
+    /// @notice Updates holdings state before depositing.
+    function emergencyRedeem(uint256 shares, address account, address owner)
+        external
+        returns (uint256 assets, uint256[] memory vaultShares)
+    {
+        uint256 maxShares = maxRedeem(owner);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
+        }
+        if (msg.sender != owner) {
+            _spendAllowance(owner, msg.sender, shares);
+        }
+        updateHoldingsState();
+
+        _transfer(owner, address(this), shares);
+
+        assets = Math.mulDiv(IERC20(asset()).balanceOf(address(this)), shares, totalSupply());
+        IERC20(asset()).transfer(account, assets);
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        vaultShares = new uint256[]($.vaults.length);
+        uint256 valueInAssets = assets;
+        for (uint256 i = 0; i < $.vaults.length; i++) {
+            vaultShares[i] = Math.mulDiv($.vaults[i].balanceOf(address(this)), shares, totalSupply());
+            valueInAssets += $.vaults[i].convertToAssets(vaultShares[i]);
+            $.vaults[i].transfer(account, vaultShares[i]);
+        }
+
+        _burn(address(this), shares);
+
+        $.rewardBuffer._decreaseAssets(valueInAssets);
+
+        emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultShares);
+    }
+
     // ----- Reporting -----
 
     /// @notice Updates holdinds state, by reporting on every vault how many assets it has.
