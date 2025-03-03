@@ -30,7 +30,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     struct AggregatorStorage {
         RewardBuffer.Buffer rewardBuffer;
         IERC4626[] vaults; // Both for iterating and a fallback queue.
-        mapping(address vault => uint256 limit) allocationLimit;
+        mapping(address vault => uint256 limit) allocationLimitBps;
         uint256 protocolFeeBps;
         address protocolFeeReceiver;
     }
@@ -59,7 +59,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         for (uint256 i = 0; i < vaults.length; i++) {
             _ensureVaultCanBeAdded(vaults[i]);
             $.vaults.push(vaults[i]);
-            $.allocationLimit[address(vaults[i])] = MAX_BPS;
+            $.allocationLimitBps[address(vaults[i])] = MAX_BPS;
         }
 
         $.protocolFeeBps = 0;
@@ -67,14 +67,12 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     }
 
     function _ensureVaultCanBeAdded(IERC4626 vault) private view {
-        require(address(vault) != address(0), "CommonAggregator: zero address");
-        require(vault.asset() == asset(), "CommonAggregator: wrong asset");
+        require(address(vault) != address(0), VaultAddressCantBeZero());
+        require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
 
         AggregatorStorage storage $ = _getAggregatorStorage();
-        require($.vaults.length < MAX_VAULTS, "CommonAggregator: too many vaults");
-        for (uint256 i = 0; i < $.vaults.length; i++) {
-            require(address($.vaults[i]) != address(vault), "CommonAggregator: vault already exists");
-        }
+        require($.vaults.length < MAX_VAULTS, VaultLimitExceeded());
+        require(!_isVaultOnTheList(vault), VaultAlreadyAded(vault));
     }
 
     // ----- ERC4626 -----
@@ -248,6 +246,55 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         return vault.convertToAssets(shares);
     }
 
+    // ----- Rebalancing -----
+
+    /// @inheritdoc ICommonAggregator
+    function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
+        updateHoldingsState();
+        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
+
+        IERC20(asset()).approve(address(vault), assets);
+        vault.deposit(assets, address(this));
+        _checkLimit(IERC4626(vault));
+
+        emit AssetsRebalanced(address(this), address(vault), assets);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function pullFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
+        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
+
+        IERC4626(vault).withdraw(assets, address(this), address(this));
+
+        emit AssetsRebalanced(address(vault), address(this), assets);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyRebalancerOrHigherRole {
+        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
+
+        uint256 assets = vault.redeem(shares, address(this), address(this));
+
+        emit AssetsRebalanced(address(vault), address(this), assets);
+    }
+
+    // ----- Allocation Limits -----
+
+    /// @inheritdoc ICommonAggregator
+    /// @notice Doesn't rebalance the assets, after the action limits may be exceeded.
+    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyRole(OWNER) {
+        require(newLimitBps <= MAX_BPS, IncorrectMaxAllocationLimit());
+        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        uint256 oldLimit = $.allocationLimitBps[address(vault)];
+
+        if (oldLimit == newLimitBps) return;
+
+        $.allocationLimitBps[address(vault)] = newLimitBps;
+        emit AllocationLimitSet(address(vault), newLimitBps);
+    }
+
     // ----- Fee management -----
 
     /// @inheritdoc ICommonAggregator
@@ -264,8 +311,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     /// @inheritdoc ICommonAggregator
     function setProtocolFeeReceiver(address protocolFeeReceiver) external onlyRole(OWNER) {
-        require(protocolFeeReceiver != address(this), "CommonAggregator: self protocol fee receiver");
-        require(protocolFeeReceiver != address(0), "CommonAggregator: address(0) protocol fee receiver");
+        require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
+        require(protocolFeeReceiver != address(0), ZeroProtocolFeeReceiver());
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         address oldProtocolFeeReceiver = $.protocolFeeReceiver;
@@ -275,9 +322,42 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 
+    function _isVaultOnTheList(IERC4626 vault) internal view returns (bool onTheList) {
+        (onTheList,) = _getVaultIndex(vault);
+    }
+
+    function _getVaultIndex(IERC4626 vault) internal view returns (bool onTheList, uint256 index) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+
+        for (uint256 i = 0; i < $.vaults.length; i++) {
+            if ($.vaults[i] == vault) {
+                return (true, i);
+            }
+        }
+        return (false, 0);
+    }
+
+    /// @notice Checks if the allocation limit is not exceeded for the given vault.
+    /// Doesn't update the holdings state - the caller should decide when to do it.
+    /// @dev Results in undefined behavior if the vault is not on the list.
+    function _checkLimit(IERC4626 vault) internal view {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        uint256 assets = vault.convertToAssets(vault.balanceOf(address(this)));
+        uint256 total = totalAssets();
+
+        require(assets <= total.mulDiv($.allocationLimitBps[address(vault)], MAX_BPS), AllocationLimitExceeded(vault));
+    }
+
     constructor() {
         _disableInitializers();
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER) {}
+
+    modifier onlyRebalancerOrHigherRole() {
+        if (!hasRole(REBALANCER, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
+            revert CallerNotRebalancerOrWithHigherRole();
+        }
+        _;
+    }
 }
