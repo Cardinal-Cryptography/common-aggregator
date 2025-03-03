@@ -33,6 +33,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         mapping(address vault => uint256 limit) allocationLimitBps;
         uint256 protocolFeeBps;
         address protocolFeeReceiver;
+        mapping(address rewardToken => address traderAddress) rewardTrader;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
@@ -72,7 +73,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         require($.vaults.length < MAX_VAULTS, VaultLimitExceeded());
-        require(!_isVaultOnTheList(vault), VaultAlreadyAded(vault));
+        require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 
     // ----- ERC4626 -----
@@ -336,4 +337,22 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         }
         _;
     }
+
+    // ----- Non-asset rewards trading -----
+
+    /// @notice Proposes execution of `setRewardTrader` with given parameters.
+    /// Caller must hold the `OWNER` role.
+    function submitSetRewardTrader(address rewardToken, address traderAddress) external {}
+
+    /// @notice Allows transfering `rewardToken`s from aggregator to `traderAddress`
+    /// using `transferRewardsForSale` method.
+    /// Can only be called after timelock initiated in `submitSetRewardTrader` has elapsed.
+    function setRewardTrader(address rewardToken, address traderAddress) external {}
+
+    /// @notice Cancels reward trader setting action.
+    /// Caller must hold `GUARDIAN`, `MANAGER` or `OWNER` role.
+    function cancelSetRewardTrader(address rewardToken, address traderAddress) external {}
+
+    /// @notice Transfers all `token`s held in the aggregator to `rewardTrader[token]`
+    function transferRewardsForSale(address token) external {}
 }
