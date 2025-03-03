@@ -8,6 +8,11 @@ interface ICommonAggregator is IERC4626 {
 
     event HoldingsStateUpdated(uint256 oldCachedAssets, uint256 newCachedAssets);
 
+    error VaultAddressCantBeZero();
+    error IncorrectAsset(address expected, address actual);
+    error VaultAlreadyAded(IERC4626 vault);
+    error VaultLimitExceeded();
+
     function updateHoldingsState() external;
 
     // ----- Rebalancing -----
@@ -18,16 +23,19 @@ interface ICommonAggregator is IERC4626 {
     /// Vault must be present on the vault list.
     /// @dev Doesn't check the allocation limits, as even if they are still
     /// exceeded, the total excess will be lowered.
-    function pullFunds(uint256 assets, address vault) external;
+    function pullFunds(uint256 assets, IERC4626 vault) external;
 
     /// @notice Redeems `shares` from `vault`, returning assets into
     /// aggregator's own balance. Vault must be present on the vault list.
     /// @dev Similarly to `pullFunds`, doesn't check the allocation limits.
-    function pullFundsByShares(uint256 shares, address _vault) external;
+    function pullFundsByShares(uint256 shares, IERC4626 vault) external;
 
     /// @notice Deposits `assets` from aggregator's own balance into `vault`.
     /// Vault must be present on the vault list. Allocation limits are checked.
-    function pushFunds(uint256 assets, address vault) external;
+    function pushFunds(uint256 assets, IERC4626 vault) external;
+
+    error AllocationLimitExceeded(IERC4626 vault);
+    error CallerNotRebalancerOrWithHigherRole();
 
     // ----- Allocation Limits -----
 
@@ -38,7 +46,10 @@ interface ICommonAggregator is IERC4626 {
     /// It's a no-op if `newLimitBps` is the same as the current limit.
     /// Reverts if `newLimitBps` is higher MAX_BPS, or if `vault` is not present
     /// on the vault list.
-    function setLimit(address vault, uint256 newLimitBps) external;
+    function setLimit(IERC4626 vault, uint256 newLimitBps) external;
+
+    error VaultNotOnTheList(IERC4626 vault);
+    error IncorrectMaxAllocationLimit();
 
     // ----- Fee management -----
 
@@ -52,6 +63,9 @@ interface ICommonAggregator is IERC4626 {
     /// The protocol fee is applied on the profit made, with each holdings state update.
     /// It's a no-op if `_protocolFeeBps` is the same as the current `protocolFeeBps`.
     function setProtocolFee(uint256 protocolFeeBps) external;
+
+    error SelfProtocolFeeReceiver();
+    error ZeroProtocolFeeReceiver();
 
     /// @notice Sets the protocol fee receiver.
     /// It's a no-op if `protocolFeeReceiver` is the same as the current `protocolFeeReceiver`.
