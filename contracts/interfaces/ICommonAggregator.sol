@@ -70,4 +70,26 @@ interface ICommonAggregator is IERC4626 {
     /// @notice Sets the protocol fee receiver.
     /// It's a no-op if `protocolFeeReceiver` is the same as the current `protocolFeeReceiver`.
     function setProtocolFeeReceiver(address protocolFeeReceiver) external;
+
+    // ----- Emergency redeem -----
+
+    /// @param sender Account executing the withdrawal.
+    /// @param receiver Account that received the assets and the aggregated vaults' shares.
+    /// @param owner Owner of the aggregator shares that were burnt.
+    /// @param assets Amount of underlying assets transferred to the `receiver`
+    /// @param shares Amount of the aggregator shares that were burnt.
+    /// @param vaultShares List of the aggregated vaults' shares amounts that were transferred to the `receiver`.
+    event EmergencyWithdraw(
+        address indexed sender,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares,
+        uint256[] vaultShares
+    );
+
+    /// @dev Burns exactly shares from owner and sends proportional amounts of aggregated vaults' shares and idle assets.
+    /// @dev MUST emit the EmergencyWithdraw event.
+    /// @dev MUST never be paused.
+    function emergencyRedeem(uint256 shares, address account, address owner) external returns(uint256 assets, uint256[] memory vaultShares);
 }
