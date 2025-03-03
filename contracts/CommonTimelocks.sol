@@ -42,6 +42,10 @@ abstract contract CommonTimelocks {
         _;
     }
 
+    function _isTimelockedActionRegistered(bytes32 actionHash) internal view returns (bool) {
+        return _getTimelocksStorage().registeredTimelocks[actionHash] != NOT_REGISTERED;
+    }
+
     /// @dev Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
     /// is greater than zero. A zero `delay` means that the action is locked only for the current timestamp.
     function _register(bytes32 actionHash, uint256 delay) private {

@@ -34,6 +34,7 @@ contract CommonAggregator is
     uint256 public constant MAX_PROTOCOL_FEE_BPS = MAX_BPS / 2;
 
     uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
+    uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 30 days;
 
     /// @custom:storage-location erc7201:common.storage.aggregator
     struct AggregatorStorage {
@@ -234,6 +235,9 @@ contract CommonAggregator is
     // ----- Aggregated vaults management -----
 
     /// @notice Submits a timelocked proposal to add a new vault to the list.
+    /// @dev There's no limit on the number of pending vaults that can be added, only on the number of fully added vaults.
+    /// Also the same vault can be submitted multiple times, with different limits. Only one such submission can be accepted at a time.
+    /// Manager or Guardian should cancel mistaken and stale submissions.
     function submitAddVault(IERC4626 vault, uint256 limit)
         external
         override
@@ -243,9 +247,6 @@ contract CommonAggregator is
             ADD_VAULT_TIMELOCK
         )
     {
-        // There's no limit on the number of pending vaults that can be added, only on the number of fully added vaults.
-        // Also the same vault can be submitted multiple times, with different limits. Only one such submission can be accepted at a time.
-        // Manager or Guardian should cancel mistaken or stale submissions.
         _ensureVaultCanBeAdded(vault);
         emit VaultAdditionSubmitted(address(vault), limit, block.timestamp + ADD_VAULT_TIMELOCK);
     }
@@ -280,6 +281,12 @@ contract CommonAggregator is
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
         (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
+        require(
+            !_isTimelockedActionRegistered(
+                keccak256(abi.encodeWithSelector(ICommonAggregator.forceRemoveVault.selector, vault))
+            ),
+            PendingVaultForceRemoval(vault)
+        );
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 allocationLimit = $.allocationLimitBps[address(vault)];
@@ -299,6 +306,42 @@ contract CommonAggregator is
 
         // No need to updateHoldingsState again, as we don' have any shares of the vault anymore.
         emit VaultRemoved(address(vault));
+    }
+
+    function submitForceRemoveVault(IERC4626 vault)
+        external
+        override
+        onlyManagerOrOwner
+        registersTimelockedAction(
+            keccak256(abi.encodeWithSelector(ICommonAggregator.forceRemoveVault.selector, vault)),
+            FORCE_REMOVE_VAULT_TIMELOCK
+        )
+    {
+        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
+        emit VaultForceRemovalSubmitted(address(vault), block.timestamp + FORCE_REMOVE_VAULT_TIMELOCK);
+    }
+
+    function cancelForceRemoveVault(IERC4626 vault)
+        external
+        override
+        onlyGuardianOrHigherRole
+        cancelsAction(keccak256(abi.encodeWithSelector(ICommonAggregator.forceRemoveVault.selector, vault)))
+    {
+        emit VaultForceRemovalCancelled(address(vault));
+    }
+
+    function forceRemoveVault(IERC4626 vault)
+        external
+        override
+        onlyManagerOrOwner
+        executesUnlockedAction(keccak256(abi.encodeWithSelector(ICommonAggregator.forceRemoveVault.selector, vault)))
+    {
+        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        require(isVaultOnTheList, VaultNotOnTheList(vault));
+
+        // TODO: implement force removal
+
+        emit VaultForceRemoved(address(vault));
     }
 
     // ----- Rebalancing -----
