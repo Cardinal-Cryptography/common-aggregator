@@ -13,8 +13,15 @@ import {
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import "./RewardBuffer.sol";
+import {CommonTimelocks} from "./CommonTimelocks.sol";
 
-contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUpgradeable, ERC4626Upgradeable {
+contract CommonAggregator is
+    ICommonAggregator,
+    UUPSUpgradeable,
+    AccessControlUpgradeable,
+    ERC4626Upgradeable,
+    CommonTimelocks
+{
     using RewardBuffer for RewardBuffer.Buffer;
     using Math for uint256;
 
@@ -25,6 +32,12 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
     uint256 public constant MAX_VAULTS = 5;
     uint256 public constant MAX_PROTOCOL_FEE_BPS = MAX_BPS / 2;
+
+    uint256 public constant SET_TRADER_TIMELOCK = 5 days;
+
+    enum ActionType {
+        SET_TRADER
+    }
 
     /// @custom:storage-location erc7201:common.storage.aggregator
     struct AggregatorStorage {
@@ -325,6 +338,66 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         require(assets <= total.mulDiv($.allocationLimitBps[address(vault)], MAX_BPS), AllocationLimitExceeded(vault));
     }
 
+    // ----- Non-asset rewards trading -----
+
+    /// @inheritdoc ICommonAggregator
+    function submitSetRewardTrader(address rewardToken, address traderAddress)
+        external
+        onlyRole(OWNER)
+        registersTimelockedAction(
+            keccak256(abi.encode(ActionType.SET_TRADER, rewardToken, traderAddress)),
+            SET_TRADER_TIMELOCK
+        )
+    {
+        _ensureTokenSafeToTransfer(rewardToken);
+
+        emit SetRewardsTraderSubmitted(rewardToken, traderAddress, block.timestamp + SET_TRADER_TIMELOCK);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function setRewardTrader(address rewardToken, address traderAddress)
+        external
+        executesUnlockedAction(keccak256(abi.encode(ActionType.SET_TRADER, rewardToken, traderAddress)))
+    {
+        _ensureTokenSafeToTransfer(rewardToken);
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        $.rewardTrader[rewardToken] = traderAddress;
+
+        emit RewardsTraderSet(rewardToken, traderAddress);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function cancelSetRewardTrader(address rewardToken, address traderAddress)
+        external
+        onlyGuardianOrHigherRole
+        cancelsAction(keccak256(abi.encode(ActionType.SET_TRADER, rewardToken, traderAddress)))
+    {
+        emit SetRewardsTraderCancelled(rewardToken, traderAddress);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function transferRewardsForSale(address rewardToken) external {
+        _ensureTokenSafeToTransfer(rewardToken);
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        require($.rewardTrader[rewardToken] != address(0), NoTraderSetForToken(rewardToken));
+
+        IERC20 transferrableToken = IERC20(rewardToken);
+        uint256 amount = transferrableToken.balanceOf(address(this));
+        address receiver = $.rewardTrader[rewardToken];
+
+        transferrableToken.transfer(receiver, amount);
+
+        emit RewardsTransferred(rewardToken, amount, receiver);
+    }
+
+    function _ensureTokenSafeToTransfer(address rewardToken) internal view {
+        require(rewardToken != asset(), InvalidRewardToken(rewardToken));
+        require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
+        require(rewardToken != address(this), InvalidRewardToken(rewardToken));
+    }
+
+    // ----- Etc -----
+
     constructor() {
         _disableInitializers();
     }
@@ -338,21 +411,10 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         _;
     }
 
-    // ----- Non-asset rewards trading -----
-
-    /// @notice Proposes execution of `setRewardTrader` with given parameters.
-    /// Caller must hold the `OWNER` role.
-    function submitSetRewardTrader(address rewardToken, address traderAddress) external {}
-
-    /// @notice Allows transfering `rewardToken`s from aggregator to `traderAddress`
-    /// using `transferRewardsForSale` method.
-    /// Can only be called after timelock initiated in `submitSetRewardTrader` has elapsed.
-    function setRewardTrader(address rewardToken, address traderAddress) external {}
-
-    /// @notice Cancels reward trader setting action.
-    /// Caller must hold `GUARDIAN`, `MANAGER` or `OWNER` role.
-    function cancelSetRewardTrader(address rewardToken, address traderAddress) external {}
-
-    /// @notice Transfers all `token`s held in the aggregator to `rewardTrader[token]`
-    function transferRewardsForSale(address token) external {}
+    modifier onlyGuardianOrHigherRole() {
+        if (!hasRole(GUARDIAN, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
+            revert CallerNotGuardianOrWithHigherRole();
+        }
+        _;
+    }
 }

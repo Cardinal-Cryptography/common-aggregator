@@ -76,12 +76,13 @@ interface ICommonAggregator is IERC4626 {
     event SetRewardsTraderSubmitted(
         address indexed rewardToken, address indexed traderAddress, uint256 unlockTimestamp
     );
-
     event SetRewardsTraderCancelled(address indexed rewardToken, address indexed traderAddress);
-
     event RewardsTraderSet(address indexed rewardToken, address indexed traderAddress);
-
     event RewardsTransferred(address indexed rewardToken, uint256 amount, address indexed receiver);
+
+    error CallerNotGuardianOrWithHigherRole();
+    error InvalidRewardToken(address token);
+    error NoTraderSetForToken(address token);
 
     /// @notice Proposes execution of `setRewardTrader` with given parameters.
     /// Caller must hold the `OWNER` role.
