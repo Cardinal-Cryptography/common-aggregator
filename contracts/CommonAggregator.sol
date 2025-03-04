@@ -75,6 +75,21 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         require(!_isVaultOnTheList(vault), VaultAlreadyAded(vault));
     }
 
+    // ----- ERC20 -----
+
+    function totalSupply() public view override(ERC20Upgradeable, IERC20) returns (uint256) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        return super.totalSupply() - $.rewardBuffer._sharesToBurn();
+    }
+
+    function balanceOf(address account) public view override(ERC20Upgradeable, IERC20) returns (uint256 balance) {
+        balance = super.balanceOf(account);
+        if (account == address(this)) {
+            AggregatorStorage storage $ = _getAggregatorStorage();
+            balance -= $.rewardBuffer._sharesToBurn();
+        }
+    }
+
     // ----- ERC4626 -----
 
     function _decimalsOffset() internal pure override returns (uint8) {
@@ -221,7 +236,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         } else {
             uint256 newAssets = _totalAssetsNotCached();
             (uint256 sharesToMint, uint256 sharesToBurn) =
-                $.rewardBuffer._updateBuffer(newAssets, totalSupply(), $.protocolFeeBps);
+                $.rewardBuffer._updateBuffer(newAssets, super.totalSupply(), $.protocolFeeBps);
             if (sharesToMint > 0) {
                 uint256 feePartOfMintedShares = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
                 _mint(address(this), sharesToMint - feePartOfMintedShares);
@@ -239,13 +254,13 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     function _previewUpdateHoldingsState() internal view returns (uint256 newTotalAssets, uint256 newTotalSupply) {
         AggregatorStorage storage $ = _getAggregatorStorage();
         if ($.rewardBuffer._getAssetsCached() == 0) {
-            return (0, totalSupply());
+            return (0, super.totalSupply());
         }
 
         newTotalAssets = _totalAssetsNotCached();
         (uint256 sharesToMint, uint256 sharesToBurn) =
             $.rewardBuffer._simulateBufferUpdate(newTotalAssets, totalSupply(), $.protocolFeeBps);
-        return (newTotalAssets, totalSupply() + sharesToMint - sharesToBurn);
+        return (newTotalAssets, super.totalSupply() + sharesToMint - sharesToBurn);
     }
 
     function _totalAssetsNotCached() internal view returns (uint256) {
