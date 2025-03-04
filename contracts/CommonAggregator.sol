@@ -190,6 +190,10 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         return assets;
     }
 
+    function _pullFundsForWithdrawal(uint256 amount) public {}
+
+    function _pullFundsProportional(uint256 amount) external onlyThis {}
+
     // TODO: make sure deposits / withdrawals from protocolReceiver are handled correctly
 
     // ----- Reporting -----
@@ -361,6 +365,11 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         if (!hasRole(REBALANCER, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
             revert CallerNotRebalancerOrWithHigherRole();
         }
+        _;
+    }
+
+    modifier onlyAggregator() {
+        require(msg.sender == address(this), CallerNotAggregator());
         _;
     }
 }
