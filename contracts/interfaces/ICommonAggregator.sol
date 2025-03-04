@@ -33,10 +33,6 @@ interface ICommonAggregator is IERC4626 {
 
     function removeVault(IERC4626 vault) external;
 
-    function submitForceRemoveVault(IERC4626 vault) external;
-    function cancelForceRemoveVault(IERC4626 vault) external;
-    function forceRemoveVault(IERC4626 vault) external;
-
     error PendingVaultForceRemoval(IERC4626 vault);
 
     // ----- Deposits -----

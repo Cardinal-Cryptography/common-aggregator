@@ -344,42 +344,6 @@ contract CommonAggregator is
         emit VaultRemoved(address(vault));
     }
 
-    function submitForceRemoveVault(IERC4626 vault)
-        external
-        override
-        onlyManagerOrOwner
-        registersTimelockedAction(
-            keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)),
-            FORCE_REMOVE_VAULT_TIMELOCK
-        )
-    {
-        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
-        emit VaultForceRemovalSubmitted(address(vault), block.timestamp + FORCE_REMOVE_VAULT_TIMELOCK);
-    }
-
-    function cancelForceRemoveVault(IERC4626 vault)
-        external
-        override
-        onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
-    {
-        emit VaultForceRemovalCancelled(address(vault));
-    }
-
-    function forceRemoveVault(IERC4626 vault)
-        external
-        override
-        onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
-    {
-        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
-        require(isVaultOnTheList, VaultNotOnTheList(vault));
-
-        // TODO: implement force removal
-
-        emit VaultForceRemoved(address(vault));
-    }
-
     // ----- Rebalancing -----
 
     /// @inheritdoc ICommonAggregator

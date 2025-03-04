@@ -207,18 +207,19 @@ contract VaultManagementTest is Test {
         aggregator.removeVault(toRemove);
     }
 
-    function testCantRemoveVaultWhenPendingForceRemoval() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
-        IERC4626[] memory initialVaults = aggregator.getVaults();
-        ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
+    // TODO: Uncomment when force removals are implemented and potentially adjust so that it works
+    // function testCantRemoveVaultWhenPendingForceRemoval() public {
+    //     CommonAggregator aggregator = _aggregatorWithThreeVaults();
+    //     IERC4626[] memory initialVaults = aggregator.getVaults();
+    //     ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
 
-        vm.prank(manager);
-        aggregator.submitForceRemoveVault(toRemove);
+    //     vm.prank(manager);
+    //     aggregator.submitForceRemoveVault(toRemove);
 
-        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.PendingVaultForceRemoval.selector, toRemove));
-        vm.prank(manager);
-        aggregator.removeVault(toRemove);
-    }
+    //     vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.PendingVaultForceRemoval.selector, toRemove));
+    //     vm.prank(manager);
+    //     aggregator.removeVault(toRemove);
+    // }
 
     function _aggregatorWithThreeVaults() private returns (CommonAggregator) {
         IERC4626[] memory vaults = new IERC4626[](3);
