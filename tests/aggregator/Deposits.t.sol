@@ -163,7 +163,7 @@ contract CommonAggregatorTest is Test {
         vaults[0].setDepositLimit(10);
         _bobMint(shares / 10);
 
-        assertEq(_vaultsAllocation(vaults[0]), 1000);
+        assertEq(_vaultsAllocation(vaults[0]), 1010);
         assertEq(_vaultsAllocation(vaults[1]), 110);
         assertEq(_vaultsAllocation(vaults[2]), 1);
     }

@@ -17,8 +17,7 @@ interface ICommonAggregator is IERC4626 {
 
     // ----- Deposits -----
 
-    event DepositedToVault(address vault, uint256 amount);
-    event DepositToVaultFailed(address vault, uint256 amount);
+    event DepositedToVault(address indexed vault, uint256 amountPlanned, uint256 amountDeposited);
 
     // ----- Rebalancing -----
 

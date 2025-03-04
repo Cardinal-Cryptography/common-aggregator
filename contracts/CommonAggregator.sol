@@ -149,12 +149,11 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
             for (uint256 i = 0; i < $.vaults.length; ++i) {
                 IERC4626 vault = $.vaults[i];
                 uint256 assetsToDepositToVault = assets.mulDiv(_aggregatedVaultAssets(vault), cachedTotalAssets);
-                IERC20(asset()).approve(address(vault), assetsToDepositToVault);
-                try vault.deposit(assetsToDepositToVault, address(this)) {
-                    emit DepositedToVault(address(vault), assetsToDepositToVault);
-                } catch {
-                    emit DepositToVaultFailed(address(vault), assetsToDepositToVault);
-                }
+                uint256 maxVaultDeposit = vault.maxDeposit(address(this));
+                uint256 depositAmount = assetsToDepositToVault.min(maxVaultDeposit);
+                IERC20(asset()).approve(address(vault), depositAmount);
+                vault.deposit(depositAmount, address(this));
+                emit DepositedToVault(address(vault), assetsToDepositToVault, depositAmount);
             }
         }
     }
