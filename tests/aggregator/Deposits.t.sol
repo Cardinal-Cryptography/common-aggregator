@@ -66,7 +66,7 @@ contract CommonAggregatorTest is Test {
         _firstDeposit(INITIAL_DEPOSIT);
         _prepareDistribution([uint256(6000), 500, 2]);
 
-        _bobDeposit(INITIAL_DEPOSIT);
+        _bobDeposit(10000);
 
         assertEq(_vaultsAllocation(vaults[0]), 12000);
         assertEq(_vaultsAllocation(vaults[1]), 1000);
@@ -100,6 +100,19 @@ contract CommonAggregatorTest is Test {
                 uint256(depositSize).mulDiv(initialDistribution[i], INITIAL_DEPOSIT) + initialDistribution[i]
             );
         }
+    }
+
+    function testRevertingVaultDeposit() public {
+        _firstDeposit(INITIAL_DEPOSIT);
+        _prepareDistribution([uint256(6000), 500, 2]);
+
+        vaults[1].setDepositLimit(0);
+
+        _bobDeposit(1000);
+
+        assertEq(_vaultsAllocation(vaults[0]), 6600);
+        assertEq(_vaultsAllocation(vaults[1]), 500);
+        assertEq(_vaultsAllocation(vaults[2]), 2);
     }
 
     function testProportionalMint() public {
@@ -140,6 +153,19 @@ contract CommonAggregatorTest is Test {
                     + initialDistribution[i]
             );
         }
+    }
+
+    function testRevertingVaultMint() public {
+        uint256 shares = _firstDeposit(INITIAL_DEPOSIT);
+        _prepareDistribution([uint256(1000), 100, 1]);
+
+        assert(shares % 10 == 0);
+        vaults[0].setDepositLimit(10);
+        _bobMint(shares / 10);
+
+        assertEq(_vaultsAllocation(vaults[0]), 1000);
+        assertEq(_vaultsAllocation(vaults[1]), 110);
+        assertEq(_vaultsAllocation(vaults[2]), 1);
     }
 
     function _firstDeposit(uint256 initialDeposit) internal returns (uint256) {
