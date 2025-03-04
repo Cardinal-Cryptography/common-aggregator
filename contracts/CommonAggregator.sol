@@ -216,6 +216,23 @@ contract CommonAggregator is
         return assets;
     }
 
+    function _fallbackPullFromVaults(uint256 assets, address account) internal {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        for (uint256 i = 0; i < $.vaults.length && assets > 0; i++) {
+            IERC4626 vault = $.vaults[i];
+            uint256 vaultMaxWithdraw = vault.maxWithdraw(address(this));
+            uint256 assetsToPullFromVault = assets.min(vaultMaxWithdraw);
+            try vault.withdraw(assetsToPullFromVault, account, address(this)) {
+                assets -= assetsToPullFromVault;
+            } catch {
+                emit VaultWithdrawFailed(vault);
+            }
+        }
+        if (assets > 0) {
+            revert InsufficientAssetsForWithdrawal();
+        }
+    }
+
     // TODO: make sure deposits / withdrawals from protocolReceiver are handled correctly
 
     // ----- Reporting -----
