@@ -51,7 +51,7 @@ contract VaultManagementTest is Test {
         // Limits are inclusive, so it's still too early
         vm.warp(STARTING_TIMESTAMP + 7 days);
 
-        bytes32 actionHash = keccak256(abi.encodePacked(CommonAggregator.TimelockTypes.ADD_VAULT, vault, MAX_BPS));
+        bytes32 actionHash = keccak256(abi.encode(CommonAggregator.TimelockTypes.ADD_VAULT, vault, MAX_BPS));
         vm.expectRevert(
             abi.encodeWithSelector(CommonTimelocks.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 7 days)
         );
@@ -70,6 +70,15 @@ contract VaultManagementTest is Test {
         vm.expectRevert();
         vm.prank(manager);
         aggregator.addVault(vault, MAX_BPS);
+    }
+
+    function testCantSubmitAddVaultWithTooHighLimit() public {
+        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        IERC4626 vault = new ERC4626Mock(address(asset));
+
+        vm.expectRevert(ICommonAggregator.IncorrectMaxAllocationLimit.selector);
+        vm.prank(manager);
+        aggregator.submitAddVault(vault, MAX_BPS + 1);
     }
 
     function testCancelAddVault() public {
