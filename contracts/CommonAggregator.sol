@@ -284,9 +284,12 @@ contract CommonAggregator is
         external
         override
         onlyManagerOrOwner
-        registersTimelockedAction(keccak256(abi.encodePacked(TimelockTypes.ADD_VAULT, vault, limit)), ADD_VAULT_TIMELOCK)
+        registersTimelockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)), ADD_VAULT_TIMELOCK)
     {
         _ensureVaultCanBeAdded(vault);
+        if (limit > MAX_BPS) {
+            revert IncorrectMaxAllocationLimit();
+        }
         emit VaultAdditionSubmitted(address(vault), limit, block.timestamp + ADD_VAULT_TIMELOCK);
     }
 
@@ -294,7 +297,7 @@ contract CommonAggregator is
         external
         override
         onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encodePacked(TimelockTypes.ADD_VAULT, vault, limit)))
+        cancelsAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)))
     {
         emit VaultAdditionCancelled(address(vault), limit);
     }
@@ -303,7 +306,7 @@ contract CommonAggregator is
         external
         override
         onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encodePacked(TimelockTypes.ADD_VAULT, vault, limit)))
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)))
     {
         _ensureVaultCanBeAdded(vault);
         if (limit > MAX_BPS) {
@@ -321,7 +324,7 @@ contract CommonAggregator is
         (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
         require(
-            !_isTimelockedActionRegistered(keccak256(abi.encodePacked(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
+            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
             PendingVaultForceRemoval(vault)
         );
 
@@ -329,6 +332,7 @@ contract CommonAggregator is
 
         updateHoldingsState();
         $.vaults[index].redeem($.vaults[index].balanceOf(address(this)), address(this), address(this));
+        delete $.allocationLimitBps[address(vault)];
 
         // Remove the vault from the list, shifting the rest of the array.
         for (uint256 i = index; i < $.vaults.length - 1; i++) {
@@ -345,7 +349,7 @@ contract CommonAggregator is
         override
         onlyManagerOrOwner
         registersTimelockedAction(
-            keccak256(abi.encodePacked(TimelockTypes.FORCE_REMOVE_VAULT, vault)),
+            keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)),
             FORCE_REMOVE_VAULT_TIMELOCK
         )
     {
@@ -357,7 +361,7 @@ contract CommonAggregator is
         external
         override
         onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encodePacked(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
+        cancelsAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
     {
         emit VaultForceRemovalCancelled(address(vault));
     }
@@ -366,7 +370,7 @@ contract CommonAggregator is
         external
         override
         onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encodePacked(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
     {
         (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
