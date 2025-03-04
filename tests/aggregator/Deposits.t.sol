@@ -44,7 +44,7 @@ contract CommonAggregatorTest is Test {
         asset.mint(bob, type(uint128).max);
     }
 
-    function testFistDepositCanBeMade() public {
+    function testFirstDepositCanBeMade() public {
         uint256 initialDeposit = 10000;
         _firstDeposit(initialDeposit);
         assertEq(commonAggregator.totalAssets(), initialDeposit);
