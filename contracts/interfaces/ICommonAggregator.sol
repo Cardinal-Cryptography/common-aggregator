@@ -37,7 +37,6 @@ interface ICommonAggregator is IERC4626 {
     function cancelForceRemoveVault(IERC4626 vault) external;
     function forceRemoveVault(IERC4626 vault) external;
 
-    error NonZeroSharesOfVaultToBeRemoved(uint256 sharesLeft);
     error PendingVaultForceRemoval(IERC4626 vault);
 
     // ----- Rebalancing -----

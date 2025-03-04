@@ -303,16 +303,13 @@ contract CommonAggregator is
         updateHoldingsState();
         $.vaults[index].redeem($.vaults[index].balanceOf(address(this)), address(this), address(this));
 
-        uint256 sharesLeft = $.vaults[index].balanceOf(address(this));
-        require(sharesLeft == 0, NonZeroSharesOfVaultToBeRemoved(sharesLeft));
-
         // Remove the vault from the list, shifting the rest of the array.
         for (uint256 i = index; i < $.vaults.length - 1; i++) {
             $.vaults[i] = $.vaults[i + 1];
         }
         $.vaults.pop();
 
-        // No need to updateHoldingsState again, as we don' have any shares of the vault anymore.
+        // No need to updateHoldingsState again, as we don't have any shares of the vault anymore.
         emit VaultRemoved(address(vault));
     }
 
