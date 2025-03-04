@@ -176,6 +176,7 @@ contract VaultManagementTest is Test {
 
         vm.prank(manager);
         aggregator.removeVault(toRemove);
+        aggregator.updateHoldingsState();
 
         assertEq(aggregator.totalAssets(), 1400);
         assertEq(aggregator.balanceOf(alice), 1000 * 10 ** (aggregator.decimals() - asset.decimals()));

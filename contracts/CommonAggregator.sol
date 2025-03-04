@@ -328,9 +328,8 @@ contract CommonAggregator is
             PendingVaultForceRemoval(vault)
         );
 
+        // No need to updateHoldingsState, as we're not operating on assets.
         AggregatorStorage storage $ = _getAggregatorStorage();
-
-        updateHoldingsState();
         $.vaults[index].redeem($.vaults[index].balanceOf(address(this)), address(this), address(this));
         delete $.allocationLimitBps[address(vault)];
 
