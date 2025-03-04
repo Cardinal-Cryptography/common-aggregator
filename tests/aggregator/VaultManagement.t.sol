@@ -188,7 +188,8 @@ contract VaultManagementTest is Test {
         vm.prank(manager);
         aggregator.pushFunds(1000, toRemove);
 
-        toRemove.setMaxWithdrawAndMaxRedeem(999, 999);
+        toRemove.setWithdrawLimit(999);
+        toRemove.setRedeemLimit(999);
 
         vm.prank(manager);
         vm.expectRevert(

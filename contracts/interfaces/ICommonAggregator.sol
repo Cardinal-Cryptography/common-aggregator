@@ -39,6 +39,10 @@ interface ICommonAggregator is IERC4626 {
 
     error PendingVaultForceRemoval(IERC4626 vault);
 
+    // ----- Deposits -----
+
+    event DepositedToVault(address indexed vault, uint256 amountPlanned, uint256 amountDeposited);
+
     // ----- Rebalancing -----
 
     event AssetsRebalanced(address indexed from, address indexed to, uint256 amount);
