@@ -10,7 +10,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
-import {MAX_BPS} from "contracts/Math.sol";
+import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
 
 contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
@@ -72,14 +72,111 @@ contract CommonAggregatorTest is Test {
         vm.prank(owner);
         commonAggregator.submitSetRewardTrader(address(reward), trader);
 
-        vm.expectRevert();
+        vm.warp(STARTING_TIMESTAMP + 2 days);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonTimelocks.ActionTimelocked.selector,
+                keccak256(abi.encode(CommonAggregator.ActionType.SET_TRADER, address(reward), trader)),
+                STARTING_TIMESTAMP + 5 days
+            )
+        );
         vm.prank(owner);
-        //commonAggregator.;
+        commonAggregator.setRewardTrader(address(reward), trader);
+
+        vm.warp(STARTING_TIMESTAMP + 6 days);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonTimelocks.ActionNotRegistered.selector,
+                keccak256(abi.encode(CommonAggregator.ActionType.SET_TRADER, address(reward), owner))
+            )
+        );
+        vm.prank(owner);
+        commonAggregator.setRewardTrader(address(reward), owner);
     }
 
-    function testTransferWithoutTraderSet() public {}
+    function testTransferWithoutTraderSet() public {
+        reward.mint(alice, 1000);
+        vm.prank(alice);
+        reward.transfer(address(commonAggregator), 1000);
 
-    function testPermissions() public {}
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.NoTraderSetForToken.selector, address(reward)));
+        vm.prank(alice);
+        commonAggregator.transferRewardsForSale(address(reward));
+    }
 
-    function testWrongTokens() public {}
+    function testPermissions() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, manager, keccak256("OWNER")
+            )
+        );
+        vm.prank(manager);
+        commonAggregator.submitSetRewardTrader(address(reward), trader);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, rebalancer, keccak256("OWNER")
+            )
+        );
+        vm.prank(rebalancer);
+        commonAggregator.submitSetRewardTrader(address(reward), trader);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, guardian, keccak256("OWNER")
+            )
+        );
+        vm.prank(guardian);
+        commonAggregator.submitSetRewardTrader(address(reward), trader);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, keccak256("OWNER"))
+        );
+        vm.prank(alice);
+        commonAggregator.submitSetRewardTrader(address(reward), trader);
+
+        vm.prank(owner);
+        commonAggregator.submitSetRewardTrader(address(reward), trader);
+
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector));
+        vm.prank(alice);
+        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector));
+        vm.prank(rebalancer);
+        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+
+        vm.prank(guardian);
+        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+
+        vm.prank(owner);
+        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        vm.prank(manager);
+        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+
+        vm.prank(owner);
+        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        vm.prank(owner);
+        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+    }
+
+    function testWrongTokens() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(commonAggregator))
+        );
+        vm.prank(owner);
+        commonAggregator.submitSetRewardTrader(address(commonAggregator), trader);
+
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(asset)));
+        vm.prank(owner);
+        commonAggregator.submitSetRewardTrader(address(asset), trader);
+
+        for (uint256 i = 0; i < vaults.length; ++i) {
+            vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(vaults[i])));
+            vm.prank(owner);
+            commonAggregator.submitSetRewardTrader(address(vaults[i]), trader);
+        }
+    }
 }
