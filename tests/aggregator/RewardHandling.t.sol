@@ -77,7 +77,7 @@ contract CommonAggregatorTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonTimelocks.ActionTimelocked.selector,
-                keccak256(abi.encode(CommonAggregator.ActionType.SET_TRADER, address(reward), trader)),
+                keccak256(abi.encode(CommonAggregator.TimelockTypes.SET_TRADER, address(reward), trader)),
                 STARTING_TIMESTAMP + 5 days
             )
         );
@@ -89,7 +89,7 @@ contract CommonAggregatorTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonTimelocks.ActionNotRegistered.selector,
-                keccak256(abi.encode(CommonAggregator.ActionType.SET_TRADER, address(reward), owner))
+                keccak256(abi.encode(CommonAggregator.TimelockTypes.SET_TRADER, address(reward), owner))
             )
         );
         vm.prank(owner);

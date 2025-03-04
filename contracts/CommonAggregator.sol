@@ -35,7 +35,7 @@ contract CommonAggregator is
 
     uint256 public constant SET_TRADER_TIMELOCK = 5 days;
 
-    enum ActionType {
+    enum TimelockTypes {
         SET_TRADER
     }
 
@@ -345,7 +345,7 @@ contract CommonAggregator is
         external
         onlyRole(OWNER)
         registersTimelockedAction(
-            keccak256(abi.encode(ActionType.SET_TRADER, rewardToken, traderAddress)),
+            keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)),
             SET_TRADER_TIMELOCK
         )
     {
@@ -357,7 +357,7 @@ contract CommonAggregator is
     /// @inheritdoc ICommonAggregator
     function setRewardTrader(address rewardToken, address traderAddress)
         external
-        executesUnlockedAction(keccak256(abi.encode(ActionType.SET_TRADER, rewardToken, traderAddress)))
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
     {
         _ensureTokenSafeToTransfer(rewardToken);
         AggregatorStorage storage $ = _getAggregatorStorage();
@@ -370,7 +370,7 @@ contract CommonAggregator is
     function cancelSetRewardTrader(address rewardToken, address traderAddress)
         external
         onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(ActionType.SET_TRADER, rewardToken, traderAddress)))
+        cancelsAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
     {
         emit SetRewardsTraderCancelled(rewardToken, traderAddress);
     }
