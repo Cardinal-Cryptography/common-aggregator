@@ -150,7 +150,11 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
                 IERC4626 vault = $.vaults[i];
                 uint256 assetsToDepositToVault = assets.mulDiv(_aggregatedVaultAssets(vault), cachedTotalAssets);
                 IERC20(asset()).approve(address(vault), assetsToDepositToVault);
-                vault.deposit(assetsToDepositToVault, address(this));
+                try vault.deposit(assetsToDepositToVault, address(this)) {
+                    emit DepositedToVault(address(vault), assetsToDepositToVault);
+                } catch {
+                    emit DepositToVaultFailed(address(vault), assetsToDepositToVault);
+                }
             }
         }
     }

@@ -15,6 +15,11 @@ interface ICommonAggregator is IERC4626 {
 
     function updateHoldingsState() external;
 
+    // ----- Deposits -----
+
+    event DepositedToVault(address vault, uint256 amount);
+    event DepositToVaultFailed(address vault, uint256 amount);
+
     // ----- Rebalancing -----
 
     event AssetsRebalanced(address indexed from, address indexed to, uint256 amount);
