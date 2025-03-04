@@ -18,6 +18,7 @@ contract CommonAggregatorTest is Test {
 
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
     uint256 constant VAULT_COUNT = 3;
+    uint256 constant INITIAL_DEPOSIT = 10000;
 
     CommonAggregator commonAggregator;
     address owner = address(0x123);
@@ -45,13 +46,13 @@ contract CommonAggregatorTest is Test {
     }
 
     function testFirstDepositCanBeMade() public {
-        uint256 initialDeposit = 10000;
+        uint256 initialDeposit = INITIAL_DEPOSIT;
         _firstDeposit(initialDeposit);
         assertEq(commonAggregator.totalAssets(), initialDeposit);
     }
 
     function testTinyProportionalDeposit() public {
-        _firstDeposit(10000);
+        _firstDeposit(INITIAL_DEPOSIT);
         _prepareDistribution([uint256(1000), 100, 1]);
 
         _bobDeposit(10);
@@ -62,10 +63,10 @@ contract CommonAggregatorTest is Test {
     }
 
     function testSmallProportionalDeposit() public {
-        _firstDeposit(10000);
+        _firstDeposit(INITIAL_DEPOSIT);
         _prepareDistribution([uint256(6000), 500, 2]);
 
-        _bobDeposit(10000);
+        _bobDeposit(INITIAL_DEPOSIT);
 
         assertEq(_vaultsAllocation(vaults[0]), 12000);
         assertEq(_vaultsAllocation(vaults[1]), 1000);
@@ -80,9 +81,9 @@ contract CommonAggregatorTest is Test {
             initDistributionSum += initialDistribution[i];
         }
 
-        vm.assume(initDistributionSum <= 10000);
+        vm.assume(initDistributionSum <= INITIAL_DEPOSIT);
 
-        _firstDeposit(10000);
+        _firstDeposit(INITIAL_DEPOSIT);
 
         uint256[VAULT_COUNT] memory initDistributionArg;
         for (uint256 i = 0; i < VAULT_COUNT; ++i) {
@@ -96,13 +97,13 @@ contract CommonAggregatorTest is Test {
         for (uint256 i = 0; i < VAULT_COUNT; ++i) {
             assertEq(
                 _vaultsAllocation(vaults[i]),
-                uint256(depositSize).mulDiv(initialDistribution[i], 10000) + initialDistribution[i]
+                uint256(depositSize).mulDiv(initialDistribution[i], INITIAL_DEPOSIT) + initialDistribution[i]
             );
         }
     }
 
     function testProportionalMint() public {
-        uint256 shares = _firstDeposit(10000);
+        uint256 shares = _firstDeposit(INITIAL_DEPOSIT);
         _prepareDistribution([uint256(1000), 100, 1]);
 
         assert(shares % 10 == 0);
@@ -119,9 +120,9 @@ contract CommonAggregatorTest is Test {
             initDistributionSum += initialDistribution[i];
         }
 
-        vm.assume(initDistributionSum <= 10000);
+        vm.assume(initDistributionSum <= INITIAL_DEPOSIT);
 
-        _firstDeposit(10000);
+        _firstDeposit(INITIAL_DEPOSIT);
 
         uint256[VAULT_COUNT] memory initDistributionArg;
         for (uint256 i = 0; i < VAULT_COUNT; ++i) {
@@ -135,7 +136,8 @@ contract CommonAggregatorTest is Test {
         for (uint256 i = 0; i < VAULT_COUNT; ++i) {
             assertEq(
                 _vaultsAllocation(vaults[i]),
-                commonAggregator.previewMint(mintSize).mulDiv(initialDistribution[i], 10000) + initialDistribution[i]
+                commonAggregator.previewMint(mintSize).mulDiv(initialDistribution[i], INITIAL_DEPOSIT)
+                    + initialDistribution[i]
             );
         }
     }
