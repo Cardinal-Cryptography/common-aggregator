@@ -55,6 +55,16 @@ contract CommonAggregator is
         }
     }
 
+    function getVaults() external view returns (IERC4626[] memory) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        return $.vaults;
+    }
+
+    function getMaxAllocationLimit(IERC4626 vault) external view returns (uint256) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        return $.allocationLimitBps[address(vault)];
+    }
+
     function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -289,10 +299,8 @@ contract CommonAggregator is
         );
 
         AggregatorStorage storage $ = _getAggregatorStorage();
-        uint256 allocationLimit = $.allocationLimitBps[address(vault)];
-        require(allocationLimit == 0, NonZeroAllocationLimitOfVaultToBeRemoved(allocationLimit));
 
-        // Redeem all shares of the vault. Updates holdings state.
+        updateHoldingsState();
         $.vaults[index].redeem($.vaults[index].balanceOf(address(this)), address(this), address(this));
 
         uint256 sharesLeft = $.vaults[index].balanceOf(address(this));
