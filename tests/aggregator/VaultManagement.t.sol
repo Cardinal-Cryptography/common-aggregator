@@ -51,7 +51,7 @@ contract VaultManagementTest is Test {
         // Limits are inclusive, so it's still too early
         vm.warp(STARTING_TIMESTAMP + 7 days);
 
-        bytes32 actionHash = keccak256(abi.encodeWithSelector(ICommonAggregator.addVault.selector, vault, MAX_BPS));
+        bytes32 actionHash = keccak256(abi.encodePacked(CommonAggregator.TimelockTypes.ADD_VAULT, vault, MAX_BPS));
         vm.expectRevert(
             abi.encodeWithSelector(CommonTimelocks.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 7 days)
         );

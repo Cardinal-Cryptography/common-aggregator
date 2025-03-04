@@ -34,7 +34,12 @@ contract CommonAggregator is
     uint256 public constant MAX_PROTOCOL_FEE_BPS = MAX_BPS / 2;
 
     uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
-    uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 30 days;
+    uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 7 days;
+
+    enum TimelockTypes {
+        ADD_VAULT,
+        FORCE_REMOVE_VAULT
+    }
 
     /// @custom:storage-location erc7201:common.storage.aggregator
     struct AggregatorStorage {
@@ -252,10 +257,7 @@ contract CommonAggregator is
         external
         override
         onlyManagerOrOwner
-        registersTimelockedAction(
-            keccak256(abi.encodeWithSelector(ICommonAggregator.addVault.selector, vault, limit)),
-            ADD_VAULT_TIMELOCK
-        )
+        registersTimelockedAction(keccak256(abi.encodePacked(TimelockTypes.ADD_VAULT, vault, limit)), ADD_VAULT_TIMELOCK)
     {
         _ensureVaultCanBeAdded(vault);
         emit VaultAdditionSubmitted(address(vault), limit, block.timestamp + ADD_VAULT_TIMELOCK);
@@ -265,7 +267,7 @@ contract CommonAggregator is
         external
         override
         onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encodeWithSelector(ICommonAggregator.addVault.selector, vault, limit)))
+        cancelsAction(keccak256(abi.encodePacked(TimelockTypes.ADD_VAULT, vault, limit)))
     {
         emit VaultAdditionCancelled(address(vault), limit);
     }
@@ -274,7 +276,7 @@ contract CommonAggregator is
         external
         override
         onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encodeWithSelector(ICommonAggregator.addVault.selector, vault, limit)))
+        executesUnlockedAction(keccak256(abi.encodePacked(TimelockTypes.ADD_VAULT, vault, limit)))
     {
         _ensureVaultCanBeAdded(vault);
         if (limit > MAX_BPS) {
@@ -292,9 +294,7 @@ contract CommonAggregator is
         (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
         require(
-            !_isTimelockedActionRegistered(
-                keccak256(abi.encodeWithSelector(ICommonAggregator.forceRemoveVault.selector, vault))
-            ),
+            !_isTimelockedActionRegistered(keccak256(abi.encodePacked(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
             PendingVaultForceRemoval(vault)
         );
 
@@ -318,7 +318,7 @@ contract CommonAggregator is
         override
         onlyManagerOrOwner
         registersTimelockedAction(
-            keccak256(abi.encodeWithSelector(ICommonAggregator.forceRemoveVault.selector, vault)),
+            keccak256(abi.encodePacked(TimelockTypes.FORCE_REMOVE_VAULT, vault)),
             FORCE_REMOVE_VAULT_TIMELOCK
         )
     {
@@ -330,7 +330,7 @@ contract CommonAggregator is
         external
         override
         onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encodeWithSelector(ICommonAggregator.forceRemoveVault.selector, vault)))
+        cancelsAction(keccak256(abi.encodePacked(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
     {
         emit VaultForceRemovalCancelled(address(vault));
     }
@@ -339,7 +339,7 @@ contract CommonAggregator is
         external
         override
         onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encodeWithSelector(ICommonAggregator.forceRemoveVault.selector, vault)))
+        executesUnlockedAction(keccak256(abi.encodePacked(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
     {
         (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
