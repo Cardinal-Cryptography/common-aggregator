@@ -186,7 +186,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     // ----- Emergency redeem -----
 
     /// @inheritdoc ICommonAggregator
-    /// @notice Updates holdings state before depositing.
     function emergencyRedeem(uint256 shares, address account, address owner)
         external
         returns (uint256 assets, uint256[] memory vaultShares)
