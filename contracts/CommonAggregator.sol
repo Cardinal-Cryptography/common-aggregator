@@ -371,7 +371,7 @@ contract CommonAggregator is
     /// @inheritdoc ICommonAggregator
     function submitSetRewardTrader(address rewardToken, address traderAddress)
         external
-        onlyRole(OWNER)
+        onlyManagerOrOwner
         registersTimelockedAction(
             keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)),
             SET_TRADER_TIMELOCK

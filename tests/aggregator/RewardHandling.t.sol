@@ -107,44 +107,26 @@ contract CommonAggregatorTest is Test {
     }
 
     function testPermissions() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, manager, keccak256("OWNER")
-            )
-        );
-        vm.prank(manager);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, rebalancer, keccak256("OWNER")
-            )
-        );
+        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
         vm.prank(rebalancer);
         commonAggregator.submitSetRewardTrader(address(reward), trader);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, guardian, keccak256("OWNER")
-            )
-        );
+        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
         vm.prank(guardian);
         commonAggregator.submitSetRewardTrader(address(reward), trader);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, keccak256("OWNER"))
-        );
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.CallerNotManagerNorOwner.selector));
         vm.prank(alice);
         commonAggregator.submitSetRewardTrader(address(reward), trader);
 
         vm.prank(owner);
         commonAggregator.submitSetRewardTrader(address(reward), trader);
 
-        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector));
+        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
         vm.prank(alice);
         commonAggregator.cancelSetRewardTrader(address(reward), trader);
 
-        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector));
+        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
         vm.prank(rebalancer);
         commonAggregator.cancelSetRewardTrader(address(reward), trader);
 
@@ -161,16 +143,16 @@ contract CommonAggregatorTest is Test {
         vm.prank(owner);
         commonAggregator.cancelSetRewardTrader(address(reward), trader);
 
-        vm.prank(owner);
+        vm.prank(manager);
         commonAggregator.submitSetRewardTrader(address(reward), trader);
 
         vm.warp(STARTING_TIMESTAMP + 6 days);
 
-        vm.expectRevert();
+        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
         vm.prank(alice);
         commonAggregator.setRewardTrader(address(reward), trader);
 
-        vm.expectRevert();
+        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
         vm.prank(guardian);
         commonAggregator.setRewardTrader(address(reward), trader);
 
