@@ -2,12 +2,14 @@
 pragma solidity ^0.8.28;
 
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {IERC20, ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {
+    IERC20,
     IERC4626,
+    IERC20Metadata,
+    SafeERC20,
+    ERC20Upgradeable,
     ERC4626Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -17,6 +19,7 @@ import "./RewardBuffer.sol";
 contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUpgradeable, ERC4626Upgradeable {
     using RewardBuffer for RewardBuffer.Buffer;
     using Math for uint256;
+    using SafeERC20 for IERC20;
 
     bytes32 public constant OWNER = keccak256("OWNER");
     bytes32 public constant MANAGER = keccak256("MANAGER");
@@ -226,7 +229,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         _transfer(owner, address(this), shares);
 
         assets = shares.mulDiv(IERC20(asset()).balanceOf(address(this)), totalSupply());
-        IERC20(asset()).transfer(account, assets);
+        IERC20(asset()).safeTransfer(account, assets);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         vaultShares = new uint256[]($.vaults.length);
