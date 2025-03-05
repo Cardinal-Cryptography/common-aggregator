@@ -48,6 +48,7 @@ contract CommonAggregator is
         mapping(address vault => uint256 limit) allocationLimitBps;
         uint256 protocolFeeBps;
         address protocolFeeReceiver;
+        mapping(address vault => bool) pendingVaultAdditions;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
@@ -290,6 +291,12 @@ contract CommonAggregator is
         if (limit > MAX_BPS) {
             revert IncorrectMaxAllocationLimit();
         }
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        if ($.pendingVaultAdditions[address(vault)] == true) {
+            revert VaultAdditionAlreadyPending(vault);
+        }
+        $.pendingVaultAdditions[address(vault)] = true;
         emit VaultAdditionSubmitted(address(vault), limit, block.timestamp + ADD_VAULT_TIMELOCK);
     }
 
@@ -299,6 +306,8 @@ contract CommonAggregator is
         onlyGuardianOrHigherRole
         cancelsAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)))
     {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        delete $.pendingVaultAdditions[address(vault)];
         emit VaultAdditionCancelled(address(vault), limit);
     }
 
@@ -315,6 +324,7 @@ contract CommonAggregator is
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.vaults.push(vault);
         $.allocationLimitBps[address(vault)] = limit;
+        delete $.pendingVaultAdditions[address(vault)];
         updateHoldingsState();
 
         emit VaultAdded(address(vault), limit);

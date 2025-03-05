@@ -34,6 +34,7 @@ interface ICommonAggregator is IERC4626 {
     function removeVault(IERC4626 vault) external;
 
     error PendingVaultForceRemoval(IERC4626 vault);
+    error VaultAdditionAlreadyPending(IERC4626 vault);
 
     // ----- Deposits -----
 
