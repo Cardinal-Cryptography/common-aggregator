@@ -59,7 +59,7 @@ contract CommonAggregatorTest is Test {
 
         vm.warp(STARTING_TIMESTAMP + 8 days);
 
-        vm.prank(alice);
+        vm.prank(manager);
         commonAggregator.setRewardTrader(address(reward), trader);
 
         vm.prank(alice);
@@ -102,7 +102,7 @@ contract CommonAggregatorTest is Test {
         reward.transfer(address(commonAggregator), 1000);
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.NoTraderSetForToken.selector, address(reward)));
-        vm.prank(alice);
+        vm.prank(owner);
         commonAggregator.transferRewardsForSale(address(reward));
     }
 
@@ -160,6 +160,32 @@ contract CommonAggregatorTest is Test {
         commonAggregator.submitSetRewardTrader(address(reward), trader);
         vm.prank(owner);
         commonAggregator.cancelSetRewardTrader(address(reward), trader);
+
+        vm.prank(owner);
+        commonAggregator.submitSetRewardTrader(address(reward), trader);
+
+        vm.warp(STARTING_TIMESTAMP + 6 days);
+
+        vm.expectRevert();
+        vm.prank(alice);
+        commonAggregator.setRewardTrader(address(reward), trader);
+
+        vm.expectRevert();
+        vm.prank(guardian);
+        commonAggregator.setRewardTrader(address(reward), trader);
+
+        // Manager can set trader
+        vm.prank(manager);
+        commonAggregator.setRewardTrader(address(reward), trader);
+
+        vm.prank(owner);
+        commonAggregator.submitSetRewardTrader(address(reward), trader);
+
+        vm.warp(STARTING_TIMESTAMP + 12 days);
+
+        // Owner can set trader
+        vm.prank(owner);
+        commonAggregator.setRewardTrader(address(reward), trader);
     }
 
     function testWrongTokens() public {

@@ -85,6 +85,7 @@ interface ICommonAggregator is IERC4626 {
     event RewardsTransferred(address indexed rewardToken, uint256 amount, address indexed receiver);
 
     error CallerNotGuardianOrWithHigherRole();
+    error CallerNotManagerNorOwner();
     error InvalidRewardToken(address token);
     error NoTraderSetForToken(address token);
 

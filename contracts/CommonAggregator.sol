@@ -384,6 +384,7 @@ contract CommonAggregator is
     /// @inheritdoc ICommonAggregator
     function setRewardTrader(address rewardToken, address traderAddress)
         external
+        onlyManagerOrOwner
         executesUnlockedAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
     {
         _ensureTokenSafeToTransfer(rewardToken);
@@ -441,6 +442,13 @@ contract CommonAggregator is
     modifier onlyGuardianOrHigherRole() {
         if (!hasRole(GUARDIAN, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
             revert CallerNotGuardianOrWithHigherRole();
+        }
+        _;
+    }
+
+    modifier onlyManagerOrOwner() {
+        if (!hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
+            revert CallerNotManagerNorOwner();
         }
         _;
     }
