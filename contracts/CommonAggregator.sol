@@ -203,6 +203,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     }
 
     function pullFundsProportional(uint256 amount) external onlyAggregator {
+        require(totalAssets() != 0, NotEnoughFunds());
+
         IERC20 asset = IERC20(asset());
         uint256 idle = asset.balanceOf(address(this));
         uint256 amountIdle = amount.mulDiv(idle, totalAssets());
