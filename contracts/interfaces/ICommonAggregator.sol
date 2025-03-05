@@ -97,7 +97,7 @@ interface ICommonAggregator is IERC4626 {
     /// @dev MUST never be paused.
     /// @return assets Amount of the underlying assets transferred to the `account`
     /// @return vaultsShares List of the aggregated vaults' shares amounts that were transferred to the `account`.
-    function emergencyRedeem(uint256 shares, address account, address owner)
+    function emergencyRedeem(uint256 shares, address receiver, address owner)
         external
         returns (uint256 assets, uint256[] memory vaultsShares);
 }
