@@ -12,11 +12,7 @@ contract CommonTimelocksImpl is CommonTimelocks {
 }
 
 contract CommonTimelocksTest is Test {
-    CommonTimelocksImpl timelocks;
-
-    function setUp() public {
-        timelocks = new CommonTimelocksImpl();
-    }
+    CommonTimelocksImpl timelocks = new CommonTimelocksImpl();
 
     // Basic success / failure scenarios
 
