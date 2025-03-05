@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20, ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -216,8 +217,17 @@ contract CommonAggregator is
         return assets;
     }
 
-    function _fallbackPullFromVaults(uint256 assets, address account) internal {
+    function _fallbackWithdraw(uint256 assets, address account) internal {
         AggregatorStorage storage $ = _getAggregatorStorage();
+
+        // Withdraw from idle.
+        IERC20 asset = IERC20(asset());
+        uint256 idle = asset.balanceOf(address(this));
+        uint256 assetsToPullFromIdle = assets.min(idle);
+        SafeERC20.safeTransfer(asset, account, assetsToPullFromIdle);
+        assets -= assetsToPullFromIdle;
+
+        // Withdraw from vaults.
         for (uint256 i = 0; i < $.vaults.length && assets > 0; i++) {
             IERC4626 vault = $.vaults[i];
             uint256 vaultMaxWithdraw = vault.maxWithdraw(address(this));
@@ -228,6 +238,8 @@ contract CommonAggregator is
                 emit VaultWithdrawFailed(vault);
             }
         }
+
+        // Fail if too little assets were withdrawn.
         if (assets > 0) {
             revert InsufficientAssetsForWithdrawal();
         }
