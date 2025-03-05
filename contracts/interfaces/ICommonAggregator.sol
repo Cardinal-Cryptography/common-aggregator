@@ -92,7 +92,7 @@ interface ICommonAggregator is IERC4626 {
         uint256[] vaultShares
     );
 
-    /// @dev Burns exactly shares from owner and sends proportional amounts of aggregated vaults' shares and idle assets.
+    /// @notice Burns exactly shares from owner and sends proportional amounts of aggregated vaults' shares and idle assets.
     /// @dev MUST emit the EmergencyWithdraw event.
     /// @dev MUST never be paused.
     /// @return assets Amount of the underlying assets transferred to the `account`
