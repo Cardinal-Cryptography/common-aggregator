@@ -194,9 +194,15 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         return assets;
     }
 
-    function _pullFundsForWithdrawal(uint256 amount) public {}
+    function _pullFundsForWithdrawal(uint256 amount) internal {
+        try CommonAggregator(address(this)).pullFundsProportional(amount) {}
+        catch {
+            emit ProportionalWithdrawalFailed(amount);
+            revert("not implemented");
+        }
+    }
 
-    function _pullFundsProportional(uint256 amount) external onlyAggregator {
+    function pullFundsProportional(uint256 amount) external onlyAggregator {
         IERC20 asset = IERC20(asset());
         uint256 idle = asset.balanceOf(address(this));
         uint256 amountIdle = amount.mulDiv(idle, totalAssets());
@@ -218,12 +224,16 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
             for (uint256 i = 0; i < $.vaults.length && missing > 0; ++i) {
                 uint256 vaultMaxWithdraw = $.vaults[i].maxWithdraw(address(this));
+                require(
+                    amountsVaults[i] <= vaultMaxWithdraw,
+                    AggregatedVaultWithdrawalLimitExceeded(address($.vaults[i]), vaultMaxWithdraw, amountsVaults[i])
+                );
                 uint256 additionalVaultContribution = missing.min(vaultMaxWithdraw - amountsVaults[i]);
                 missing -= additionalVaultContribution;
                 amountsVaults[i] += additionalVaultContribution;
             }
 
-            require(missing == 0, "It's so over.");
+            require(missing == 0, NotEnoughFunds());
         }
 
         for (uint256 i = 0; i < $.vaults.length; ++i) {

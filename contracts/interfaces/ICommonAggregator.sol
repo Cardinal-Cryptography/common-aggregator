@@ -21,6 +21,13 @@ interface ICommonAggregator is IERC4626 {
 
     event DepositedToVault(address indexed vault, uint256 amountPlanned, uint256 amountDeposited);
 
+    // ----- Withdrawals -----
+
+    error NotEnoughFunds();
+    error AggregatedVaultWithdrawalLimitExceeded(address vault, uint256 maxWithdraw, uint256 amount);
+
+    event ProportionalWithdrawalFailed(uint256 amount);
+
     // ----- Rebalancing -----
 
     event AssetsRebalanced(address indexed from, address indexed to, uint256 amount);
