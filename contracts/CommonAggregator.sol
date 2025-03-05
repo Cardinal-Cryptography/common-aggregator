@@ -282,7 +282,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
 
         newTotalAssets = _totalAssetsNotCached();
         (uint256 sharesToMint, uint256 sharesToBurn) =
-            $.rewardBuffer._simulateBufferUpdate(newTotalAssets, totalSupply(), $.protocolFeeBps);
+            $.rewardBuffer._simulateBufferUpdate(newTotalAssets, super.totalSupply(), $.protocolFeeBps);
         return (newTotalAssets, super.totalSupply() + sharesToMint - sharesToBurn);
     }
 
