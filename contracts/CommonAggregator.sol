@@ -241,7 +241,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
             $.vaults[i].safeTransfer(account, vaultShares[i]);
         }
 
-
         $.rewardBuffer._decreaseAssets(valueInAssets);
 
         emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultShares);
