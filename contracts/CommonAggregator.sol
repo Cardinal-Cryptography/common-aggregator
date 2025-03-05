@@ -20,6 +20,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
     using RewardBuffer for RewardBuffer.Buffer;
     using Math for uint256;
     using SafeERC20 for IERC20;
+    using SafeERC20 for IERC4626;
 
     bytes32 public constant OWNER = keccak256("OWNER");
     bytes32 public constant MANAGER = keccak256("MANAGER");
@@ -237,7 +238,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         for (uint256 i = 0; i < $.vaults.length; i++) {
             vaultShares[i] = shares.mulDiv($.vaults[i].balanceOf(address(this)), totalSupply());
             valueInAssets += $.vaults[i].convertToAssets(vaultShares[i]);
-            $.vaults[i].transfer(account, vaultShares[i]);
+            $.vaults[i].safeTransfer(account, vaultShares[i]);
         }
 
         _burn(address(this), shares);
