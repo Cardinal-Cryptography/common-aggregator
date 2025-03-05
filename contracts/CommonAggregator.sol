@@ -227,21 +227,20 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, AccessControlUp
         }
         updateHoldingsState();
 
-        _transfer(owner, address(this), shares);
+        _burn(owner, shares);
 
-        assets = shares.mulDiv(IERC20(asset()).balanceOf(address(this)), totalSupply());
+        assets = shares.mulDiv(IERC20(asset()).balanceOf(address(this)), totalSupply() + shares);
         IERC20(asset()).safeTransfer(account, assets);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         vaultShares = new uint256[]($.vaults.length);
         uint256 valueInAssets = assets;
         for (uint256 i = 0; i < $.vaults.length; i++) {
-            vaultShares[i] = shares.mulDiv($.vaults[i].balanceOf(address(this)), totalSupply());
+            vaultShares[i] = shares.mulDiv($.vaults[i].balanceOf(address(this)), totalSupply() + shares);
             valueInAssets += $.vaults[i].convertToAssets(vaultShares[i]);
             $.vaults[i].safeTransfer(account, vaultShares[i]);
         }
 
-        _burn(address(this), shares);
 
         $.rewardBuffer._decreaseAssets(valueInAssets);
 
