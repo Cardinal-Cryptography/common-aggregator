@@ -217,31 +217,26 @@ contract CommonAggregator is
         return assets;
     }
 
-    function _fallbackWithdraw(uint256 assets, address account) internal {
+    function _pullFundsSequential(uint256 assets) internal {
         AggregatorStorage storage $ = _getAggregatorStorage();
 
-        // Withdraw from idle.
-        IERC20 asset = IERC20(asset());
-        uint256 idle = asset.balanceOf(address(this));
-        uint256 assetsToPullFromIdle = assets.min(idle);
-        SafeERC20.safeTransfer(asset, account, assetsToPullFromIdle);
-        assets -= assetsToPullFromIdle;
-
-        // Withdraw from vaults.
         for (uint256 i = 0; i < $.vaults.length && assets > 0; i++) {
             IERC4626 vault = $.vaults[i];
             uint256 vaultMaxWithdraw = vault.maxWithdraw(address(this));
             uint256 assetsToPullFromVault = assets.min(vaultMaxWithdraw);
-            try vault.withdraw(assetsToPullFromVault, account, address(this)) {
+            uint256 sharesToBurnInVault = vault.convertToShares(assetsToPullFromVault);
+            vault.approve(address(vault), sharesToBurnInVault);
+            try vault.withdraw(assetsToPullFromVault, address(this), address(this)) {
                 assets -= assetsToPullFromVault;
             } catch {
+                vault.approve(address(vault), 0);
                 emit VaultWithdrawFailed(vault);
             }
         }
 
         // Fail if too little assets were withdrawn.
         if (assets > 0) {
-            revert InsufficientAssetsForWithdrawal();
+            revert InsufficientAssetsForWithdrawal(assets);
         }
     }
 
