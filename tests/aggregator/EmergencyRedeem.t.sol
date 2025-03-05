@@ -276,6 +276,35 @@ contract CommonAggregatorTest is Test {
         assertLt(expectedValueInAssets, expectedValueInAssetsBeforeChange);
     }
 
+    function testFuzz_EmergencyReedemRoundingError(uint192 a, uint192 b) public {
+        uint256 aliceShares = _deposit(uint256(a), alice);
+        _deposit(uint256(b), bob);
+
+        uint256 sum = uint256(a) + uint256(b);
+
+        _distribute([sum / 3, sum / 4, sum / 5]);
+
+        uint256 expectedAliceAssets = _expectedUserAssets(aliceShares);
+        uint256[VAULT_COUNT] memory expectedAliceVaultsShares = _expectedUserVaultsShares(aliceShares);
+
+        uint256 expectedEmergencyRedeem = _expectedValueInAssets(aliceShares);
+        uint256 expectedRedeem = commonAggregator.previewRedeem(aliceShares);
+
+        vm.prank(alice);
+        (uint256 assets, uint256[] memory aliceVaultShares) =
+            commonAggregator.emergencyRedeem(aliceShares, alice, alice);
+
+        for (uint256 i = 0; i < VAULT_COUNT; i++) {
+            assertEq(expectedAliceVaultsShares[i], aliceVaultShares[i]);
+            assertEq(expectedAliceVaultsShares[i], IERC20(vaults[i]).balanceOf(alice));
+        }
+
+        assertEq(expectedAliceAssets, assets);
+        assertLe(expectedEmergencyRedeem, expectedRedeem);
+        (,uint256 expectedRedeemWithRoundingError) = expectedRedeem.trySub(VAULT_COUNT); 
+        assertGe(expectedEmergencyRedeem, expectedRedeemWithRoundingError);
+    }
+
     function _deposit(uint256 amount, address depositor) internal returns (uint256) {
         asset.mint(depositor, amount);
 
