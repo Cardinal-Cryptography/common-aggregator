@@ -301,7 +301,7 @@ contract CommonAggregatorTest is Test {
 
         assertEq(expectedAliceAssets, assets);
         assertLe(expectedEmergencyRedeem, expectedRedeem);
-        (,uint256 expectedRedeemWithRoundingError) = expectedRedeem.trySub(VAULT_COUNT); 
+        (, uint256 expectedRedeemWithRoundingError) = expectedRedeem.trySub(VAULT_COUNT);
         assertGe(expectedEmergencyRedeem, expectedRedeemWithRoundingError);
     }
 
