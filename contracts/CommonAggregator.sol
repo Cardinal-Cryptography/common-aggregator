@@ -10,6 +10,7 @@ import {
     IERC4626,
     ERC4626Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import "./RewardBuffer.sol";
@@ -413,7 +414,7 @@ contract CommonAggregator is
         uint256 amount = transferrableToken.balanceOf(address(this));
         address receiver = $.rewardTrader[rewardToken];
 
-        transferrableToken.transfer(receiver, amount);
+        SafeERC20.safeTransfer(transferrableToken, receiver, amount);
 
         emit RewardsTransferred(rewardToken, amount, receiver);
     }
