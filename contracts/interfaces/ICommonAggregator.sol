@@ -17,12 +17,11 @@ interface ICommonAggregator is IERC4626 {
 
     // ----- Deposits -----
 
-    error CallerNotAggregator();
-
     event DepositedToVault(address indexed vault, uint256 amountPlanned, uint256 amountDeposited);
 
     // ----- Withdrawals -----
 
+    error CallerNotAggregator();
     error NotEnoughFunds();
     error AggregatedVaultWithdrawalLimitExceeded(address vault, uint256 maxWithdraw, uint256 amount);
 

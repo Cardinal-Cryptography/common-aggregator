@@ -45,14 +45,7 @@ contract CommonAggregatorTest is Test {
     function testSimpleWithdraw() public {
         _prepareDistribution([uint256(10), 20, 30], 5);
 
-        uint256 bobShares = commonAggregator.convertToShares(13);
-        vm.prank(alice);
-        commonAggregator.transfer(bob, bobShares);
-
-        vm.prank(bob);
-        commonAggregator.approve(address(commonAggregator), bobShares);
-        vm.prank(bob);
-        commonAggregator.withdraw(13, bob, bob);
+        _bobWithdraw(13);
 
         assertEq(asset.balanceOf(bob), 13);
 
@@ -65,14 +58,7 @@ contract CommonAggregatorTest is Test {
     function testWithdrawRoundingErrors() public {
         _prepareDistribution([uint256(10), 20, 50], 5);
 
-        uint256 bobShares = commonAggregator.convertToShares(12);
-        vm.prank(alice);
-        commonAggregator.transfer(bob, bobShares);
-
-        vm.prank(bob);
-        commonAggregator.approve(address(commonAggregator), bobShares);
-        vm.prank(bob);
-        commonAggregator.withdraw(12, bob, bob);
+        _bobWithdraw(12);
 
         assertEq(asset.balanceOf(bob), 12);
 
@@ -87,14 +73,7 @@ contract CommonAggregatorTest is Test {
     function testWithdrawRoundingErrors2() public {
         _prepareDistribution([uint256(10), 20, 50], 1);
 
-        uint256 bobShares = commonAggregator.convertToShares(12);
-        vm.prank(alice);
-        commonAggregator.transfer(bob, bobShares);
-
-        vm.prank(bob);
-        commonAggregator.approve(address(commonAggregator), bobShares);
-        vm.prank(bob);
-        commonAggregator.withdraw(12, bob, bob);
+        _bobWithdraw(12);
 
         assertEq(asset.balanceOf(bob), 12);
 
@@ -115,26 +94,72 @@ contract CommonAggregatorTest is Test {
     }
 
     function testWithdrawAll() public {
-        _prepareDistribution([uint256(10), 20, 50], 30);
-        uint256 bobShares = commonAggregator.convertToShares(100);
+        _prepareDistribution([uint256(10), 20, 50], 23);
+
+        _bobWithdraw(103);
+
+        assertEq(asset.balanceOf(bob), 103);
+    }
+
+    // Idea: Fuzz for it never happening other than when initial assets are 0.
+    // function testNotEnoughAssets() public {}
+
+    function testCustomVaultWithdrawLimits() public {
+        // TODO:
+    }
+
+    function testTryDirectCall() public {
+        _prepareDistribution([uint256(0), 0, 0], 100);
+
+        vm.expectRevert(ICommonAggregator.CallerNotAggregator.selector);
+        commonAggregator.pullFundsProportional(10);
+    }
+
+    function testSimpleRedeem() public {
+        _prepareDistribution([uint256(10), 20, 50], 20);
+
+        uint256 bobShares = commonAggregator.balanceOf(alice) / 2;
         vm.prank(alice);
         commonAggregator.transfer(bob, bobShares);
 
         vm.prank(bob);
         commonAggregator.approve(address(commonAggregator), bobShares);
         vm.prank(bob);
-        commonAggregator.withdraw(100, bob, bob);
+        commonAggregator.redeem(bobShares, bob, bob);
+
+        assertEq(_vaultsAllocation(vaults[0]), 5);
+        assertEq(_vaultsAllocation(vaults[1]), 10);
+        assertEq(_vaultsAllocation(vaults[2]), 25);
+        assertEq(asset.balanceOf(address(commonAggregator)), 10);
+
+        assertEq(asset.balanceOf(bob), 50);
+    }
+
+    function testRedeemAll() public {
+        _prepareDistribution([uint256(10), 20, 50], 20);
+
+        uint256 bobShares = commonAggregator.balanceOf(alice);
+        vm.prank(alice);
+        commonAggregator.transfer(bob, bobShares);
+
+        vm.prank(bob);
+        commonAggregator.approve(address(commonAggregator), bobShares);
+        vm.prank(bob);
+        commonAggregator.redeem(bobShares, bob, bob);
 
         assertEq(asset.balanceOf(bob), 100);
     }
 
-    function testNotEnoughAssets() public {}
+    function _bobWithdraw(uint256 amount) internal {
+        uint256 bobShares = commonAggregator.convertToShares(amount);
+        vm.prank(alice);
+        commonAggregator.transfer(bob, bobShares);
 
-    function testCustomVaultWithdrawLimits() public {}
-
-    function testTryDirectCall() public {}
-
-    function testSimpleRedeem() public {}
+        vm.prank(bob);
+        commonAggregator.approve(address(commonAggregator), bobShares);
+        vm.prank(bob);
+        commonAggregator.withdraw(amount, bob, bob);
+    }
 
     function _vaultsAllocation(IERC4626 vault) internal view returns (uint256) {
         uint256 sharesInAggregator = vault.balanceOf(address(commonAggregator));
