@@ -224,12 +224,9 @@ contract CommonAggregator is
             IERC4626 vault = $.vaults[i];
             uint256 vaultMaxWithdraw = vault.maxWithdraw(address(this));
             uint256 assetsToPullFromVault = assets.min(vaultMaxWithdraw);
-            uint256 sharesToBurnInVault = vault.convertToShares(assetsToPullFromVault);
-            vault.approve(address(vault), sharesToBurnInVault);
             try vault.withdraw(assetsToPullFromVault, address(this), address(this)) {
                 assets -= assetsToPullFromVault;
             } catch {
-                vault.approve(address(vault), 0);
                 emit VaultWithdrawFailed(vault);
             }
         }

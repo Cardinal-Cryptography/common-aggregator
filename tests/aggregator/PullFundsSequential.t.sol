@@ -33,12 +33,6 @@ abstract contract PullSequentialTest is Test {
     address alice = address(0x456);
     ERC20Mock asset = new ERC20Mock();
     ERC4626Mock[] vaults;
-
-    function assertVaultsZeroAllowance() internal view {
-        for (uint256 i = 0; i < vaults.length; i++) {
-            assertEq(IERC20(asset).allowance(address(commonAggregator), address(vaults[i])), 0);
-        }
-    }
 }
 
 contract HealthyVaultsTest is PullSequentialTest {
@@ -67,7 +61,6 @@ contract HealthyVaultsTest is PullSequentialTest {
         assertEq(IERC20(asset).balanceOf(address(commonAggregator)), 500);
         assertEq(IERC20(asset).balanceOf(address(vaults[0])), 0);
         assertEq(IERC20(asset).balanceOf(address(vaults[1])), 0);
-        assertVaultsZeroAllowance();
     }
 
     function testPullSequentialPartial() public {
@@ -82,7 +75,6 @@ contract HealthyVaultsTest is PullSequentialTest {
         assertEq(IERC20(asset).balanceOf(address(commonAggregator)), 800);
         assertEq(IERC20(asset).balanceOf(address(vaults[0])), 0);
         assertEq(IERC20(asset).balanceOf(address(vaults[1])), 300);
-        assertVaultsZeroAllowance();
     }
 
     function testPullSequentialTooMuch() public {
@@ -98,7 +90,6 @@ contract HealthyVaultsTest is PullSequentialTest {
         assertEq(IERC20(asset).balanceOf(address(commonAggregator)), 0);
         assertEq(IERC20(asset).balanceOf(address(vaults[0])), 300);
         assertEq(IERC20(asset).balanceOf(address(vaults[1])), 400);
-        assertVaultsZeroAllowance();
     }
 }
 
@@ -135,7 +126,6 @@ contract UnhealthyVaultTest is PullSequentialTest {
         assertEq(IERC20(asset).balanceOf(address(vaults[0])), 0);
         assertEq(IERC20(asset).balanceOf(address(vaults[1])), 400);
         assertEq(IERC20(asset).balanceOf(address(vaults[2])), 0);
-        assertVaultsZeroAllowance();
     }
 
     function testStopsAfterCollectingFullAmount() public {
@@ -154,6 +144,5 @@ contract UnhealthyVaultTest is PullSequentialTest {
         }
         assertEq(IERC20(asset).balanceOf(address(commonAggregator)), 300);
         assertEq(IERC20(asset).balanceOf(address(vaults[0])), 0);
-        assertVaultsZeroAllowance();
     }
 }
