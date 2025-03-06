@@ -6,11 +6,8 @@ import {ICommonAggregator} from "contracts/interfaces/ICommonAggregator.sol";
 import {CommonAggregator} from "contracts/CommonAggregator.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
-
-import {console} from "forge-std/console.sol";
 
 contract CommonAggregatorImpl is CommonAggregator {
     function pullFundsSequential(uint256 assets) external {
