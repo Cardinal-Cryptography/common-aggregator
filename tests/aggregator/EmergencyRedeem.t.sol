@@ -276,13 +276,15 @@ contract CommonAggregatorTest is Test {
         assertLt(expectedValueInAssets, expectedValueInAssetsBeforeChange);
     }
 
-    function testFuzz_EmergencyReedemRoundingError(uint192 a, uint192 b) public {
+    function testFuzz_EmergencyReedemRoundingError(uint256 a, uint192 p, uint192 q, uint192 r, uint192 s) public {
+        uint256 sum = uint256(p) + q + r + s;
+        a = bound(a, 0, sum);
+        uint256 b = sum - a;
+
         uint256 aliceShares = _deposit(uint256(a), alice);
-        _deposit(uint256(b), bob);
+        _deposit(b, bob);
 
-        uint256 sum = uint256(a) + uint256(b);
-
-        _distribute([sum / 3, sum / 4, sum / 5]);
+        _distribute([uint256(p), q, r]); // `s` stays as the idle balance
 
         uint256 expectedAliceAssets = _expectedUserAssets(aliceShares);
         uint256[VAULT_COUNT] memory expectedAliceVaultsShares = _expectedUserVaultsShares(aliceShares);
