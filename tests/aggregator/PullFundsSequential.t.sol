@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {ICommonAggregator} from "contracts/interfaces/ICommonAggregator.sol";
 import {CommonAggregator} from "contracts/CommonAggregator.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -18,15 +18,33 @@ contract CommonAggregatorImpl is CommonAggregator {
     }
 }
 
-contract CommonAggregatorTest is Test {
+contract RevertingWithdrawVault is ERC4626Mock {
+    constructor(address asset) ERC4626Mock(asset) {}
+
+    function withdraw(uint256, address, address) public pure override returns (uint256) {
+        require(false);
+        return 0;
+    }
+}
+
+abstract contract PullSequentialTest is Test {
     CommonAggregatorImpl commonAggregator;
     address owner = address(0x123);
     address alice = address(0x456);
     ERC20Mock asset = new ERC20Mock();
-    ERC4626Mock[] vaults = new ERC4626Mock[](2);
+    ERC4626Mock[] vaults;
 
+    function assertVaultsZeroAllowance() internal view {
+        for (uint256 i = 0; i < vaults.length; i++) {
+            assertEq(IERC20(asset).allowance(address(commonAggregator), address(vaults[i])), 0);
+        }
+    }
+}
+
+contract HealthyVaultsTest is PullSequentialTest {
     function setUp() public {
         CommonAggregatorImpl implementation = new CommonAggregatorImpl();
+        vaults = new ERC4626Mock[](2);
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
@@ -49,6 +67,7 @@ contract CommonAggregatorTest is Test {
         assertEq(IERC20(asset).balanceOf(address(commonAggregator)), 500);
         assertEq(IERC20(asset).balanceOf(address(vaults[0])), 0);
         assertEq(IERC20(asset).balanceOf(address(vaults[1])), 0);
+        assertVaultsZeroAllowance();
     }
 
     function testPullSequentialPartial() public {
@@ -63,6 +82,7 @@ contract CommonAggregatorTest is Test {
         assertEq(IERC20(asset).balanceOf(address(commonAggregator)), 800);
         assertEq(IERC20(asset).balanceOf(address(vaults[0])), 0);
         assertEq(IERC20(asset).balanceOf(address(vaults[1])), 300);
+        assertVaultsZeroAllowance();
     }
 
     function testPullSequentialTooMuch() public {
@@ -78,5 +98,62 @@ contract CommonAggregatorTest is Test {
         assertEq(IERC20(asset).balanceOf(address(commonAggregator)), 0);
         assertEq(IERC20(asset).balanceOf(address(vaults[0])), 300);
         assertEq(IERC20(asset).balanceOf(address(vaults[1])), 400);
+        assertVaultsZeroAllowance();
+    }
+}
+
+contract UnhealthyVaultTest is PullSequentialTest {
+    function setUp() public {
+        CommonAggregatorImpl implementation = new CommonAggregatorImpl();
+        vaults = new ERC4626Mock[](3);
+        vaults[0] = new ERC4626Mock(address(asset));
+        vaults[1] = new RevertingWithdrawVault(address(asset));
+        vaults[2] = new ERC4626Mock(address(asset));
+
+        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
+
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
+        commonAggregator = CommonAggregatorImpl(address(proxy));
+        vm.prank(owner);
+    }
+
+    function testSkipsRevertingVault() public {
+        asset.mint(address(vaults[0]), 300);
+        asset.mint(address(vaults[1]), 400);
+        asset.mint(address(vaults[2]), 200);
+        vaults[0].mint(address(commonAggregator), 300 * 10000);
+        vaults[1].mint(address(commonAggregator), 400 * 10000);
+        vaults[2].mint(address(commonAggregator), 200 * 10000);
+
+        vm.prank(address(commonAggregator));
+        vm.expectEmit(true, true, true, true, address(commonAggregator));
+        emit ICommonAggregator.VaultWithdrawFailed(vaults[1]);
+
+        commonAggregator.pullFundsSequential(500);
+
+        assertEq(IERC20(asset).balanceOf(address(commonAggregator)), 500);
+        assertEq(IERC20(asset).balanceOf(address(vaults[0])), 0);
+        assertEq(IERC20(asset).balanceOf(address(vaults[1])), 400);
+        assertEq(IERC20(asset).balanceOf(address(vaults[2])), 0);
+        assertVaultsZeroAllowance();
+    }
+
+    function testStopsAfterCollectingFullAmount() public {
+        asset.mint(address(vaults[0]), 300);
+        vaults[0].mint(address(commonAggregator), 300 * 10000);
+
+        vm.prank(address(commonAggregator));
+        vm.recordLogs();
+
+        commonAggregator.pullFundsSequential(300);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 vaultWithdrawFailedEventSignatureHash = keccak256("VaultWithdrawFailed(address)");
+        for (uint256 i = 0; i < logs.length; i++) {
+            assert(logs[i].topics[0] != vaultWithdrawFailedEventSignatureHash);
+        }
+        assertEq(IERC20(asset).balanceOf(address(commonAggregator)), 300);
+        assertEq(IERC20(asset).balanceOf(address(vaults[0])), 0);
+        assertVaultsZeroAllowance();
     }
 }
