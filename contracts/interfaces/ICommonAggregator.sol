@@ -15,6 +15,27 @@ interface ICommonAggregator is IERC4626 {
 
     function updateHoldingsState() external;
 
+    // ----- Vault management -----
+
+    event VaultAdditionSubmitted(address indexed vault, uint256 limit, uint256 unlockTimestamp);
+    event VaultAdditionCancelled(address indexed vault, uint256 limit);
+    event VaultAdded(address indexed vault, uint256 limit);
+
+    event VaultRemoved(address indexed vault);
+
+    event VaultForceRemovalSubmitted(address indexed vault, uint256 unlockTimestamp);
+    event VaultForceRemovalCancelled(address indexed vault);
+    event VaultForceRemoved(address indexed vault);
+
+    function submitAddVault(IERC4626 vault, uint256 limit) external;
+    function cancelAddVault(IERC4626 vault, uint256 limit) external;
+    function addVault(IERC4626 vault, uint256 limit) external;
+
+    function removeVault(IERC4626 vault) external;
+
+    error PendingVaultForceRemoval(IERC4626 vault);
+    error VaultAdditionAlreadyPending(IERC4626 vault);
+
     // ----- Deposits -----
 
     event DepositedToVault(address indexed vault, uint256 amountPlanned, uint256 amountDeposited);
@@ -39,7 +60,10 @@ interface ICommonAggregator is IERC4626 {
     function pushFunds(uint256 assets, IERC4626 vault) external;
 
     error AllocationLimitExceeded(IERC4626 vault);
+
     error CallerNotRebalancerOrWithHigherRole();
+    error CallerNotManagerNorOwner();
+    error CallerNotGuardianOrWithHigherRole();
 
     // ----- Allocation Limits -----
 
