@@ -214,7 +214,6 @@ contract CommonAggregator is
         returns (uint256)
     {
         updateHoldingsState();
-        // We make an explicit conversion not to run update twice
         uint256 assetsNeeded = convertToAssets(shares);
         _pullFundsForWithdrawal(assetsNeeded);
         uint256 assets = super.redeem(shares, account, owner);

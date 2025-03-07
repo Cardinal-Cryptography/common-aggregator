@@ -11,6 +11,8 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {MAX_BPS} from "contracts/Math.sol";
+import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 contract CommonAggregatorTest is Test {
     using Math for uint256;
@@ -101,16 +103,33 @@ contract CommonAggregatorTest is Test {
         assertEq(asset.balanceOf(bob), 103);
     }
 
-    // Idea: Fuzz for it never happening other than when initial assets are 0.
-    // function testNotEnoughAssets() public {}
+    function testFuzz_CanPullAssets(uint120[VAULT_COUNT] memory vaultFunds, uint120 idle, uint16 bps) public {
+        vm.assume(bps <= MAX_BPS);
+
+        uint256[VAULT_COUNT] memory _vaultFunds;
+        for (uint256 i = 0; i < VAULT_COUNT; ++i) {
+            _vaultFunds[i] = uint256(vaultFunds[i]);
+        }
+
+        uint256 assetsDeposited = _prepareDistribution(_vaultFunds, idle);
+
+        uint256 assetsToWithdraw = assetsDeposited.mulDiv(bps, MAX_BPS);
+
+        vm.prank(address(commonAggregator));
+        commonAggregator.pullFundsProportional(assetsToWithdraw);
+    }
 
     function testCustomVaultWithdrawLimits() public {
-        // TODO:
+        _prepareDistribution([uint256(30), 30, 30], 30);
+
+        vaults[0].setWithdrawLimit(10);
+
+        vm.prank(address(commonAggregator));
+        vm.expectPartialRevert(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector);
+        commonAggregator.pullFundsProportional(70);
     }
 
     function testTryDirectCall() public {
-        _prepareDistribution([uint256(0), 0, 0], 100);
-
         vm.expectRevert(ICommonAggregator.CallerNotAggregator.selector);
         commonAggregator.pullFundsProportional(10);
     }
@@ -166,7 +185,7 @@ contract CommonAggregatorTest is Test {
         return vault.convertToAssets(sharesInAggregator);
     }
 
-    function _prepareDistribution(uint256[VAULT_COUNT] memory vaultFunds, uint256 idle) internal {
+    function _prepareDistribution(uint256[VAULT_COUNT] memory vaultFunds, uint256 idle) internal returns (uint256) {
         uint256 initialDeposit = idle;
         for (uint256 i = 0; i < vaultFunds.length; ++i) {
             initialDeposit += vaultFunds[i];
@@ -183,5 +202,7 @@ contract CommonAggregatorTest is Test {
             vm.prank(owner);
             commonAggregator.pushFunds(vaultFunds[i], vaults[i]);
         }
+
+        return initialDeposit;
     }
 }
