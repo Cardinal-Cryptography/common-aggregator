@@ -517,6 +517,7 @@ contract CommonAggregator is
         require(rewardToken != asset(), InvalidRewardToken(rewardToken));
         require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
         require(rewardToken != address(this), InvalidRewardToken(rewardToken));
+        require(!_getAggregatorStorage().pendingVaultAdditions[rewardToken], InvalidRewardToken(rewardToken));
     }
 
     // ----- Etc -----
