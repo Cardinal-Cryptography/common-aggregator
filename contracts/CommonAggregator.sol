@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
+import {CommonTimelocks} from "./CommonTimelocks.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -18,10 +19,10 @@ import {CommonTimelocks} from "./CommonTimelocks.sol";
 
 contract CommonAggregator is
     ICommonAggregator,
+    CommonTimelocks,
     UUPSUpgradeable,
     AccessControlUpgradeable,
-    ERC4626Upgradeable,
-    CommonTimelocks
+    ERC4626Upgradeable
 {
     using RewardBuffer for RewardBuffer.Buffer;
     using Math for uint256;
@@ -35,9 +36,13 @@ contract CommonAggregator is
     uint256 public constant MAX_PROTOCOL_FEE_BPS = MAX_BPS / 2;
 
     uint256 public constant SET_TRADER_TIMELOCK = 5 days;
+    uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
+    uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 7 days;
 
     enum TimelockTypes {
-        SET_TRADER
+        SET_TRADER,
+        ADD_VAULT,
+        FORCE_REMOVE_VAULT
     }
 
     /// @custom:storage-location erc7201:common.storage.aggregator
@@ -48,6 +53,7 @@ contract CommonAggregator is
         uint256 protocolFeeBps;
         address protocolFeeReceiver;
         mapping(address rewardToken => address traderAddress) rewardTrader;
+        mapping(address vault => bool) pendingVaultAdditions;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
@@ -58,6 +64,16 @@ contract CommonAggregator is
         assembly {
             $.slot := AGGREGATOR_STORAGE_LOCATION
         }
+    }
+
+    function getVaults() external view returns (IERC4626[] memory) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        return $.vaults;
+    }
+
+    function getMaxAllocationLimit(IERC4626 vault) external view returns (uint256) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        return $.allocationLimitBps[address(vault)];
     }
 
     function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
@@ -262,6 +278,84 @@ contract CommonAggregator is
     function _aggregatedVaultAssets(IERC4626 vault) internal view returns (uint256) {
         uint256 shares = vault.balanceOf(address(this));
         return vault.convertToAssets(shares);
+    }
+
+    // ----- Aggregated vaults management -----
+
+    /// @notice Submits a timelocked proposal to add a new vault to the list.
+    /// @dev There's no limit on the number of pending vaults that can be added, only on the number of fully added vaults.
+    /// Also the same vault can be submitted multiple times, with different limits. Only one such submission can be accepted at a time.
+    /// Manager or Guardian should cancel mistaken and stale submissions.
+    function submitAddVault(IERC4626 vault, uint256 limit)
+        external
+        override
+        onlyManagerOrOwner
+        registersTimelockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)), ADD_VAULT_TIMELOCK)
+    {
+        _ensureVaultCanBeAdded(vault);
+        if (limit > MAX_BPS) {
+            revert IncorrectMaxAllocationLimit();
+        }
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        if ($.pendingVaultAdditions[address(vault)] == true) {
+            revert VaultAdditionAlreadyPending(vault);
+        }
+        $.pendingVaultAdditions[address(vault)] = true;
+        emit VaultAdditionSubmitted(address(vault), limit, block.timestamp + ADD_VAULT_TIMELOCK);
+    }
+
+    function cancelAddVault(IERC4626 vault, uint256 limit)
+        external
+        override
+        onlyGuardianOrHigherRole
+        cancelsAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)))
+    {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        delete $.pendingVaultAdditions[address(vault)];
+        emit VaultAdditionCancelled(address(vault), limit);
+    }
+
+    function addVault(IERC4626 vault, uint256 limit)
+        external
+        override
+        onlyManagerOrOwner
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)))
+    {
+        _ensureVaultCanBeAdded(vault);
+        if (limit > MAX_BPS) {
+            revert IncorrectMaxAllocationLimit();
+        }
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        $.vaults.push(vault);
+        $.allocationLimitBps[address(vault)] = limit;
+        delete $.pendingVaultAdditions[address(vault)];
+        updateHoldingsState();
+
+        emit VaultAdded(address(vault), limit);
+    }
+
+    function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
+        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        require(isVaultOnTheList, VaultNotOnTheList(vault));
+        require(
+            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
+            PendingVaultForceRemoval(vault)
+        );
+
+        // No need to updateHoldingsState, as we're not operating on assets.
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        $.vaults[index].redeem($.vaults[index].balanceOf(address(this)), address(this), address(this));
+        delete $.allocationLimitBps[address(vault)];
+
+        // Remove the vault from the list, shifting the rest of the array.
+        for (uint256 i = index; i < $.vaults.length - 1; i++) {
+            $.vaults[i] = $.vaults[i + 1];
+        }
+        $.vaults.pop();
+
+        // No need to updateHoldingsState again, as we don't have any shares of the vault anymore.
+        emit VaultRemoved(address(vault));
     }
 
     // ----- Rebalancing -----
