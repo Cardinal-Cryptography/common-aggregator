@@ -187,4 +187,30 @@ contract CommonAggregatorTest is Test {
             commonAggregator.submitSetRewardTrader(address(vaults[i]), trader);
         }
     }
+
+    function testAddedVaultCannotBeTransferred() public {
+        ERC4626Mock freshVault = new ERC4626Mock(address(asset));
+
+        vm.prank(owner);
+        commonAggregator.submitSetRewardTrader(address(freshVault), trader);
+
+        vm.warp(STARTING_TIMESTAMP + 6 days);
+
+        vm.prank(owner);
+        commonAggregator.setRewardTrader(address(freshVault), trader);
+
+        vm.prank(owner);
+        commonAggregator.submitAddVault(IERC4626(address(freshVault)), 0);
+
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(freshVault)));
+        commonAggregator.transferRewardsForSale(address(freshVault));
+
+        vm.warp(STARTING_TIMESTAMP + 20 days);
+
+        vm.prank(owner);
+        commonAggregator.addVault(IERC4626(address(freshVault)), 0);
+
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(freshVault)));
+        commonAggregator.transferRewardsForSale(address(freshVault));
+    }
 }
