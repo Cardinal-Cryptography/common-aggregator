@@ -11,9 +11,11 @@ import {
     IERC4626,
     ERC4626Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import "./RewardBuffer.sol";
+import {CommonTimelocks} from "./CommonTimelocks.sol";
 
 contract CommonAggregator is
     ICommonAggregator,
@@ -33,10 +35,12 @@ contract CommonAggregator is
     uint256 public constant MAX_VAULTS = 5;
     uint256 public constant MAX_PROTOCOL_FEE_BPS = MAX_BPS / 2;
 
+    uint256 public constant SET_TRADER_TIMELOCK = 5 days;
     uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
     uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 7 days;
 
     enum TimelockTypes {
+        SET_TRADER,
         ADD_VAULT,
         FORCE_REMOVE_VAULT
     }
@@ -48,6 +52,7 @@ contract CommonAggregator is
         mapping(address vault => uint256 limit) allocationLimitBps;
         uint256 protocolFeeBps;
         address protocolFeeReceiver;
+        mapping(address rewardToken => address traderAddress) rewardTrader;
         mapping(address vault => bool) pendingVaultAdditions;
     }
 
@@ -98,7 +103,7 @@ contract CommonAggregator is
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         require($.vaults.length < MAX_VAULTS, VaultLimitExceeded());
-        require(!_isVaultOnTheList(vault), VaultAlreadyAded(vault));
+        require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 
     // ----- ERC4626 -----
@@ -455,6 +460,68 @@ contract CommonAggregator is
         require(assets <= total.mulDiv($.allocationLimitBps[address(vault)], MAX_BPS), AllocationLimitExceeded(vault));
     }
 
+    // ----- Non-asset rewards trading -----
+
+    /// @inheritdoc ICommonAggregator
+    function submitSetRewardTrader(address rewardToken, address traderAddress)
+        external
+        onlyManagerOrOwner
+        registersTimelockedAction(
+            keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)),
+            SET_TRADER_TIMELOCK
+        )
+    {
+        _ensureTokenSafeToTransfer(rewardToken);
+
+        emit SetRewardsTraderSubmitted(rewardToken, traderAddress, block.timestamp + SET_TRADER_TIMELOCK);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function setRewardTrader(address rewardToken, address traderAddress)
+        external
+        onlyManagerOrOwner
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
+    {
+        _ensureTokenSafeToTransfer(rewardToken);
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        $.rewardTrader[rewardToken] = traderAddress;
+
+        emit RewardsTraderSet(rewardToken, traderAddress);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function cancelSetRewardTrader(address rewardToken, address traderAddress)
+        external
+        onlyGuardianOrHigherRole
+        cancelsAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
+    {
+        emit SetRewardsTraderCancelled(rewardToken, traderAddress);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function transferRewardsForSale(address rewardToken) external {
+        _ensureTokenSafeToTransfer(rewardToken);
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        require($.rewardTrader[rewardToken] != address(0), NoTraderSetForToken(rewardToken));
+
+        IERC20 transferrableToken = IERC20(rewardToken);
+        uint256 amount = transferrableToken.balanceOf(address(this));
+        address receiver = $.rewardTrader[rewardToken];
+
+        SafeERC20.safeTransfer(transferrableToken, receiver, amount);
+
+        emit RewardsTransferred(rewardToken, amount, receiver);
+    }
+
+    function _ensureTokenSafeToTransfer(address rewardToken) internal view {
+        require(rewardToken != asset(), InvalidRewardToken(rewardToken));
+        require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
+        require(rewardToken != address(this), InvalidRewardToken(rewardToken));
+        require(!_getAggregatorStorage().pendingVaultAdditions[rewardToken], InvalidRewardToken(rewardToken));
+    }
+
+    // ----- Etc -----
+
     constructor() {
         _disableInitializers();
     }
@@ -468,16 +535,16 @@ contract CommonAggregator is
         _;
     }
 
-    modifier onlyManagerOrOwner() {
-        if (!hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
-            revert CallerNotManagerNorOwner();
+    modifier onlyGuardianOrHigherRole() {
+        if (!hasRole(GUARDIAN, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
+            revert CallerNotGuardianOrWithHigherRole();
         }
         _;
     }
 
-    modifier onlyGuardianOrHigherRole() {
-        if (!hasRole(GUARDIAN, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
-            revert CallerNotGuardianOrWithHigherRole();
+    modifier onlyManagerOrOwner() {
+        if (!hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
+            revert CallerNotManagerNorOwner();
         }
         _;
     }
