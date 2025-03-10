@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20, ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -219,6 +220,26 @@ contract CommonAggregator is
         $.rewardBuffer._decreaseAssets(assets);
 
         return assets;
+    }
+
+    function _pullFundsSequential(uint256 assets) internal {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+
+        for (uint256 i = 0; i < $.vaults.length && assets > 0; i++) {
+            IERC4626 vault = $.vaults[i];
+            uint256 vaultMaxWithdraw = vault.maxWithdraw(address(this));
+            uint256 assetsToPullFromVault = assets.min(vaultMaxWithdraw);
+            try vault.withdraw(assetsToPullFromVault, address(this), address(this)) {
+                assets -= assetsToPullFromVault;
+            } catch {
+                emit VaultWithdrawFailed(vault);
+            }
+        }
+
+        // Fail if too little assets were withdrawn.
+        if (assets > 0) {
+            revert InsufficientAssetsForWithdrawal(assets);
+        }
     }
 
     // TODO: make sure deposits / withdrawals from protocolReceiver are handled correctly
