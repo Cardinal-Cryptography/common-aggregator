@@ -49,8 +49,8 @@ contract HealthyVaultsTest is PullSequentialTest {
     function testPullSequentialAll() public {
         asset.mint(address(vaults[0]), 200);
         asset.mint(address(vaults[1]), 300);
-        vaults[0].mint(address(commonAggregator), 200 * 10000);
-        vaults[1].mint(address(commonAggregator), 300 * 10000);
+        vaults[0].mint(address(commonAggregator), 200);
+        vaults[1].mint(address(commonAggregator), 300);
 
         vm.prank(address(commonAggregator));
         commonAggregator.pullFundsSequential(500);
@@ -63,8 +63,8 @@ contract HealthyVaultsTest is PullSequentialTest {
     function testPullSequentialPartial() public {
         asset.mint(address(vaults[0]), 400);
         asset.mint(address(vaults[1]), 700);
-        vaults[0].mint(address(commonAggregator), 400 * 10000);
-        vaults[1].mint(address(commonAggregator), 700 * 10000);
+        vaults[0].mint(address(commonAggregator), 400);
+        vaults[1].mint(address(commonAggregator), 700);
 
         vm.prank(address(commonAggregator));
         commonAggregator.pullFundsSequential(800);
@@ -77,8 +77,8 @@ contract HealthyVaultsTest is PullSequentialTest {
     function testPullSequentialTooMuch() public {
         asset.mint(address(vaults[0]), 300);
         asset.mint(address(vaults[1]), 400);
-        vaults[0].mint(address(commonAggregator), 300 * 10000);
-        vaults[1].mint(address(commonAggregator), 400 * 10000);
+        vaults[0].mint(address(commonAggregator), 300);
+        vaults[1].mint(address(commonAggregator), 400);
 
         vm.prank(address(commonAggregator));
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InsufficientAssetsForWithdrawal.selector, 1));
@@ -109,9 +109,9 @@ contract UnhealthyVaultTest is PullSequentialTest {
         asset.mint(address(vaults[0]), 300);
         asset.mint(address(vaults[1]), 400);
         asset.mint(address(vaults[2]), 200);
-        vaults[0].mint(address(commonAggregator), 300 * 10000);
-        vaults[1].mint(address(commonAggregator), 400 * 10000);
-        vaults[2].mint(address(commonAggregator), 200 * 10000);
+        vaults[0].mint(address(commonAggregator), 300);
+        vaults[1].mint(address(commonAggregator), 400);
+        vaults[2].mint(address(commonAggregator), 200);
 
         vm.prank(address(commonAggregator));
         vm.expectEmit(true, true, true, true, address(commonAggregator));
@@ -127,7 +127,7 @@ contract UnhealthyVaultTest is PullSequentialTest {
 
     function testStopsAfterCollectingFullAmount() public {
         asset.mint(address(vaults[0]), 300);
-        vaults[0].mint(address(commonAggregator), 300 * 10000);
+        vaults[0].mint(address(commonAggregator), 300);
 
         vm.prank(address(commonAggregator));
         vm.recordLogs();
