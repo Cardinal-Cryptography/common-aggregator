@@ -85,7 +85,7 @@ contract VaultManagementTest is Test {
         CommonAggregator aggregator = _aggregatorWithThreeVaults();
         IERC4626 vault = aggregator.getVaults()[0];
 
-        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultAlreadyAded.selector, vault));
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultAlreadyAdded.selector, vault));
         vm.prank(manager);
         aggregator.submitAddVault(vault, MAX_BPS);
     }

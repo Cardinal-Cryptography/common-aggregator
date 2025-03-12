@@ -7,10 +7,12 @@ interface ICommonAggregator is IERC4626 {
     // ----- Reporting -----
 
     event HoldingsStateUpdated(uint256 oldCachedAssets, uint256 newCachedAssets);
+    event VaultWithdrawFailed(IERC4626 vault);
 
+    error InsufficientAssetsForWithdrawal(uint256 missing);
     error VaultAddressCantBeZero();
     error IncorrectAsset(address expected, address actual);
-    error VaultAlreadyAded(IERC4626 vault);
+    error VaultAlreadyAdded(IERC4626 vault);
     error VaultLimitExceeded();
 
     function updateHoldingsState() external;
@@ -90,7 +92,7 @@ interface ICommonAggregator is IERC4626 {
     /// @notice Sets bps-wise protocol fee.
     /// The protocol fee is applied on the profit made, with each holdings state update.
     /// It's a no-op if `_protocolFeeBps` is the same as the current `protocolFeeBps`.
-    function setProtocolFee(uint256 protocolFeeBps) external;
+    function setProtocolFee(uint256 _protocolFeeBps) external;
 
     error SelfProtocolFeeReceiver();
     error ZeroProtocolFeeReceiver();
@@ -98,6 +100,34 @@ interface ICommonAggregator is IERC4626 {
     /// @notice Sets the protocol fee receiver.
     /// It's a no-op if `protocolFeeReceiver` is the same as the current `protocolFeeReceiver`.
     function setProtocolFeeReceiver(address protocolFeeReceiver) external;
+
+    // ----- Non-asset rewards trading -----
+
+    event SetRewardsTraderSubmitted(
+        address indexed rewardToken, address indexed traderAddress, uint256 unlockTimestamp
+    );
+    event SetRewardsTraderCancelled(address indexed rewardToken, address indexed traderAddress);
+    event RewardsTraderSet(address indexed rewardToken, address indexed traderAddress);
+    event RewardsTransferred(address indexed rewardToken, uint256 amount, address indexed receiver);
+
+    error InvalidRewardToken(address token);
+    error NoTraderSetForToken(address token);
+
+    /// @notice Proposes execution of `setRewardTrader` with given parameters.
+    /// Caller must hold the `OWNER` role.
+    function submitSetRewardTrader(address rewardToken, address traderAddress) external;
+
+    /// @notice Allows transfering `rewardToken`s from aggregator to `traderAddress`
+    /// using `transferRewardsForSale` method.
+    /// Can only be called after timelock initiated in `submitSetRewardTrader` has elapsed.
+    function setRewardTrader(address rewardToken, address traderAddress) external;
+
+    /// @notice Cancels reward trader setting action.
+    /// Caller must hold `GUARDIAN`, `MANAGER` or `OWNER` role.
+    function cancelSetRewardTrader(address rewardToken, address traderAddress) external;
+
+    /// @notice Transfers all `token`s held in the aggregator to `rewardTrader[token]`
+    function transferRewardsForSale(address token) external;
 
     // ----- Emergency redeem -----
 
