@@ -156,6 +156,30 @@ contract VaultManagementTest is Test {
         aggregator.addVault(vaultC);
     }
 
+    function testChangeLimitAfterAddingAndRemovingVault() public {
+        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        IERC4626 vault = new ERC4626Mock(address(asset));
+        vm.prank(manager);
+        aggregator.submitAddVault(vault);
+
+        vm.warp(STARTING_TIMESTAMP + 8 days);
+        vm.prank(manager);
+        aggregator.addVault(vault);
+
+        assertEq(aggregator.getMaxAllocationLimit(vault), 0);
+
+        vm.prank(owner);
+        aggregator.setLimit(vault, MAX_BPS);
+
+        assertEq(aggregator.getMaxAllocationLimit(vault), MAX_BPS);
+
+        vm.prank(manager);
+        aggregator.removeVault(vault);
+
+        // vault limit should be deleted
+        assertEq(aggregator.getMaxAllocationLimit(vault), 0);
+    }
+
     function testRemoveVault() public {
         CommonAggregator aggregator = _aggregatorWithThreeVaults();
         IERC4626[] memory initialVaults = aggregator.getVaults();
