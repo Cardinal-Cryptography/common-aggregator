@@ -19,9 +19,9 @@ interface ICommonAggregator is IERC4626 {
 
     // ----- Vault management -----
 
-    event VaultAdditionSubmitted(address indexed vault, uint256 limit, uint256 unlockTimestamp);
-    event VaultAdditionCancelled(address indexed vault, uint256 limit);
-    event VaultAdded(address indexed vault, uint256 limit);
+    event VaultAdditionSubmitted(address indexed vault, uint256 unlockTimestamp);
+    event VaultAdditionCancelled(address indexed vault);
+    event VaultAdded(address indexed vault);
 
     event VaultRemoved(address indexed vault);
 
@@ -29,9 +29,9 @@ interface ICommonAggregator is IERC4626 {
     event VaultForceRemovalCancelled(address indexed vault);
     event VaultForceRemoved(address indexed vault);
 
-    function submitAddVault(IERC4626 vault, uint256 limit) external;
-    function cancelAddVault(IERC4626 vault, uint256 limit) external;
-    function addVault(IERC4626 vault, uint256 limit) external;
+    function submitAddVault(IERC4626 vault) external;
+    function cancelAddVault(IERC4626 vault) external;
+    function addVault(IERC4626 vault) external;
 
     function removeVault(IERC4626 vault) external;
 
