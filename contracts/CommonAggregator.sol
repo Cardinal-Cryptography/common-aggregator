@@ -232,6 +232,8 @@ contract CommonAggregator is
         }
     }
 
+    /// @dev Function is exposed as external but only callable by aggregator, because we want to be able
+    /// to easily revert all changes in case of it's failure - it is not possible for internal functions.
     function pullFundsProportional(uint256 amount) external onlyAggregator {
         require(totalAssets() != 0, NotEnoughFunds());
 
