@@ -56,7 +56,6 @@ contract CommonAggregator is
         uint256 protocolFeeBps;
         address protocolFeeReceiver;
         mapping(address rewardToken => address traderAddress) rewardTrader;
-        mapping(address vault => bool) pendingVaultAdditions;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
@@ -414,55 +413,39 @@ contract CommonAggregator is
 
     /// @notice Submits a timelocked proposal to add a new vault to the list.
     /// @dev There's no limit on the number of pending vaults that can be added, only on the number of fully added vaults.
-    /// Also the same vault can be submitted multiple times, with different limits. Only one such submission can be accepted at a time.
     /// Manager or Guardian should cancel mistaken and stale submissions.
-    function submitAddVault(IERC4626 vault, uint256 limit)
+    function submitAddVault(IERC4626 vault)
         external
         override
         onlyManagerOrOwner
-        registersTimelockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)), ADD_VAULT_TIMELOCK)
+        registersTimelockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), ADD_VAULT_TIMELOCK)
     {
         _ensureVaultCanBeAdded(vault);
-        if (limit > MAX_BPS) {
-            revert IncorrectMaxAllocationLimit();
-        }
 
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        if ($.pendingVaultAdditions[address(vault)] == true) {
-            revert VaultAdditionAlreadyPending(vault);
-        }
-        $.pendingVaultAdditions[address(vault)] = true;
-        emit VaultAdditionSubmitted(address(vault), limit, block.timestamp + ADD_VAULT_TIMELOCK);
+        emit VaultAdditionSubmitted(address(vault), block.timestamp + ADD_VAULT_TIMELOCK);
     }
 
-    function cancelAddVault(IERC4626 vault, uint256 limit)
+    function cancelAddVault(IERC4626 vault)
         external
         override
         onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)))
+        cancelsAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)))
     {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        delete $.pendingVaultAdditions[address(vault)];
-        emit VaultAdditionCancelled(address(vault), limit);
+        emit VaultAdditionCancelled(address(vault));
     }
 
-    function addVault(IERC4626 vault, uint256 limit)
+    function addVault(IERC4626 vault)
         external
         override
         onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault, limit)))
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)))
     {
         _ensureVaultCanBeAdded(vault);
-        if (limit > MAX_BPS) {
-            revert IncorrectMaxAllocationLimit();
-        }
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.vaults.push(vault);
-        $.allocationLimitBps[address(vault)] = limit;
-        delete $.pendingVaultAdditions[address(vault)];
         updateHoldingsState();
 
-        emit VaultAdded(address(vault), limit);
+        emit VaultAdded(address(vault));
     }
 
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
@@ -647,7 +630,10 @@ contract CommonAggregator is
         require(rewardToken != asset(), InvalidRewardToken(rewardToken));
         require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
         require(rewardToken != address(this), InvalidRewardToken(rewardToken));
-        require(!_getAggregatorStorage().pendingVaultAdditions[rewardToken], InvalidRewardToken(rewardToken));
+        require(
+            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
+            InvalidRewardToken(rewardToken)
+        );
     }
 
     // ----- Etc -----
