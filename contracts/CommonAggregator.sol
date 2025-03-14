@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
@@ -23,7 +24,8 @@ contract CommonAggregator is
     CommonTimelocks,
     UUPSUpgradeable,
     AccessControlUpgradeable,
-    ERC4626Upgradeable
+    ERC4626Upgradeable,
+    PausableUpgradeable
 {
     using RewardBuffer for RewardBuffer.Buffer;
     using Math for uint256;
@@ -166,7 +168,12 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Updates holdings state before depositing.
-    function deposit(uint256 assets, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function deposit(uint256 assets, address account)
+        public
+        override(ERC4626Upgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
         updateHoldingsState();
         uint256 shares = super.deposit(assets, account);
 
@@ -179,7 +186,12 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Updates holdings state before minting.
-    function mint(uint256 shares, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function mint(uint256 shares, address account)
+        public
+        override(ERC4626Upgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
         updateHoldingsState();
         uint256 assets = super.mint(shares, account);
 
@@ -211,6 +223,7 @@ contract CommonAggregator is
     function withdraw(uint256 assets, address account, address owner)
         public
         override(ERC4626Upgradeable, IERC4626)
+        whenNotPaused
         returns (uint256)
     {
         updateHoldingsState();
@@ -228,6 +241,7 @@ contract CommonAggregator is
     function redeem(uint256 shares, address account, address owner)
         public
         override(ERC4626Upgradeable, IERC4626)
+        whenNotPaused
         returns (uint256)
     {
         updateHoldingsState();
@@ -634,6 +648,20 @@ contract CommonAggregator is
             !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
+    }
+
+    // ----- Pausing user interactions -----
+
+    /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Controlled by the owner,
+    /// to be used in case of an emergency. Users can still use emergencyWithdraw to exit the aggregator.
+    function pauseUserInteractions() public onlyRole(OWNER) {
+        _pause();
+    }
+
+    /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Controlled by the owner,
+    /// to be used after mitigating a potential emergency.
+    function unpauseUserInteractions() public onlyRole(OWNER) {
+        _unpause();
     }
 
     // ----- Etc -----
