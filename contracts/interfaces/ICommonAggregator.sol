@@ -7,7 +7,9 @@ interface ICommonAggregator is IERC4626 {
     // ----- Reporting -----
 
     event HoldingsStateUpdated(uint256 oldCachedAssets, uint256 newCachedAssets);
+    event VaultWithdrawFailed(IERC4626 vault);
 
+    error InsufficientAssetsForWithdrawal(uint256 missing);
     error VaultAddressCantBeZero();
     error IncorrectAsset(address expected, address actual);
     error VaultAlreadyAdded(IERC4626 vault);
@@ -134,4 +136,30 @@ interface ICommonAggregator is IERC4626 {
 
     /// @notice Transfers all `token`s held in the aggregator to `rewardTrader[token]`
     function transferRewardsForSale(address token) external;
+
+    // ----- Emergency redeem -----
+
+    /// @param sender Account executing the withdrawal.
+    /// @param receiver Account that received the assets and the aggregated vaults' shares.
+    /// @param owner Owner of the aggregator shares that were burnt.
+    /// @param assets Amount of underlying assets transferred to the `receiver`
+    /// @param shares Amount of the aggregator shares that were burnt.
+    /// @param vaultShares List of the aggregated vaults' shares amounts that were transferred to the `receiver`.
+    event EmergencyWithdraw(
+        address indexed sender,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares,
+        uint256[] vaultShares
+    );
+
+    /// @notice Burns exactly shares from owner and sends proportional amounts of aggregated vaults' shares and idle assets.
+    /// @dev MUST emit the EmergencyWithdraw event.
+    /// @dev MUST never be paused.
+    /// @return assets Amount of the underlying assets transferred to the `receiver`
+    /// @return vaultsShares List of the aggregated vaults' shares amounts that were transferred to the `receiver`.
+    function emergencyRedeem(uint256 shares, address receiver, address owner)
+        external
+        returns (uint256 assets, uint256[] memory vaultsShares);
 }

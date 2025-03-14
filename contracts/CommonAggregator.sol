@@ -3,15 +3,16 @@ pragma solidity ^0.8.28;
 
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {IERC20, ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {
+    IERC20,
     IERC4626,
+    IERC20Metadata,
+    SafeERC20,
+    ERC20Upgradeable,
     ERC4626Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import "./RewardBuffer.sol";
@@ -26,6 +27,8 @@ contract CommonAggregator is
 {
     using RewardBuffer for RewardBuffer.Buffer;
     using Math for uint256;
+    using SafeERC20 for IERC20;
+    using SafeERC20 for IERC4626;
 
     bytes32 public constant OWNER = keccak256("OWNER");
     bytes32 public constant MANAGER = keccak256("MANAGER");
@@ -104,6 +107,21 @@ contract CommonAggregator is
         AggregatorStorage storage $ = _getAggregatorStorage();
         require($.vaults.length < MAX_VAULTS, VaultLimitExceeded());
         require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
+    }
+
+    // ----- ERC20 -----
+
+    function totalSupply() public view override(ERC20Upgradeable, IERC20) returns (uint256) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        return super.totalSupply() - $.rewardBuffer._sharesToBurn();
+    }
+
+    function balanceOf(address account) public view override(ERC20Upgradeable, IERC20) returns (uint256 balance) {
+        balance = super.balanceOf(account);
+        if (account == address(this)) {
+            AggregatorStorage storage $ = _getAggregatorStorage();
+            balance -= $.rewardBuffer._sharesToBurn();
+        }
     }
 
     // ----- ERC4626 -----
@@ -228,7 +246,7 @@ contract CommonAggregator is
         try CommonAggregator(address(this)).pullFundsProportional(amount) {}
         catch {
             emit ProportionalWithdrawalFailed(amount);
-            revert("not implemented");
+            _pullFundsSequential(amount);
         }
     }
 
@@ -277,7 +295,63 @@ contract CommonAggregator is
         }
     }
 
+    function _pullFundsSequential(uint256 assets) internal {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+
+        for (uint256 i = 0; i < $.vaults.length && assets > 0; i++) {
+            IERC4626 vault = $.vaults[i];
+            uint256 vaultMaxWithdraw = vault.maxWithdraw(address(this));
+            uint256 assetsToPullFromVault = assets.min(vaultMaxWithdraw);
+            try vault.withdraw(assetsToPullFromVault, address(this), address(this)) {
+                assets -= assetsToPullFromVault;
+            } catch {
+                emit VaultWithdrawFailed(vault);
+            }
+        }
+
+        // Fail if too little assets were withdrawn.
+        if (assets > 0) {
+            revert InsufficientAssetsForWithdrawal(assets);
+        }
+    }
+
     // TODO: make sure deposits / withdrawals from protocolReceiver are handled correctly
+
+    // ----- Emergency redeem -----
+
+    /// @inheritdoc ICommonAggregator
+    function emergencyRedeem(uint256 shares, address account, address owner)
+        external
+        returns (uint256 assets, uint256[] memory vaultShares)
+    {
+        uint256 maxShares = maxRedeem(owner);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
+        }
+        if (msg.sender != owner) {
+            _spendAllowance(owner, msg.sender, shares);
+        }
+        updateHoldingsState();
+
+        uint256 totalShares = totalSupply();
+        _burn(owner, shares);
+
+        assets = shares.mulDiv(IERC20(asset()).balanceOf(address(this)), totalShares);
+        IERC20(asset()).safeTransfer(account, assets);
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        vaultShares = new uint256[]($.vaults.length);
+        uint256 valueInAssets = assets;
+        for (uint256 i = 0; i < $.vaults.length; i++) {
+            vaultShares[i] = shares.mulDiv($.vaults[i].balanceOf(address(this)), totalShares);
+            valueInAssets += $.vaults[i].convertToAssets(vaultShares[i]);
+            $.vaults[i].safeTransfer(account, vaultShares[i]);
+        }
+
+        $.rewardBuffer._decreaseAssets(valueInAssets);
+
+        emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultShares);
+    }
 
     // ----- Reporting -----
 
@@ -294,7 +368,7 @@ contract CommonAggregator is
         } else {
             uint256 newAssets = _totalAssetsNotCached();
             (uint256 sharesToMint, uint256 sharesToBurn) =
-                $.rewardBuffer._updateBuffer(newAssets, totalSupply(), $.protocolFeeBps);
+                $.rewardBuffer._updateBuffer(newAssets, super.totalSupply(), $.protocolFeeBps);
             if (sharesToMint > 0) {
                 uint256 feePartOfMintedShares = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
                 _mint(address(this), sharesToMint - feePartOfMintedShares);
@@ -312,13 +386,13 @@ contract CommonAggregator is
     function _previewUpdateHoldingsState() internal view returns (uint256 newTotalAssets, uint256 newTotalSupply) {
         AggregatorStorage storage $ = _getAggregatorStorage();
         if ($.rewardBuffer._getAssetsCached() == 0) {
-            return (0, totalSupply());
+            return (0, super.totalSupply());
         }
 
         newTotalAssets = _totalAssetsNotCached();
         (uint256 sharesToMint, uint256 sharesToBurn) =
-            $.rewardBuffer._simulateBufferUpdate(newTotalAssets, totalSupply(), $.protocolFeeBps);
-        return (newTotalAssets, totalSupply() + sharesToMint - sharesToBurn);
+            $.rewardBuffer._simulateBufferUpdate(newTotalAssets, super.totalSupply(), $.protocolFeeBps);
+        return (newTotalAssets, super.totalSupply() + sharesToMint - sharesToBurn);
     }
 
     function _totalAssetsNotCached() internal view returns (uint256) {
