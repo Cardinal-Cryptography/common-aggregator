@@ -652,15 +652,16 @@ contract CommonAggregator is
 
     // ----- Pausing user interactions -----
 
-    /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Controlled by the owner,
-    /// to be used in case of an emergency. Users can still use emergencyWithdraw to exit the aggregator.
-    function pauseUserInteractions() public onlyRole(OWNER) {
+    /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
+    /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
+    /// to exit the aggregator.
+    function pauseUserInteractions() public onlyGuardianOrHigherRole {
         _pause();
     }
 
-    /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Controlled by the owner,
-    /// to be used after mitigating a potential emergency.
-    function unpauseUserInteractions() public onlyRole(OWNER) {
+    /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
+    /// the manager or the owner. To be used after mitigating a potential emergency.
+    function unpauseUserInteractions() public onlyGuardianOrHigherRole {
         _unpause();
     }
 

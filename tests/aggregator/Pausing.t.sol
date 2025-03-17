@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {ICommonAggregator} from "contracts/interfaces/ICommonAggregator.sol";
 import {CommonAggregator} from "contracts/CommonAggregator.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -11,6 +12,8 @@ import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
 contract PausingTest is Test {
     address owner = address(0x123);
+    address manager = address(0x231);
+    address guardian = address(0x312);
     address alice = address(0x456);
     address bob = address(0x789);
     ERC20Mock asset = new ERC20Mock();
@@ -26,23 +29,42 @@ contract PausingTest is Test {
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
         aggregator = CommonAggregator(address(proxy));
+        _grantRoles();
     }
 
-    function testOnlyOwnerCanPauseUnpauseGlobal() public {
+    function testOwnerCanPauseUnpauseGlobal() public {
         vm.prank(owner);
         aggregator.pauseUserInteractions();
         vm.prank(owner);
         aggregator.unpauseUserInteractions();
+    }
+
+    function testManagerCanPauseUnpauseGlobal() public {
+        vm.prank(manager);
+        aggregator.pauseUserInteractions();
+        vm.prank(manager);
+        aggregator.unpauseUserInteractions();
+    }
+
+    function testGuardianCanPauseUnpauseGlobal() public {
+        vm.prank(guardian);
+        aggregator.pauseUserInteractions();
+        vm.prank(guardian);
+        aggregator.unpauseUserInteractions();
+    }
+
+    function testRegularUserCantPauseUnpauseGlobal() public {
+        vm.prank(alice);
+        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
+
+        aggregator.pauseUserInteractions();
+
+        // actually pause, so that unpausing is a correct action
+        vm.prank(owner);
+        aggregator.pauseUserInteractions();
 
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, keccak256("OWNER"))
-        );
-        aggregator.pauseUserInteractions();
-        vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, keccak256("OWNER"))
-        );
+        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
         aggregator.unpauseUserInteractions();
     }
 
@@ -171,5 +193,12 @@ contract PausingTest is Test {
         // withdraw succeeds again
         vm.prank(alice);
         aggregator.redeem(500 * 10000, alice, alice);
+    }
+
+    function _grantRoles() private {
+        vm.prank(owner);
+        aggregator.grantRole(keccak256("MANAGER"), manager);
+        vm.prank(owner);
+        aggregator.grantRole(keccak256("GUARDIAN"), guardian);
     }
 }
