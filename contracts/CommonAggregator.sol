@@ -214,6 +214,7 @@ contract CommonAggregator is
         returns (uint256)
     {
         updateHoldingsState();
+        _pullFundsForWithdrawal(assets);
         uint256 shares = super.withdraw(assets, account, owner);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
@@ -230,12 +231,67 @@ contract CommonAggregator is
         returns (uint256)
     {
         updateHoldingsState();
+        uint256 assetsNeeded = convertToAssets(shares);
+        _pullFundsForWithdrawal(assetsNeeded);
         uint256 assets = super.redeem(shares, account, owner);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.rewardBuffer._decreaseAssets(assets);
 
         return assets;
+    }
+
+    function _pullFundsForWithdrawal(uint256 amount) internal {
+        try CommonAggregator(address(this)).pullFundsProportional(amount) {}
+        catch {
+            emit ProportionalWithdrawalFailed(amount);
+            _pullFundsSequential(amount);
+        }
+    }
+
+    /// @dev Function is exposed as external but only callable by aggregator, because we want to be able
+    /// to easily revert all changes in case of it's failure - it is not possible for internal functions.
+    function pullFundsProportional(uint256 amount) external onlyAggregator {
+        require(totalAssets() != 0, NotEnoughFunds());
+
+        IERC20 asset = IERC20(asset());
+        uint256 idle = asset.balanceOf(address(this));
+        uint256 amountIdle = amount.mulDiv(idle, totalAssets());
+
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        uint256[] memory amountsVaults = new uint256[]($.vaults.length);
+
+        uint256 totalGathered = amountIdle;
+        for (uint256 i = 0; i < $.vaults.length; ++i) {
+            amountsVaults[i] = amount.mulDiv(_aggregatedVaultAssets($.vaults[i]), totalAssets());
+            totalGathered += amountsVaults[i];
+        }
+
+        if (totalGathered < amount) {
+            uint256 missing = amount - totalGathered;
+            uint256 additionalIdleContribution = missing.min(idle - amountIdle);
+            missing -= additionalIdleContribution;
+            amountIdle += additionalIdleContribution;
+
+            for (uint256 i = 0; i < $.vaults.length && missing > 0; ++i) {
+                uint256 vaultMaxWithdraw = $.vaults[i].maxWithdraw(address(this));
+                require(
+                    amountsVaults[i] <= vaultMaxWithdraw,
+                    AggregatedVaultWithdrawalLimitExceeded(address($.vaults[i]), vaultMaxWithdraw, amountsVaults[i])
+                );
+                uint256 additionalVaultContribution = missing.min(vaultMaxWithdraw - amountsVaults[i]);
+                missing -= additionalVaultContribution;
+                amountsVaults[i] += additionalVaultContribution;
+            }
+
+            require(missing == 0, NotEnoughFunds());
+        }
+
+        for (uint256 i = 0; i < $.vaults.length; ++i) {
+            uint256 shares = $.vaults[i].convertToShares(amountsVaults[i]);
+            $.vaults[i].approve(address($.vaults[i]), shares);
+            $.vaults[i].withdraw(amountsVaults[i], address(this), address(this));
+        }
     }
 
     function _pullFundsSequential(uint256 assets) internal {
@@ -592,6 +648,11 @@ contract CommonAggregator is
         if (!hasRole(REBALANCER, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
             revert CallerNotRebalancerOrWithHigherRole();
         }
+        _;
+    }
+
+    modifier onlyAggregator() {
+        require(msg.sender == address(this), CallerNotAggregator());
         _;
     }
 
