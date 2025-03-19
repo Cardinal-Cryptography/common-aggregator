@@ -83,6 +83,71 @@ contract PausingTest is Test {
         aggregator.pauseUserInteractions();
     }
 
+    function testMaxDepositIsZeroWhenPaused() public {
+        assertGt(aggregator.maxDeposit(alice), 0);
+
+        vm.prank(owner);
+        aggregator.pauseUserInteractions();
+
+        assertEq(aggregator.maxDeposit(alice), 0);
+    }
+
+    function testMaxMintIsZeroWhenPaused() public {
+        assertGt(aggregator.maxMint(alice), 0);
+
+        vm.prank(owner);
+        aggregator.pauseUserInteractions();
+
+        assertEq(aggregator.maxMint(alice), 0);
+    }
+
+    function testMaxWithdrawIsZeroWhenPaused() public {
+        asset.mint(alice, 1000);
+        vm.prank(alice);
+        asset.approve(address(aggregator), 1000);
+        vm.prank(alice);
+        aggregator.deposit(1000, alice);
+
+        assertEq(aggregator.maxWithdraw(alice), 1000);
+
+        vm.prank(owner);
+        aggregator.pauseUserInteractions();
+
+        assertEq(aggregator.maxWithdraw(alice), 0);
+    }
+
+    function testMaxRedeemIsZeroWhenPaused() public {
+        asset.mint(alice, 1000);
+        vm.prank(alice);
+        asset.approve(address(aggregator), 1000);
+        vm.prank(alice);
+        uint256 shares = aggregator.deposit(1000, alice);
+
+        assertGt(shares, 0);
+        assertEq(aggregator.maxRedeem(alice), shares);
+
+        vm.prank(owner);
+        aggregator.pauseUserInteractions();
+
+        assertEq(aggregator.maxRedeem(alice), 0);
+    }
+
+    function testMaxEmergencyRedeemDoesNotChangeWhenPaused() public {
+        asset.mint(alice, 1000);
+        vm.prank(alice);
+        asset.approve(address(aggregator), 1000);
+        vm.prank(alice);
+        uint256 shares = aggregator.deposit(1000, alice);
+
+        assertGt(shares, 0);
+        assertEq(aggregator.maxEmergencyRedeem(alice), shares);
+
+        vm.prank(owner);
+        aggregator.pauseUserInteractions();
+
+        assertEq(aggregator.maxEmergencyRedeem(alice), shares);
+    }
+
     function testDepositGetsPaused() public {
         asset.mint(alice, 1000);
         vm.prank(alice);
@@ -99,7 +164,7 @@ contract PausingTest is Test {
         // deposit fails when paused
         vm.prank(alice);
         vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        aggregator.deposit(100, alice);
+        aggregator.deposit(500, alice);
 
         // unpause
         vm.prank(owner);
@@ -114,10 +179,11 @@ contract PausingTest is Test {
         asset.mint(alice, 1000);
         vm.prank(alice);
         asset.approve(address(aggregator), 1000);
+        uint256 shares = aggregator.convertToShares(1000);
 
         // first mint works
         vm.prank(alice);
-        aggregator.mint(500 * 10000, bob);
+        aggregator.mint(shares / 2, bob);
 
         // pause
         vm.prank(owner);
@@ -126,7 +192,7 @@ contract PausingTest is Test {
         // mint fails when paused
         vm.prank(alice);
         vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        aggregator.mint(500 * 10000, bob);
+        aggregator.mint(shares / 2, bob);
 
         // unpause
         vm.prank(owner);
@@ -134,7 +200,7 @@ contract PausingTest is Test {
 
         // mint succeeds again
         vm.prank(alice);
-        aggregator.mint(500 * 10000, bob);
+        aggregator.mint(shares / 2, bob);
     }
 
     function testWithdrawGetsPaused() public {
@@ -171,28 +237,48 @@ contract PausingTest is Test {
         vm.prank(alice);
         asset.approve(address(aggregator), 1000);
         vm.prank(alice);
-        aggregator.deposit(1000, alice);
+        uint256 shares = aggregator.deposit(1000, alice);
 
-        // first withdraw works
+        // first redeem works
         vm.prank(alice);
-        aggregator.redeem(500 * 10000, alice, alice);
+        aggregator.redeem(shares / 2, alice, alice);
 
         // pause
         vm.prank(owner);
         aggregator.pauseUserInteractions();
 
-        // withdraw fails when paused
+        // redeem fails when paused
         vm.prank(alice);
         vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        aggregator.redeem(500 * 10000, alice, alice);
+        aggregator.redeem(shares / 2, alice, alice);
 
         // unpause
         vm.prank(owner);
         aggregator.unpauseUserInteractions();
 
-        // withdraw succeeds again
+        // redeem succeeds again
         vm.prank(alice);
-        aggregator.redeem(500 * 10000, alice, alice);
+        aggregator.redeem(shares / 2, alice, alice);
+    }
+
+    function testEmergencyRedeemDoesNotGetPaused() public {
+        asset.mint(alice, 1000);
+        vm.prank(alice);
+        asset.approve(address(aggregator), 1000);
+        vm.prank(alice);
+        uint256 shares = aggregator.deposit(1000, alice);
+
+        // first emergency redeem works
+        vm.prank(alice);
+        aggregator.emergencyRedeem(shares / 2, alice, alice);
+
+        // pause
+        vm.prank(owner);
+        aggregator.pauseUserInteractions();
+
+        // emergency redeem still works when paused
+        vm.prank(alice);
+        aggregator.emergencyRedeem(shares / 2, alice, alice);
     }
 
     function _grantRoles() private {
