@@ -139,6 +139,42 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc IERC4626
+    /// @notice Returns the maximum deposit amount of the given address at the current time.
+    function maxDeposit(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
+        return super.maxDeposit(owner);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Returns the maximum mint amount of the given address at the current time.
+    function maxMint(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
+        return super.maxMint(owner);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Returns the maximum withdraw amount of the given address at the current time.
+    function maxWithdraw(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
+        return super.maxWithdraw(owner);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Returns the maximum redeem amount of the given address at the current time.
+    function maxRedeem(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
+        return super.maxRedeem(owner);
+    }
+
+    /// @inheritdoc IERC4626
     /// @dev Updates holdings state before the preview.
     function previewDeposit(uint256 assets) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
@@ -332,12 +368,16 @@ contract CommonAggregator is
 
     // ----- Emergency redeem -----
 
+    function maxEmergencyRedeem(address owner) public view returns (uint256) {
+        return super.maxRedeem(owner);
+    }
+
     /// @inheritdoc ICommonAggregator
     function emergencyRedeem(uint256 shares, address account, address owner)
         external
         returns (uint256 assets, uint256[] memory vaultShares)
     {
-        uint256 maxShares = maxRedeem(owner);
+        uint256 maxShares = maxEmergencyRedeem(owner);
         if (shares > maxShares) {
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
         }
