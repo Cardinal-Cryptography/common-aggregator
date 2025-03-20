@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
@@ -23,7 +24,8 @@ contract CommonAggregator is
     CommonTimelocks,
     UUPSUpgradeable,
     AccessControlUpgradeable,
-    ERC4626Upgradeable
+    ERC4626Upgradeable,
+    PausableUpgradeable
 {
     using RewardBuffer for RewardBuffer.Buffer;
     using Math for uint256;
@@ -137,6 +139,42 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc IERC4626
+    /// @notice Returns the maximum deposit amount of the given address at the current time.
+    function maxDeposit(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
+        return super.maxDeposit(owner);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Returns the maximum mint amount of the given address at the current time.
+    function maxMint(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
+        return super.maxMint(owner);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Returns the maximum withdraw amount of the given address at the current time.
+    function maxWithdraw(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
+        return super.maxWithdraw(owner);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Returns the maximum redeem amount of the given address at the current time.
+    function maxRedeem(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
+        return super.maxRedeem(owner);
+    }
+
+    /// @inheritdoc IERC4626
     /// @dev Updates holdings state before the preview.
     function previewDeposit(uint256 assets) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
@@ -166,7 +204,12 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Updates holdings state before depositing.
-    function deposit(uint256 assets, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function deposit(uint256 assets, address account)
+        public
+        override(ERC4626Upgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
         updateHoldingsState();
         uint256 shares = super.deposit(assets, account);
 
@@ -179,7 +222,12 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Updates holdings state before minting.
-    function mint(uint256 shares, address account) public override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function mint(uint256 shares, address account)
+        public
+        override(ERC4626Upgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
         updateHoldingsState();
         uint256 assets = super.mint(shares, account);
 
@@ -211,6 +259,7 @@ contract CommonAggregator is
     function withdraw(uint256 assets, address account, address owner)
         public
         override(ERC4626Upgradeable, IERC4626)
+        whenNotPaused
         returns (uint256)
     {
         updateHoldingsState();
@@ -228,6 +277,7 @@ contract CommonAggregator is
     function redeem(uint256 shares, address account, address owner)
         public
         override(ERC4626Upgradeable, IERC4626)
+        whenNotPaused
         returns (uint256)
     {
         updateHoldingsState();
@@ -318,12 +368,16 @@ contract CommonAggregator is
 
     // ----- Emergency redeem -----
 
+    function maxEmergencyRedeem(address owner) public view returns (uint256) {
+        return super.maxRedeem(owner);
+    }
+
     /// @inheritdoc ICommonAggregator
     function emergencyRedeem(uint256 shares, address account, address owner)
         external
         returns (uint256 assets, uint256[] memory vaultShares)
     {
-        uint256 maxShares = maxRedeem(owner);
+        uint256 maxShares = maxEmergencyRedeem(owner);
         if (shares > maxShares) {
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
         }
@@ -634,6 +688,21 @@ contract CommonAggregator is
             !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
+    }
+
+    // ----- Pausing user interactions -----
+
+    /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
+    /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
+    /// to exit the aggregator.
+    function pauseUserInteractions() public onlyGuardianOrHigherRole {
+        _pause();
+    }
+
+    /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
+    /// the manager or the owner. To be used after mitigating a potential emergency.
+    function unpauseUserInteractions() public onlyGuardianOrHigherRole {
+        _unpause();
     }
 
     // ----- Etc -----
