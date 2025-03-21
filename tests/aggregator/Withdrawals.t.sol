@@ -129,6 +129,16 @@ contract CommonAggregatorTest is Test {
         commonAggregator.pullFundsProportional(70);
     }
 
+    function testFallback() public {
+        _prepareDistribution([uint256(30), 30, 30], 30);
+
+        vaults[0].setWithdrawLimit(10);
+
+        // Max amount that can be withdrawn from aggregated vaults.
+        // Sequential withdrawal should be able to pull all 100.
+        _bobWithdraw(100);
+    }
+
     function testTryDirectCall() public {
         vm.expectRevert(ICommonAggregator.CallerNotAggregator.selector);
         commonAggregator.pullFundsProportional(10);
