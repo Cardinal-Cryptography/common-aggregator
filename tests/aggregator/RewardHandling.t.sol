@@ -200,7 +200,7 @@ contract CommonAggregatorTest is Test {
         commonAggregator.setRewardTrader(address(freshVault), trader);
 
         vm.prank(owner);
-        commonAggregator.submitAddVault(IERC4626(address(freshVault)), 0);
+        commonAggregator.submitAddVault(IERC4626(address(freshVault)));
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(freshVault)));
         commonAggregator.transferRewardsForSale(address(freshVault));
@@ -208,7 +208,7 @@ contract CommonAggregatorTest is Test {
         vm.warp(STARTING_TIMESTAMP + 20 days);
 
         vm.prank(owner);
-        commonAggregator.addVault(IERC4626(address(freshVault)), 0);
+        commonAggregator.addVault(IERC4626(address(freshVault)));
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(freshVault)));
         commonAggregator.transferRewardsForSale(address(freshVault));
