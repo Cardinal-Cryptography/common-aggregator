@@ -44,6 +44,20 @@ contract CommonAggregatorTest is Test {
         commonAggregator = CommonAggregator(address(proxy));
     }
 
+    function testMaxWithdraw() public {
+        _prepareDistribution([uint256(30), 30, 30], 30);
+        vaults[0].setWithdrawLimit(10);
+
+        assertEq(commonAggregator.maxWithdraw(alice), 100);
+    }
+
+    function testMaxRedeem() public {
+        _prepareDistribution([uint256(30), 30, 30], 30);
+        vaults[0].setWithdrawLimit(10);
+
+        assertEq(commonAggregator.maxRedeem(alice), commonAggregator.convertToShares(100));
+    }
+
     function testSimpleWithdraw() public {
         _prepareDistribution([uint256(10), 20, 30], 5);
 
