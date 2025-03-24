@@ -179,6 +179,9 @@ contract CommonAggregator is
         uint256 availableFunds = IERC20(asset()).balanceOf(address(this));
 
         for (uint256 i = 0; i < $.vaults.length; ++i) {
+            // ERC-4626 requires `maxWithdraw` and `maxRedeem` to be non-reverting.
+            // We want to ensure that this requirement is fulfilled, even if one of the
+            // aggregated vaults does not respect it and reverts on `maxWithdraw`.
             try $.vaults[i].maxWithdraw(address(this)) returns (uint256 pullableFunds) {
                 availableFunds += pullableFunds;
             } catch {}
