@@ -24,12 +24,11 @@ jobs:
         id: deps
 
       - name: Run tests
-        run: forge test --match-test Benchmark --gas-report > .gasreport
+        run: forge test --match-test Benchmark --gas-report > gasreport.ansi
 
       - name: Compare gas reports
         uses: Rubilmax/foundry-gas-diff@v3
         with:
-          report: .gasreport
           sortCriteria: avg,max
           sortOrders: desc,asc
         id: gas_diff
