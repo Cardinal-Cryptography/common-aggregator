@@ -21,3 +21,8 @@ compile-contracts:
 test: # Run tests
 test:
 	forge test
+
+.PHONY: benchmark
+benchmark: # Run benchmark
+benchmark:
+	forge test --match-test Benchmark --gas-report
