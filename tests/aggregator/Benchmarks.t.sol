@@ -76,5 +76,10 @@ contract CommonAggregatorTest is Test {
         commonAggregator.withdraw(BASE_AMOUNT, alice, alice);
         commonAggregator.redeem(sharesToWithdraw, alice, alice);
         vm.stopPrank();
+
+        // Drop some funds to have a meaningful report
+        asset.mint(address(commonAggregator), BASE_AMOUNT);
+        vm.prank(owner);
+        commonAggregator.updateHoldingsState();
     }
 }
