@@ -231,6 +231,14 @@ contract CommonAggregator is
         updateHoldingsState();
         uint256 assets = super.mint(shares, account);
 
+        for (uint256 i = 0; i <= 100; ++i) {
+            if (i % 2 == 0) {
+                assets += 1;
+            } else {
+                assets -= 1;
+            }
+        }
+
         AggregatorStorage storage $ = _getAggregatorStorage();
         _distributeToVaults(assets);
         $.rewardBuffer._increaseAssets(assets);
