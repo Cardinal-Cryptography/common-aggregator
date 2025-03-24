@@ -10,27 +10,45 @@ contract ERC4626Mock is ERC4626 {
     uint256 mintLimit;
     uint256 withdrawLimit;
     uint256 redeemLimit;
+    bool reverting;
 
     constructor(address asset) ERC20("ERC4626Mock", "E4626M") ERC4626(IERC20(asset)) {
         depositLimit = type(uint256).max;
         mintLimit = type(uint256).max;
         withdrawLimit = type(uint256).max;
         redeemLimit = type(uint256).max;
+        reverting = false;
     }
 
     function maxDeposit(address) public view override returns (uint256) {
+        if (reverting) {
+            revert();
+        }
+
         return depositLimit;
     }
 
     function maxMint(address) public view override returns (uint256) {
+        if (reverting) {
+            revert();
+        }
+
         return mintLimit;
     }
 
     function maxWithdraw(address owner) public view override returns (uint256) {
+        if (reverting) {
+            revert();
+        }
+
         return Math.min(super.maxWithdraw(owner), withdrawLimit);
     }
 
     function maxRedeem(address owner) public view override returns (uint256) {
+        if (reverting) {
+            revert();
+        }
+
         return Math.min(super.maxRedeem(owner), redeemLimit);
     }
 
@@ -48,6 +66,10 @@ contract ERC4626Mock is ERC4626 {
 
     function setRedeemLimit(uint256 limit) external {
         redeemLimit = limit;
+    }
+
+    function setReverting(bool _reverting) external {
+        reverting = _reverting;
     }
 
     function mint(address account, uint256 amount) external {
