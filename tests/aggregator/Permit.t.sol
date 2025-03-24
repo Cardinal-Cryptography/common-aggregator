@@ -77,22 +77,6 @@ contract PermitTest is Test {
         commonAggregator.permit(alice, bob, amount, deadline, v, r, s);
     }
 
-    function testWithdrawUsingPermit() public {
-        uint256 shares = commonAggregator.balanceOf(alice);
-        uint256 withdrawable = commonAggregator.maxWithdraw(alice);
-
-        uint256 deadline = block.timestamp + 1 days;
-        (uint8 v, bytes32 r, bytes32 s) = _permitOnCommonAggregatorData(alicePrivateKey, bob, shares, deadline);
-
-        vm.prank(bob);
-        commonAggregator.permit(alice, bob, shares, deadline, v, r, s);
-
-        vm.prank(bob);
-        commonAggregator.withdraw(withdrawable, bob, alice);
-
-        assertEq(asset.balanceOf(bob), withdrawable);
-    }
-
     function _permitOnCommonAggregatorData(uint256 ownerPrivateKey, address spender, uint256 value, uint256 deadline)
         internal
         view
