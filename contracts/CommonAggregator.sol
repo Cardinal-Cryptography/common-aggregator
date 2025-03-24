@@ -162,7 +162,7 @@ contract CommonAggregator is
         if (paused()) {
             return 0;
         }
-        return super.maxWithdraw(owner);
+        return super.maxWithdraw(owner).min(_availableFunds());
     }
 
     /// @inheritdoc IERC4626
@@ -171,7 +171,20 @@ contract CommonAggregator is
         if (paused()) {
             return 0;
         }
-        return super.maxRedeem(owner);
+        return super.maxRedeem(owner).min(convertToShares(_availableFunds()));
+    }
+
+    function _availableFunds() internal view returns (uint256) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        uint256 availableFunds = IERC20(asset()).balanceOf(address(this));
+
+        for (uint256 i = 0; i < $.vaults.length; ++i) {
+            try $.vaults[i].maxWithdraw(address(this)) returns (uint256 pullableFunds) {
+                availableFunds += pullableFunds;
+            } catch {}
+        }
+
+        return availableFunds;
     }
 
     /// @inheritdoc IERC4626
