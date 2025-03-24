@@ -1,0 +1,37 @@
+name: Report gas diff
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  compare_gas_reports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: onbjerg/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run tests
+        run: forge test --match-test Benchmark --gas-report > .gasreport
+
+      - name: Compare gas reports
+        uses: Rubilmax/foundry-gas-diff@v3
+        with:
+          sortCriteria: avg,max
+          sortOrders: desc,asc
+        id: gas_diff
+
+      - name: Add gas diff to sticky comment
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          delete: ${{ !steps.gas_diff.outputs.markdown }}
+          message: ${{ steps.gas_diff.outputs.markdown }}
