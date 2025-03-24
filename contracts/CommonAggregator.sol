@@ -14,6 +14,8 @@ import {
     ERC20Upgradeable,
     ERC4626Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC20PermitUpgradeable} from
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import "./RewardBuffer.sol";
@@ -25,6 +27,7 @@ contract CommonAggregator is
     UUPSUpgradeable,
     AccessControlUpgradeable,
     ERC4626Upgradeable,
+    ERC20PermitUpgradeable,
     PausableUpgradeable
 {
     using RewardBuffer for RewardBuffer.Buffer;
@@ -81,9 +84,13 @@ contract CommonAggregator is
     }
 
     function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
+        string memory tokenName = string.concat("Common-Aggregator-", asset.name(), "-v1");
+
         __AccessControl_init();
         __UUPSUpgradeable_init();
-        __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
+        __Pausable_init();
+        __ERC20_init(tokenName, string.concat("ca", asset.symbol()));
+        __ERC20Permit_init(tokenName);
         __ERC4626_init(asset);
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
@@ -123,6 +130,11 @@ contract CommonAggregator is
             AggregatorStorage storage $ = _getAggregatorStorage();
             balance -= $.rewardBuffer._sharesToBurn();
         }
+    }
+
+    /// @inheritdoc IERC20Metadata
+    function decimals() public view override(ERC20Upgradeable, ERC4626Upgradeable, IERC20Metadata) returns (uint8) {
+        return ERC4626Upgradeable.decimals();
     }
 
     // ----- ERC4626 -----
