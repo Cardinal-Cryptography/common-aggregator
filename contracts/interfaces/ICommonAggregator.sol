@@ -35,6 +35,22 @@ interface ICommonAggregator is IERC4626 {
 
     function removeVault(IERC4626 vault) external;
 
+    /// @notice Submits timelocked force removal action for `vault`.
+    /// Pauses user actions (deposit, mint, withdraw, redeem), allowing only for the emergency redeem.
+    /// After `unlockTimestamp` passes, the `forceRemoveVault` can be called.
+    /// @dev Doesn't try to `pullFunds` from the `vault`, as the vault could be in a totally unexpected state,
+    /// and such an action could result in undefined behaviour. It's the caller who has to decide (before or after
+    /// submitting the force removal) whether pulling funds is necessary.
+    function submitForceRemoveVault(IERC4626 vault) external;
+
+    /// @notice Cancels timelocked force removal action for `vault`. Doesn't unpause user actions by itself.
+    function cancelForceRemoveVault(IERC4626 vault) external;
+
+    /// @notice Force-removes `vault` from the aggregator, lossing all the assets allocated to it.
+    /// @dev Similarly to `submitForceRemoveVault`, it doesn't try to `pullFunds` from the `vault`, as the vault could
+    /// be in a totally unexpected state.
+    function forceRemoveVault(IERC4626 vault) external;
+
     error PendingVaultForceRemoval(IERC4626 vault);
     error VaultAdditionAlreadyPending(IERC4626 vault);
 
