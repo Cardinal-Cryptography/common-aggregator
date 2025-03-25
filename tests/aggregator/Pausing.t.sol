@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {ICommonAggregator} from "contracts/interfaces/ICommonAggregator.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
+import {IERC4626, CommonAggregator} from "contracts/CommonAggregator.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -279,6 +279,35 @@ contract PausingTest is Test {
         // emergency redeem still works when paused
         vm.prank(alice);
         aggregator.emergencyRedeem(shares / 2, alice, alice);
+    }
+
+    function testCantUnpauseWhenPendingVaultForceRemoval() public {
+        IERC4626 vault0 = aggregator.getVaults()[0];
+        IERC4626 vault1 = aggregator.getVaults()[1];
+        vm.prank(owner);
+        aggregator.submitForceRemoveVault(vault0);
+        vm.prank(owner);
+        aggregator.submitForceRemoveVault(vault1);
+
+        vm.prank(guardian);
+        vm.expectRevert(abi.encodeWithSelector(CommonAggregator.PendingVaultForceRemovals.selector, 2));
+        aggregator.unpauseUserInteractions();
+
+        vm.prank(guardian);
+        aggregator.cancelForceRemoveVault(vault0);
+
+        vm.prank(guardian);
+        vm.expectRevert(abi.encodeWithSelector(CommonAggregator.PendingVaultForceRemovals.selector, 1));
+        aggregator.unpauseUserInteractions();
+
+        vm.warp(30 days);
+        vm.prank(owner);
+        aggregator.forceRemoveVault(vault1);
+
+        vm.prank(guardian);
+        aggregator.unpauseUserInteractions();
+
+        assertEq(aggregator.paused(), false);
     }
 
     function _grantRoles() private {

@@ -58,6 +58,7 @@ contract CommonAggregator is
         uint256 protocolFeeBps;
         address protocolFeeReceiver;
         mapping(address rewardToken => address traderAddress) rewardTrader;
+        uint256 pendingVaultForceRemovals;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
@@ -526,9 +527,8 @@ contract CommonAggregator is
             PendingVaultForceRemoval(vault)
         );
 
-        AggregatorStorage storage $ = _getAggregatorStorage();
-
         // No need to updateHoldingsState, as we're not operating on assets.
+        AggregatorStorage storage $ = _getAggregatorStorage();
         $.vaults[index].redeem($.vaults[index].balanceOf(address(this)), address(this), address(this));
 
         _removeVault(vault);
@@ -570,6 +570,8 @@ contract CommonAggregator is
         if (!paused()) {
             pauseUserInteractions();
         }
+
+        _getAggregatorStorage().pendingVaultForceRemovals++;
         emit VaultForceRemovalSubmitted(address(vault), block.timestamp + FORCE_REMOVE_VAULT_TIMELOCK);
     }
 
@@ -580,6 +582,7 @@ contract CommonAggregator is
         onlyGuardianOrHigherRole
         cancelsAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
     {
+        _getAggregatorStorage().pendingVaultForceRemovals--;
         emit VaultForceRemovalCancelled(address(vault));
     }
 
@@ -595,6 +598,7 @@ contract CommonAggregator is
         // Some assets were lost, so we have to update the holdings state.
         updateHoldingsState();
 
+        _getAggregatorStorage().pendingVaultForceRemovals--;
         emit VaultForceRemoved(address(vault));
     }
     // ----- Rebalancing -----
@@ -774,8 +778,12 @@ contract CommonAggregator is
     /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used after mitigating a potential emergency.
     function unpauseUserInteractions() public onlyGuardianOrHigherRole {
+        uint256 pendingVaultForceRemovals = _getAggregatorStorage().pendingVaultForceRemovals;
+        require(pendingVaultForceRemovals == 0, PendingVaultForceRemovals(pendingVaultForceRemovals));
         _unpause();
     }
+
+    error PendingVaultForceRemovals(uint256 count);
 
     // ----- Etc -----
 
