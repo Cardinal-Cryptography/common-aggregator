@@ -528,8 +528,7 @@ contract CommonAggregator is
         );
 
         // No need to updateHoldingsState, as we're not operating on assets.
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        $.vaults[index].redeem($.vaults[index].balanceOf(address(this)), address(this), address(this));
+        vault.redeem(vault.balanceOf(address(this)), address(this), address(this));
 
         _removeVault(vault);
 
@@ -566,6 +565,11 @@ contract CommonAggregator is
     {
         (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
+
+        // Try redeeming as much shares of the removed vault as possible
+        try vault.maxRedeem(address(this)) returns (uint256 redeemableShares) {
+            try vault.redeem(redeemableShares, address(this), address(this)) {} catch {}
+        } catch {}
 
         if (!paused()) {
             pauseUserInteractions();

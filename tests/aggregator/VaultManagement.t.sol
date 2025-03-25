@@ -287,7 +287,7 @@ contract VaultManagementTest is Test {
 
     function testForceRemoveVaultNotPaused() public {
         CommonAggregator aggregator = _aggregatorWithThreeVaults();
-        _testSimpleForceRemove(aggregator);
+        _testSimpleForceRemoveMiddleVault(aggregator);
     }
 
     function testForceRemoveVaultPaused() public {
@@ -295,10 +295,10 @@ contract VaultManagementTest is Test {
         vm.prank(owner);
         aggregator.pauseUserInteractions();
 
-        _testSimpleForceRemove(aggregator);
+        _testSimpleForceRemoveMiddleVault(aggregator);
     }
 
-    function _testSimpleForceRemove(CommonAggregator aggregator) private {
+    function _testSimpleForceRemoveMiddleVault(CommonAggregator aggregator) private {
         assertEq(aggregator.getVaults().length, 3, "Incorrect test usage");
 
         IERC4626[] memory initialVaults = aggregator.getVaults();
@@ -420,29 +420,40 @@ contract VaultManagementTest is Test {
         aggregator.forceRemoveVault(toRemove);
     }
 
-    function testForceRemoveVaultRemovesAssets() public {
+    function testForceRemoveVaultRemovesAssetsWhenVaultIsBroken() public {
         CommonAggregator aggregator = _aggregatorWithThreeVaults();
         _firstDeposit(aggregator, 1000);
         _equalDistributionFromIdle(aggregator, true);
-
         assertEq(aggregator.totalAssets(), 1000);
 
         ERC4626Mock(address(aggregator.getVaults()[1])).setReverting(true);
-
-        _testSimpleForceRemove(aggregator);
+        _testSimpleForceRemoveMiddleVault(aggregator);
 
         assertEq(aggregator.totalAssets(), 750);
+    }
+
+    function testForceRemoveVaultRedeemsSharesIfPossilbe() public {
+        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        _firstDeposit(aggregator, 1000);
+        _equalDistributionFromIdle(aggregator, true);
+        assertEq(aggregator.totalAssets(), 1000);
+
+        ERC4626Mock(address(aggregator.getVaults()[1])).setRedeemLimit(200);
+        _testSimpleForceRemoveMiddleVault(aggregator);
+
+        assertEq(aggregator.totalAssets(), 950);
     }
 
     function testSubmitForceRemoveVaultDoesntRemoveAssetsYet() public {
         CommonAggregator aggregator = _aggregatorWithThreeVaults();
         _firstDeposit(aggregator, 1000);
         _equalDistributionFromIdle(aggregator, true);
-
         assertEq(aggregator.totalAssets(), 1000);
 
         IERC4626[] memory initialVaults = aggregator.getVaults();
         ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
+
+        toRemove.setReverting(true);
 
         vm.prank(manager);
         aggregator.submitForceRemoveVault(toRemove);
@@ -461,6 +472,8 @@ contract VaultManagementTest is Test {
 
         IERC4626[] memory initialVaults = aggregator.getVaults();
         ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
+
+        toRemove.setReverting(true);
 
         vm.prank(manager);
         aggregator.submitForceRemoveVault(toRemove);
