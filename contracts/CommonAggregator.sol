@@ -42,7 +42,7 @@ contract CommonAggregator is
 
     uint256 public constant SET_TRADER_TIMELOCK = 5 days;
     uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
-    uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 7 days;
+    uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 14 days;
 
     enum TimelockTypes {
         SET_TRADER,
@@ -58,6 +58,7 @@ contract CommonAggregator is
         uint256 protocolFeeBps;
         address protocolFeeReceiver;
         mapping(address rewardToken => address traderAddress) rewardTrader;
+        uint256 pendingVaultForceRemovals;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
@@ -527,8 +528,22 @@ contract CommonAggregator is
         );
 
         // No need to updateHoldingsState, as we're not operating on assets.
+        vault.redeem(vault.balanceOf(address(this)), address(this), address(this));
+
+        _removeVault(vault);
+
+        // No need to updateHoldingsState again, as we don't have any shares of the vault anymore.
+        emit VaultRemoved(address(vault));
+    }
+
+    /// @notice Removes vault from the list, without any timelocks or checks other than
+    /// the presence of the vault on the list. Updates storage and removes vault from mappings.
+    function _removeVault(IERC4626 vault) internal {
+        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        require(isVaultOnTheList, VaultNotOnTheList(vault));
+
         AggregatorStorage storage $ = _getAggregatorStorage();
-        $.vaults[index].redeem($.vaults[index].balanceOf(address(this)), address(this), address(this));
+
         delete $.allocationLimitBps[address(vault)];
 
         // Remove the vault from the list, shifting the rest of the array.
@@ -536,15 +551,64 @@ contract CommonAggregator is
             $.vaults[i] = $.vaults[i + 1];
         }
         $.vaults.pop();
-
-        // No need to updateHoldingsState again, as we don't have any shares of the vault anymore.
-        emit VaultRemoved(address(vault));
     }
 
+    /// @inheritdoc ICommonAggregator
+    function submitForceRemoveVault(IERC4626 vault)
+        external
+        override
+        onlyManagerOrOwner
+        registersTimelockedAction(
+            keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)),
+            FORCE_REMOVE_VAULT_TIMELOCK
+        )
+    {
+        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        require(isVaultOnTheList, VaultNotOnTheList(vault));
+
+        // Try redeeming as much shares of the removed vault as possible
+        try vault.maxRedeem(address(this)) returns (uint256 redeemableShares) {
+            try vault.redeem(redeemableShares, address(this), address(this)) {} catch {}
+        } catch {}
+
+        if (!paused()) {
+            pauseUserInteractions();
+        }
+
+        _getAggregatorStorage().pendingVaultForceRemovals++;
+        emit VaultForceRemovalSubmitted(address(vault), block.timestamp + FORCE_REMOVE_VAULT_TIMELOCK);
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function cancelForceRemoveVault(IERC4626 vault)
+        external
+        override
+        onlyGuardianOrHigherRole
+        cancelsAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
+    {
+        _getAggregatorStorage().pendingVaultForceRemovals--;
+        emit VaultForceRemovalCancelled(address(vault));
+    }
+
+    /// @inheritdoc ICommonAggregator
+    function forceRemoveVault(IERC4626 vault)
+        external
+        override
+        onlyManagerOrOwner
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
+    {
+        _removeVault(vault);
+
+        // Some assets were lost, so we have to update the holdings state.
+        updateHoldingsState();
+
+        _getAggregatorStorage().pendingVaultForceRemovals--;
+        emit VaultForceRemoved(address(vault));
+    }
     // ----- Rebalancing -----
 
     /// @inheritdoc ICommonAggregator
-    function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
+    function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole whenNotPaused {
         updateHoldingsState();
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
 
@@ -718,8 +782,12 @@ contract CommonAggregator is
     /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used after mitigating a potential emergency.
     function unpauseUserInteractions() public onlyGuardianOrHigherRole {
+        uint256 pendingVaultForceRemovals = _getAggregatorStorage().pendingVaultForceRemovals;
+        require(pendingVaultForceRemovals == 0, PendingVaultForceRemovals(pendingVaultForceRemovals));
         _unpause();
     }
+
+    error PendingVaultForceRemovals(uint256 count);
 
     // ----- Etc -----
 
