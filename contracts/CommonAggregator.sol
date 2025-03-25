@@ -604,7 +604,7 @@ contract CommonAggregator is
     // ----- Rebalancing -----
 
     /// @inheritdoc ICommonAggregator
-    function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
+    function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole whenNotPaused {
         updateHoldingsState();
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
 
