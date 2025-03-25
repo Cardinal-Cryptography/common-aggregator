@@ -8,6 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
+import {MAX_BPS} from "contracts/Math.sol";
 
 contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
@@ -200,7 +201,6 @@ contract CommonAggregatorTest is Test {
         vm.warp(STARTING_TIMESTAMP + 2 days);
 
         // after 10% of buffering time
-        commonAggregator.updateHoldingsState();
         assertEq(commonAggregator.maxWithdraw(alice), 1009);
         assertEq(commonAggregator.maxWithdraw(bob), 504);
 
@@ -210,7 +210,6 @@ contract CommonAggregatorTest is Test {
 
         vm.warp(STARTING_TIMESTAMP + 20 days);
 
-        commonAggregator.updateHoldingsState();
         assertEq(commonAggregator.maxWithdraw(alice), 1145);
         assertEq(commonAggregator.maxWithdraw(bob), 0);
     }
@@ -247,7 +246,6 @@ contract CommonAggregatorTest is Test {
         vm.warp(STARTING_TIMESTAMP + 10 days);
         vm.prank(owner);
         commonAggregator.setProtocolFee(200);
-        commonAggregator.updateHoldingsState();
 
         vm.warp(STARTING_TIMESTAMP + 25 days);
         commonAggregator.updateHoldingsState();
@@ -334,5 +332,86 @@ contract CommonAggregatorTest is Test {
         assertEq(commonAggregator.totalAssets(), 450);
         assertEq(commonAggregator.maxWithdraw(alice), 300);
         assertEq(commonAggregator.maxWithdraw(bob), 150);
+    }
+
+    function testTotalSupply() public {
+        IERC4626 vault0 = commonAggregator.getVaults()[0];
+        IERC4626 vault1 = commonAggregator.getVaults()[1];
+        uint256 decimalsOffset = commonAggregator.decimals() - asset.decimals();
+
+        vm.prank(owner);
+        commonAggregator.setLimit(vault0, MAX_BPS);
+        vm.prank(owner);
+        commonAggregator.setLimit(vault1, MAX_BPS);
+
+        assertEq(commonAggregator.totalSupply(), 0, "1");
+
+        asset.mint(alice, 1000);
+        asset.mint(bob, 500);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 1000);
+        vm.prank(alice);
+        commonAggregator.deposit(800, alice);
+        vm.prank(bob);
+        asset.approve(address(commonAggregator), 500);
+        vm.prank(bob);
+        commonAggregator.deposit(200, bob);
+
+        assertEq(commonAggregator.totalSupply(), 1000 * (10 ** decimalsOffset), "2");
+
+        vm.prank(owner);
+        commonAggregator.pushFunds(600, vault0);
+        vm.prank(owner);
+        commonAggregator.pushFunds(200, vault1);
+
+        assertEq(commonAggregator.totalSupply(), 1000 * (10 ** decimalsOffset), "3");
+
+        asset.mint(address(vault0), 600);
+        asset.mint(address(vault1), 400);
+        commonAggregator.updateHoldingsState();
+
+        assertEq(commonAggregator.totalSupply(), 1997 * (10 ** decimalsOffset), "4");
+
+        vm.warp(STARTING_TIMESTAMP + 2 days);
+
+        _checkIfUpdateHoldingsStateDoesntAffectAnything();
+
+        vm.prank(bob);
+        commonAggregator.deposit(200, bob);
+
+        vm.warp(STARTING_TIMESTAMP + 7 days);
+
+        _checkIfUpdateHoldingsStateDoesntAffectAnything();
+
+        vm.prank(bob);
+        commonAggregator.deposit(100, bob);
+        vm.prank(alice);
+        commonAggregator.deposit(200, alice);
+
+        vm.warp(STARTING_TIMESTAMP + 13 days);
+
+        _checkIfUpdateHoldingsStateDoesntAffectAnything();
+
+        vm.warp(STARTING_TIMESTAMP + 20 days);
+        assertEq(commonAggregator.balanceOf(address(commonAggregator)), 0);
+    }
+
+    function _checkIfUpdateHoldingsStateDoesntAffectAnything() private {
+        uint256 totalSupply = commonAggregator.totalSupply();
+        uint256 aggregatorShares = commonAggregator.balanceOf(address(commonAggregator));
+        uint256 aliceShares = commonAggregator.balanceOf(alice);
+        uint256 maxWithdrawAlice = commonAggregator.maxWithdraw(alice);
+        uint256 bobShares = commonAggregator.balanceOf(bob);
+        uint256 maxWithdrawBob = commonAggregator.maxWithdraw(bob);
+
+        commonAggregator.updateHoldingsState();
+
+        assertEq(commonAggregator.totalSupply(), totalSupply, "5");
+        assertEq(commonAggregator.balanceOf(address(commonAggregator)), aggregatorShares, "6");
+        assertEq(commonAggregator.balanceOf(alice), aliceShares, "7");
+        assertEq(commonAggregator.maxWithdraw(alice), maxWithdrawAlice, "8");
+        assertEq(commonAggregator.balanceOf(bob), bobShares, "9");
+        assertEq(commonAggregator.maxWithdraw(bob), maxWithdrawBob, "10");
+        assertEq(aliceShares + bobShares + aggregatorShares, totalSupply, "11");
     }
 }
