@@ -351,12 +351,83 @@ contract VaultManagementTest is Test {
         aggregator.forceRemoveVault(toRemove);
     }
 
+    function submitForceRemoveSameVaultTwiceFails() public {
+        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        IERC4626[] memory initialVaults = aggregator.getVaults();
+        ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
+
+        vm.prank(manager);
+        aggregator.submitForceRemoveVault(toRemove);
+
+        vm.prank(manager);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonTimelocks.ActionAlreadyRegistered.selector,
+                keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
+            )
+        );
+        aggregator.submitForceRemoveVault(toRemove);
+    }
+
+    function submitForceRemoveOfNonExistentVaultFails() public {
+        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        ERC4626Mock fakeVault = new ERC4626Mock(address(3));
+
+        vm.prank(manager);
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, fakeVault));
+        aggregator.submitForceRemoveVault(fakeVault);
+    }
+
+    function testCancelForceRemoveVault() public {
+        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        IERC4626[] memory initialVaults = aggregator.getVaults();
+        ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
+
+        // Cancelling too early fails
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonTimelocks.ActionNotRegistered.selector,
+                keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
+            )
+        );
+        vm.prank(guardian);
+        aggregator.cancelForceRemoveVault(toRemove);
+
+        // Successfull submission and cancellation
+        vm.prank(manager);
+        aggregator.submitForceRemoveVault(toRemove);
+        vm.warp(STARTING_TIMESTAMP + 8 days);
+        vm.expectEmit(true, true, true, true, address(aggregator), 1);
+        emit ICommonAggregator.VaultForceRemovalCancelled(address(toRemove));
+        vm.prank(guardian);
+        aggregator.cancelForceRemoveVault(toRemove);
+
+        // Cancelling for the second time fails
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonTimelocks.ActionNotRegistered.selector,
+                keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
+            )
+        );
+        vm.prank(guardian);
+        aggregator.cancelForceRemoveVault(toRemove);
+
+        // Force removal doesn't work after cancelling
+        vm.warp(STARTING_TIMESTAMP + 30 days);
+        bytes32 actionHash = keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove));
+        vm.expectRevert(abi.encodeWithSelector(CommonTimelocks.ActionNotRegistered.selector, actionHash));
+        vm.prank(manager);
+        aggregator.forceRemoveVault(toRemove);
+    }
+
     function testForceRemoveVaultRemovesAssets() public {
         CommonAggregator aggregator = _aggregatorWithThreeVaults();
         _firstDeposit(aggregator, 1000);
         _equalDistributionFromIdle(aggregator, true);
 
         assertEq(aggregator.totalAssets(), 1000);
+
+        ERC4626Mock(address(aggregator.getVaults()[1])).setReverting(true);
 
         _testSimpleForceRemove(aggregator);
 

@@ -79,4 +79,15 @@ contract ERC4626Mock is ERC4626 {
     function burn(address account, uint256 amount) external {
         _burn(account, amount);
     }
+
+    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
+        internal
+        override
+    {
+        if (reverting) {
+            revert();
+        }
+
+        return super._withdraw(caller, receiver, owner, assets, shares);
+    }
 }
