@@ -15,7 +15,7 @@ interface ICommonAggregator is IERC4626 {
     error VaultAlreadyAdded(IERC4626 vault);
     error VaultLimitExceeded();
 
-    function updateHoldingsState() external;
+    //function updateHoldingsState() external;
 
     // ----- Vault management -----
 
