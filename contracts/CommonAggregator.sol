@@ -16,7 +16,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
-import {ERC4626BufferedUpgradable} from "./ERC4626BufferedUpgradable.sol";
+import {ERC4626BufferedUpgradeable} from "./ERC4626BufferedUpgradeable.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
 
 contract CommonAggregator is
@@ -24,7 +24,7 @@ contract CommonAggregator is
     CommonTimelocks,
     UUPSUpgradeable,
     AccessControlUpgradeable,
-    ERC4626BufferedUpgradable,
+    ERC4626BufferedUpgradeable,
     PausableUpgradeable
 {
     using Math for uint256;
@@ -53,8 +53,6 @@ contract CommonAggregator is
     struct AggregatorStorage {
         IERC4626[] vaults; // Both for iterating and a fallback queue.
         mapping(address vault => uint256 limit) allocationLimitBps;
-        uint256 protocolFeeBps;
-        address protocolFeeReceiver;
         mapping(address rewardToken => address traderAddress) rewardTrader;
         uint256 pendingVaultForceRemovals;
     }
@@ -83,7 +81,8 @@ contract CommonAggregator is
         __AccessControl_init();
         __UUPSUpgradeable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
-        __ERC4626_init(asset);
+        // TODO: set meaningful address here
+        __ERC4626Buffered_init(asset, address(1));
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(OWNER, owner);
@@ -95,9 +94,6 @@ contract CommonAggregator is
             $.vaults.push(vaults[i]);
             $.allocationLimitBps[address(vaults[i])] = MAX_BPS;
         }
-
-        $.protocolFeeBps = 0;
-        $.protocolFeeReceiver = address(1);
     }
 
     function _ensureVaultCanBeAdded(IERC4626 vault) private view {
@@ -167,69 +163,7 @@ contract CommonAggregator is
         return availableFunds;
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewDeposit(uint256 assets) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Floor);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewWithdraw(uint256 assets) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Ceil);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewRedeem(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Floor);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before depositing.
-    function deposit(uint256 assets, address account)
-        public
-        override(ERC4626Upgradeable, IERC4626)
-        whenNotPaused
-        returns (uint256)
-    {
-        updateHoldingsState();
-        uint256 shares = super.deposit(assets, account);
-
-        _distributeToVaults(assets);
-        _increaseAssets(assets);
-
-        return shares;
-    }
-
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before minting.
-    function mint(uint256 shares, address account)
-        public
-        override(ERC4626Upgradeable, IERC4626)
-        whenNotPaused
-        returns (uint256)
-    {
-        updateHoldingsState();
-        uint256 assets = super.mint(shares, account);
-
-        _distributeToVaults(assets);
-        _increaseAssets(assets);
-
-        return assets;
-    }
-
-    function _distributeToVaults(uint256 assets) internal {
+    function _postDeposit(uint256 assets) internal override whenNotPaused {
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 cachedTotalAssets = totalAssets();
         if (cachedTotalAssets > 0) {
@@ -245,46 +179,11 @@ contract CommonAggregator is
         }
     }
 
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before withdrawing.
-    function withdraw(uint256 assets, address account, address owner)
-        public
-        override(ERC4626Upgradeable, IERC4626)
-        whenNotPaused
-        returns (uint256)
-    {
-        updateHoldingsState();
-        _pullFundsForWithdrawal(assets);
-        uint256 shares = super.withdraw(assets, account, owner);
-
-        _decreaseAssets(assets);
-
-        return shares;
-    }
-
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before redeeming.
-    function redeem(uint256 shares, address account, address owner)
-        public
-        override(ERC4626Upgradeable, IERC4626)
-        whenNotPaused
-        returns (uint256)
-    {
-        updateHoldingsState();
-        uint256 assetsNeeded = convertToAssets(shares);
-        _pullFundsForWithdrawal(assetsNeeded);
-        uint256 assets = super.redeem(shares, account, owner);
-
-        _decreaseAssets(assets);
-
-        return assets;
-    }
-
-    function _pullFundsForWithdrawal(uint256 amount) internal {
-        try CommonAggregator(address(this)).pullFundsProportional(amount) {}
+    function _preWithdrawal(uint256 assets) internal override whenNotPaused {
+        try CommonAggregator(address(this)).pullFundsProportional(assets) {}
         catch {
-            emit ProportionalWithdrawalFailed(amount);
-            _pullFundsSequential(amount);
+            emit ProportionalWithdrawalFailed(assets);
+            _pullFundsSequential(assets);
         }
     }
 
@@ -592,11 +491,11 @@ contract CommonAggregator is
     function setProtocolFee(uint256 protocolFeeBps) external onlyRole(OWNER) {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
 
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        uint256 oldProtocolFee = $.protocolFeeBps;
+        BufferStorage storage buffer$ = _getBufferStorage();
+        uint256 oldProtocolFee = buffer$.protocolFeeBps;
 
         if (oldProtocolFee == protocolFeeBps) return;
-        $.protocolFeeBps = protocolFeeBps;
+        buffer$.protocolFeeBps = protocolFeeBps;
         emit ProtocolFeeChanged(oldProtocolFee, protocolFeeBps);
     }
 
@@ -605,11 +504,11 @@ contract CommonAggregator is
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
         require(protocolFeeReceiver != address(0), ZeroProtocolFeeReceiver());
 
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        address oldProtocolFeeReceiver = $.protocolFeeReceiver;
+        BufferStorage storage buffer$ = _getBufferStorage();
+        address oldProtocolFeeReceiver = buffer$.protocolFeeReceiver;
 
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;
-        $.protocolFeeReceiver = protocolFeeReceiver;
+        buffer$.protocolFeeReceiver = protocolFeeReceiver;
         emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 

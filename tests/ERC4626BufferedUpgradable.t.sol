@@ -1,65 +1,79 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
-/*
+
 import {Test} from "forge-std/Test.sol";
-import {RewardBuffer} from "../contracts/RewardBuffer.sol";
+import {ERC4626BufferedUpgradeable} from "../contracts/ERC4626BufferedUpgradeable.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "../contracts/Math.sol";
 
-contract RewardBufferTest is Test {
-    using RewardBuffer for RewardBuffer.Buffer;
+import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
+
+contract ERC4626BufferedUpgradeableTest is Test {
     using Math for uint256;
 
     uint256 constant STARTING_TIMESTAMP = 100;
     uint256 constant STARTING_BALANCE = 10;
 
-    RewardBuffer.Buffer buffer;
+    ERC4626BufferedUpgradeable bufferedVault;
+    ERC20Mock asset = new ERC20Mock();
+
+    address alice = address(0x456);
+    address bob = address(0x678);
 
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
-        buffer = RewardBuffer._newBuffer(STARTING_BALANCE);
+        ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeable();
+
+        bytes memory initializeData = abi.encodeWithSelector(ERC4626BufferedUpgradeable.initialize.selector, asset, bob);
+
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
+        bufferedVault = ERC4626BufferedUpgradeable(address(proxy));
     }
 
-    function testCachedAssetsAfterInit() public view {
-        assertEq(buffer._getAssetsCached(), STARTING_BALANCE);
+    function testAssetsAfterInit() public view {
+        assertEq(bufferedVault.totalAssets(), 0);
     }
 
-    function testCachedAssetsAfterBufferUpdate() public {
-        buffer._updateBuffer(20, 200, 0);
-        assertEq(buffer._getAssetsCached(), 20);
-    }
-
-    /// forge-config: default.allow_internal_expect_revert = true
-    function testUpdateRevertsWhenZeroStartingAssets() public {
-        buffer.assetsCached = 0;
-        vm.expectRevert(RewardBuffer.AssetsCachedIsZero.selector);
-        buffer._updateBuffer(20, 1000, 0);
+    function testAssetsAfterDropAndBufferUpdate() public {
+        _dropToVault(100);
+        bufferedVault.updateHoldingsState();
+        assertEq(bufferedVault.totalAssets(), 0);
     }
 
     function testCachedAssetsAfterBufferUpdateAndTimeElapsed() public {
-        buffer._updateBuffer(20, 200, 0);
+        // TODO: remove this when we have impl using virtual shares
+        _depositToVault(1);
+        _dropToVault(20);
+        bufferedVault.updateHoldingsState();
         vm.warp(STARTING_TIMESTAMP + 10 days);
-        assertEq(buffer._getAssetsCached(), 20);
+        assertEq(bufferedVault.totalAssets(), 21);
     }
 
     function testSharesBurntAfterBufferUpdate() public {
-        buffer._updateBuffer(20, 100, 0);
-        assertEq(buffer._sharesToBurn(), 0);
+        _depositToVault(1);
+        _dropToVault(20);
+        bufferedVault.updateHoldingsState();
+        assertEq(bufferedVault.totalSupply(), 21);
     }
 
     function testSharesBurntAfterBufferUpdateAndTimeElapsed() public {
-        buffer._updateBuffer(20, 100, 0);
+        _depositToVault(1);
+        _dropToVault(20);
+        bufferedVault.updateHoldingsState();
         vm.warp(STARTING_TIMESTAMP + 2 days);
-        assertEq(buffer._sharesToBurn(), 10);
+        assertEq(bufferedVault.totalSupply(), 19);
     }
 
     function testSharesBurntAfterBufferUpdateAndTimeElapsed2() public {
-        buffer._updateBuffer(17, 100, 0);
+        _depositToVault(10);
+        _dropToVault(7);
+        bufferedVault.updateHoldingsState();
         vm.warp(STARTING_TIMESTAMP + 7 days);
-        assertEq(buffer._sharesToBurn(), 24);
+        assertEq(bufferedVault.totalSupply(), 15);
     }
 
-    function testSharesBurntAfterFullPeriodHasPassed() public {
+    /*function testSharesBurntAfterFullPeriodHasPassed() public {
         buffer._updateBuffer(15, 100, 0);
         vm.warp(STARTING_TIMESTAMP + 20 days);
         assertEq(buffer._sharesToBurn(), 50);
@@ -248,6 +262,17 @@ contract RewardBufferTest is Test {
             _totalShares -= _withdrawShares;
             buffer.assetsCached -= _withdraw[i];
         }
+    }*/
+
+    function _dropToVault(uint256 amount) private {
+        asset.mint(address(bufferedVault), amount);
+    }
+
+    function _depositToVault(uint256 amount) private {
+        vm.startPrank(alice);
+        asset.mint(alice, amount);
+        asset.approve(address(bufferedVault), amount);
+        bufferedVault.deposit(amount, alice);
+        vm.stopPrank();
     }
 }
-*/

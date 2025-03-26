@@ -15,7 +15,7 @@ uint256 constant FILE_ID = 10044883199429504109510964582554469701684221682022847
 
 /// @title Buffer structure implementation for gradual reward release.
 /// Intended for usage within ERC-4626 vault implementations.
-contract ERC4626BufferedUpgradable is ERC4626Upgradeable {
+contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
     using Math for uint256;
 
     error AssetsCachedIsZero();
@@ -39,6 +39,22 @@ contract ERC4626BufferedUpgradable is ERC4626Upgradeable {
         uint256 protocolFeeBps;
     }
 
+    // ----- Initialization -----
+
+    function initialize(IERC20 asset, address protocolFeeReceiver) public initializer {
+        __ERC4626Buffered_init(asset, protocolFeeReceiver);
+    }
+
+    function __ERC4626Buffered_init(IERC20 asset, address protocolFeeReceiver) internal onlyInitializing {
+        __ERC4626_init(asset);
+
+        BufferStorage storage $ = _getBufferStorage();
+        $.lastUpdate = block.timestamp;
+        $.currentBufferEnd = block.timestamp;
+        $.protocolFeeBps = 0;
+        $.protocolFeeReceiver = protocolFeeReceiver;
+    }
+
     /// @dev Increases the buffer's `assetsCached` field.
     /// Used when deposit or mint has been made to the vault.
     function _increaseAssets(uint256 assets) internal {
@@ -53,23 +69,12 @@ contract ERC4626BufferedUpgradable is ERC4626Upgradeable {
         $.assetsCached -= assets;
     }
 
-    // function _newBuffer(uint256 initialAssets) private view returns (Buffer memory buffer) {
-    //     if (initialAssets == 0) revert AssetsCachedIsZero();
-    //     return Buffer(initialAssets, 0, block.timestamp, block.timestamp);
-    // }
-
-    /// @dev Use this to implement `totalAssets()`.
-    function _getAssetsCached() private view returns (uint256 assets) {
-        BufferStorage storage $ = _getBufferStorage();
-        return $.assetsCached;
-    }
-
     /// @notice Updates holdinds state, by reporting on every vault how many assets it has.
     /// Profits are smoothed out by the reward buffer, and ditributed to the holders.
     /// Protocol fee is taken from the profits. Potential losses are first covered by the buffer.
     function updateHoldingsState() public {
         BufferStorage storage $ = _getBufferStorage();
-        uint256 oldCachedAssets = _getAssetsCached();
+        uint256 oldCachedAssets = $.assetsCached;
 
         if (oldCachedAssets == 0) {
             // We have to wait for the deposit to happen
@@ -95,7 +100,7 @@ contract ERC4626BufferedUpgradable is ERC4626Upgradeable {
     function _previewUpdateHoldingsState() internal view returns (uint256 newTotalAssets, uint256 newTotalSupply) {
         BufferStorage storage $ = _getBufferStorage();
 
-        if (_getAssetsCached() == 0) {
+        if ($.assetsCached == 0) {
             return (0, super.totalSupply());
         }
 
@@ -124,9 +129,8 @@ contract ERC4626BufferedUpgradable is ERC4626Upgradeable {
         private
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
-        BufferStorage storage $ = _getBufferStorage();
-        BufferStorage memory memBuf = $;
-        (sharesToMint, sharesToBurn) = _updateBuffer(memBuf, _totalAssets, totalShares, feeBps);
+        BufferStorage memory memBuf = _toMemory();
+        (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, _totalAssets, totalShares, feeBps);
         _toStorage(memBuf);
     }
 
@@ -137,7 +141,7 @@ contract ERC4626BufferedUpgradable is ERC4626Upgradeable {
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
         BufferStorage memory updatedBuffer = _toMemory();
-        (sharesToMint, sharesToBurn) = _updateBuffer(updatedBuffer, _totalAssets, totalShares, feeBps);
+        (sharesToMint, sharesToBurn) = __updateBuffer(updatedBuffer, _totalAssets, totalShares, feeBps);
     }
 
     /// @dev Creates a `memory` copy of a buffer.
@@ -158,7 +162,7 @@ contract ERC4626BufferedUpgradable is ERC4626Upgradeable {
         $.currentBufferEnd = buffer.currentBufferEnd;
     }
 
-    function _updateBuffer(BufferStorage memory buffer, uint256 _totalAssets, uint256 totalShares, uint256 feeBps)
+    function __updateBuffer(BufferStorage memory buffer, uint256 _totalAssets, uint256 totalShares, uint256 feeBps)
         private
         view
         returns (uint256 sharesToMint, uint256 sharesToBurn)
@@ -265,10 +269,105 @@ contract ERC4626BufferedUpgradable is ERC4626Upgradeable {
 
     /// @notice Returns cached assets from the last holdings state update.
     function totalAssets() public view override(ERC4626Upgradeable) returns (uint256) {
-        return _getAssetsCached();
+        return _getBufferStorage().assetsCached;
     }
 
-    function _getBufferStorage() private pure returns (BufferStorage storage $) {
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewDeposit(uint256 assets) public view override(ERC4626Upgradeable) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Floor);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewMint(uint256 shares) public view override(ERC4626Upgradeable) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewWithdraw(uint256 assets) public view override(ERC4626Upgradeable) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Ceil);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewRedeem(uint256 shares) public view override(ERC4626Upgradeable) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Floor);
+    }
+
+    /// TODO: Add pausing back to deposit
+    /// @inheritdoc IERC4626
+    /// @notice Updates holdings state before depositing.
+    function deposit(uint256 assets, address account) public override(ERC4626Upgradeable) returns (uint256) {
+        updateHoldingsState();
+        uint256 shares = super.deposit(assets, account);
+
+        _postDeposit(assets);
+        _increaseAssets(assets);
+
+        return shares;
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Updates holdings state before minting.
+    function mint(uint256 shares, address account) public override(ERC4626Upgradeable) returns (uint256) {
+        updateHoldingsState();
+        uint256 assets = super.mint(shares, account);
+
+        _postDeposit(assets);
+        _increaseAssets(assets);
+
+        return assets;
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Updates holdings state before withdrawing.
+    function withdraw(uint256 assets, address account, address owner)
+        public
+        override(ERC4626Upgradeable)
+        returns (uint256)
+    {
+        updateHoldingsState();
+        _preWithdrawal(assets);
+        uint256 shares = super.withdraw(assets, account, owner);
+
+        _decreaseAssets(assets);
+
+        return shares;
+    }
+
+    /// @inheritdoc IERC4626
+    /// @notice Updates holdings state before redeeming.
+    function redeem(uint256 shares, address account, address owner)
+        public
+        override(ERC4626Upgradeable)
+        returns (uint256)
+    {
+        updateHoldingsState();
+        uint256 assetsNeeded = convertToAssets(shares);
+        _preWithdrawal(assetsNeeded);
+        uint256 assets = super.redeem(shares, account, owner);
+
+        _decreaseAssets(assets);
+
+        return assets;
+    }
+
+    function _postDeposit(uint256 assets) internal virtual {}
+    function _preWithdrawal(uint256 assets) internal virtual {}
+
+    // ----- Etc -----
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    function _getBufferStorage() internal pure returns (BufferStorage storage $) {
         assembly {
             $.slot := BUFFER_STORAGE_LOCATION
         }
