@@ -81,8 +81,7 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
             return;
         } else {
             uint256 newAssets = _totalAssetsNotCached();
-            (uint256 sharesToMint, uint256 sharesToBurn) =
-                _updateBuffer(newAssets, super.totalSupply(), $.protocolFeeBps);
+            (uint256 sharesToMint, uint256 sharesToBurn) = _updateBuffer(newAssets, super.totalSupply());
             if (sharesToMint > 0) {
                 uint256 feePartOfMintedShares = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
                 _mint(address(this), sharesToMint - feePartOfMintedShares);
@@ -105,8 +104,7 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
         }
 
         newTotalAssets = _totalAssetsNotCached();
-        (uint256 sharesToMint, uint256 sharesToBurn) =
-            _simulateBufferUpdate(newTotalAssets, super.totalSupply(), $.protocolFeeBps);
+        (uint256 sharesToMint, uint256 sharesToBurn) = _simulateBufferUpdate(newTotalAssets, super.totalSupply());
         return (newTotalAssets, super.totalSupply() + sharesToMint - sharesToBurn);
     }
 
@@ -125,32 +123,22 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
     /// Out of these shares, `sharesToMint.mulDiv(feeBps, 10_000, Math.Rounding.Ceil)` should be minted to
     /// the fee receiver, and the rest to the aggergator.
     /// @return sharesToBurn Amount of shares to burn to account for rewards that have been released.
-    function _updateBuffer(uint256 _totalAssets, uint256 totalShares, uint256 feeBps)
+    function _updateBuffer(uint256 _totalAssets, uint256 totalShares)
         private
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
-        BufferStorage memory memBuf = _toMemory();
-        (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, _totalAssets, totalShares, feeBps);
+        BufferStorage memory memBuf = _getBufferStorage();
+        (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, _totalAssets, totalShares);
         _toStorage(memBuf);
     }
 
     /// @dev Simulates buffer update.
-    function _simulateBufferUpdate(uint256 _totalAssets, uint256 totalShares, uint256 feeBps)
+    function _simulateBufferUpdate(uint256 _totalAssets, uint256 totalShares)
         private
         view
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
-        BufferStorage memory updatedBuffer = _toMemory();
-        (sharesToMint, sharesToBurn) = __updateBuffer(updatedBuffer, _totalAssets, totalShares, feeBps);
-    }
-
-    /// @dev Creates a `memory` copy of a buffer.
-    function _toMemory() internal view returns (BufferStorage memory memBuffer) {
-        BufferStorage storage $ = _getBufferStorage();
-        memBuffer.assetsCached = $.assetsCached;
-        memBuffer.bufferedShares = $.bufferedShares;
-        memBuffer.lastUpdate = $.lastUpdate;
-        memBuffer.currentBufferEnd = $.currentBufferEnd;
+        (sharesToMint, sharesToBurn) = __updateBuffer(_getBufferStorage(), _totalAssets, totalShares);
     }
 
     /// @dev Copies `memory` buffer into storage.
@@ -162,7 +150,7 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
         $.currentBufferEnd = buffer.currentBufferEnd;
     }
 
-    function __updateBuffer(BufferStorage memory buffer, uint256 _totalAssets, uint256 totalShares, uint256 feeBps)
+    function __updateBuffer(BufferStorage memory buffer, uint256 _totalAssets, uint256 totalShares)
         private
         view
         returns (uint256 sharesToMint, uint256 sharesToBurn)
@@ -191,7 +179,7 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
         sharesToBurn = checkedSub(sharesToBurn, cancelledOut, FILE_ID, 5);
         sharesToMint = checkedSub(sharesToMint, cancelledOut, FILE_ID, 6);
         if (sharesToMint > 0) {
-            buffer.bufferedShares -= sharesToMint.mulDiv(feeBps, MAX_BPS, Math.Rounding.Ceil);
+            buffer.bufferedShares -= sharesToMint.mulDiv(buffer.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
         }
 
         buffer.assetsCached = _totalAssets;
