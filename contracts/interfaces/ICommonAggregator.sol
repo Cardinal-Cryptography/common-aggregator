@@ -10,7 +10,6 @@ interface ICommonAggregator is IERC4626 {
     event VaultWithdrawFailed(IERC4626 vault);
 
     error InsufficientAssetsForWithdrawal(uint256 missing);
-    error VaultAddressCantBeZero();
     error IncorrectAsset(address expected, address actual);
     error VaultAlreadyAdded(IERC4626 vault);
     error VaultLimitExceeded();

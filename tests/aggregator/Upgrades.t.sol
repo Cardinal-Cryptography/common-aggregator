@@ -25,7 +25,7 @@ import {
 error ContractIsNoLongerPauseable();
 
 contract CommonAggregatorUpgraded is CommonAggregator {
-    function _pause() internal override {
+    function _pause() internal pure override {
         revert ContractIsNoLongerPauseable();
     }
 
@@ -123,7 +123,7 @@ contract CommonAggregatorTest is Test {
         address nonUUPSImpl = address(new ERC4626MockUUPS());
 
         vm.prank(owner);
-        commonAggregator.submitUpgrade(alice);
+        commonAggregator.submitUpgrade(nonContract);
 
         vm.prank(owner);
         commonAggregator.submitUpgrade(nonUUPSImpl);
@@ -132,7 +132,7 @@ contract CommonAggregatorTest is Test {
 
         vm.prank(owner);
         vm.expectRevert();
-        commonAggregator.upgradeToAndCall(alice, "");
+        commonAggregator.upgradeToAndCall(nonContract, "");
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ERC1967Utils.ERC1967InvalidImplementation.selector, nonUUPSImpl));

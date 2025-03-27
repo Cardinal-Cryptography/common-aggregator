@@ -86,7 +86,8 @@ contract CommonAggregator is
     function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
         __ERC4626_init(asset);
-        // other initializers are empty
+        __Pausable_init();
+        __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(OWNER, owner);
@@ -103,7 +104,6 @@ contract CommonAggregator is
     }
 
     function _ensureVaultCanBeAdded(IERC4626 vault) private view {
-        require(address(vault) != address(0), VaultAddressCantBeZero());
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
 
         AggregatorStorage storage $ = _getAggregatorStorage();
@@ -259,7 +259,7 @@ contract CommonAggregator is
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 cachedTotalAssets = totalAssets();
         if (cachedTotalAssets > 0) {
-            for (uint256 i = 0; i < $.vaults.length; ++i) {
+            for (uint256 i = 0; i < $.vaults.length;  ++i) {
                 IERC4626 vault = $.vaults[i];
                 uint256 assetsToDepositToVault = assets.mulDiv(_aggregatedVaultAssets(vault), cachedTotalAssets);
                 uint256 maxVaultDeposit = vault.maxDeposit(address(this));
@@ -547,8 +547,10 @@ contract CommonAggregator is
         delete $.allocationLimitBps[address(vault)];
 
         // Remove the vault from the list, shifting the rest of the array.
-        for (uint256 i = index; i < $.vaults.length - 1; i++) {
-            $.vaults[i] = $.vaults[i + 1];
+        unchecked {
+            for (uint256 i = index; i < $.vaults.length - 1; i++) {
+                $.vaults[i] = $.vaults[i + 1];
+            }
         }
         $.vaults.pop();
     }
@@ -788,8 +790,10 @@ contract CommonAggregator is
     }
 
     error PendingVaultForceRemovals(uint256 count);
+
     // ----- Etc -----
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
