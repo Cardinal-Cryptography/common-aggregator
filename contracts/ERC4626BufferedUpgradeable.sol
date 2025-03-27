@@ -114,12 +114,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         return (newTotalAssets, _totalSupply + sharesToMint - sharesToBurn);
     }
 
-    /// @dev TODO: write
-    function _totalAssetsNotCached() internal view virtual returns (uint256) {
-        uint256 assets = IERC20(asset()).balanceOf(address(this));
-        return assets;
-    }
-
     /// @dev Updates the buffer based on the current vault's state.
     /// Should be called before any state mutating methods that depend on price-per-share.
     ///
@@ -246,44 +240,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         }
     }
 
-    // ----- ERC4626 -----
-
-    /// @notice Returns cached assets from the last holdings state update.
-    function totalAssets() public view override(IERC4626) returns (uint256) {
-        return _getERC4626BufferedStorage().assetsCached;
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewDeposit(uint256 assets) public view override(IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Floor);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewMint(uint256 shares) public view override(IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewWithdraw(uint256 assets) public view override(IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Ceil);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewRedeem(uint256 shares) public view override(IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Floor);
-    }
-
-    function _postDeposit(uint256 assets) internal virtual {}
-    function _preWithdrawal(uint256 assets) internal virtual {}
-
     // ----- Etc -----
 
     constructor() {
@@ -309,8 +265,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     /// @dev Attempted to redeem more shares than the max amount for `receiver`.
     error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
-
-    function __ERC4626_init_unchained(IERC20 asset_) internal onlyInitializing {}
 
     /**
      * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
@@ -343,6 +297,39 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     function asset() public view virtual returns (address) {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         return address($._asset);
+    }
+
+    /// @notice Returns cached assets from the last holdings state update.
+    function totalAssets() public view override(IERC4626) returns (uint256) {
+        return _getERC4626BufferedStorage().assetsCached;
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewDeposit(uint256 assets) public view override(IERC4626) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Floor);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewMint(uint256 shares) public view override(IERC4626) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewWithdraw(uint256 assets) public view override(IERC4626) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Ceil);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Updates holdings state before the preview.
+    function previewRedeem(uint256 shares) public view override(IERC4626) returns (uint256) {
+        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
+        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Floor);
     }
 
     /// @inheritdoc IERC4626
@@ -475,4 +462,17 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     function _decimalsOffset() internal view virtual returns (uint8) {
         return 0;
     }
+
+    // ----- Hooks -----
+
+    /// @dev Defines calculation for amount of assets currently held by the vault (disregarding cache).
+    function _totalAssetsNotCached() internal view virtual returns (uint256) {
+        return IERC20(asset()).balanceOf(address(this));
+    }
+
+    /// @dev Can be used to define action that should be run after each deposit/mint.
+    function _postDeposit(uint256 assets) internal virtual {}
+
+    /// @dev Can be used to define action that should be run before each withdraw/redeem.
+    function _preWithdrawal(uint256 assets) internal virtual {}
 }
