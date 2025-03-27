@@ -790,11 +790,19 @@ contract CommonAggregator is
     }
 
     error PendingVaultForceRemovals(uint256 count);
-
     // ----- Etc -----
 
     constructor() {
         _disableInitializers();
+    }
+
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyRole(OWNER)
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)))
+    {
+        emit ContractUpgradeAuthorized(newImplementation);
     }
 
     function submitUpgrade(address newImplementation)
@@ -814,15 +822,6 @@ contract CommonAggregator is
         cancelsAction(keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)))
     {
         emit ContractUpgradeCancelled(newImplementation);
-    }
-
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(OWNER)
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)))
-    {
-        emit ContractUpgradeAuthorized(newImplementation);
     }
 
     modifier onlyRebalancerOrHigherRole() {

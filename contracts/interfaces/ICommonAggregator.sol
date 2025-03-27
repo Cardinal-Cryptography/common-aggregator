@@ -26,8 +26,13 @@ interface ICommonAggregator is IERC4626 {
     /// @notice Submits timelocked upgrade action to `newImplementation`.
     /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
     /// @dev After the timelock passes, upgrader can upgradeToAndCall on the new implementation with
-    /// any reinitializing data.
+    /// any calldata. No check against missing some storage or selectors are done on the contract
+    /// level. It's recommended to use the `openzeppelin-foundry-upgrades` libarary for updates.
+    /// There could be many pending upgrades, so it's the guardian's responsibility to cancel
+    /// the invalid ones.
     function submitUpgrade(address newImplementation) external;
+
+    /// @notice Cancels timelocked upgrade action to `newImplementation`.
     function cancelUpgrade(address newImplementation) external;
 
     // ----- Vault management -----
