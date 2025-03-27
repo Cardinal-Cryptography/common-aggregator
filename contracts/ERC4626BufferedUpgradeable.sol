@@ -96,16 +96,17 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
 
     /// @notice Preview the holdings state update, without actually updating it.
     /// Returns `totalAssets` and `totalSupply` that there would be after the update.
-    function _previewUpdateHoldingsState() internal view returns (uint256 newTotalAssets, uint256 newTotalSupply) {
+    function _previewUpdateHoldingsState() internal view returns (uint256, uint256) {
         BufferStorage storage $ = _getBufferStorage();
+        uint256 _totalSupply = super.totalSupply();
 
         if ($.assetsCached == 0) {
-            return (0, super.totalSupply());
+            return (0, _totalSupply);
         }
 
-        newTotalAssets = _totalAssetsNotCached();
-        (uint256 sharesToMint, uint256 sharesToBurn) = _simulateBufferUpdate(newTotalAssets, super.totalSupply());
-        return (newTotalAssets, super.totalSupply() + sharesToMint - sharesToBurn);
+        uint256 newTotalAssets = _totalAssetsNotCached();
+        (uint256 sharesToMint, uint256 sharesToBurn) = __updateBuffer($, newTotalAssets, _totalSupply);
+        return (newTotalAssets, _totalSupply + sharesToMint - sharesToBurn);
     }
 
     /// @dev TODO: write
@@ -130,15 +131,6 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
         BufferStorage memory memBuf = _getBufferStorage();
         (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, _totalAssets, totalShares);
         _toStorage(memBuf);
-    }
-
-    /// @dev Simulates buffer update.
-    function _simulateBufferUpdate(uint256 _totalAssets, uint256 totalShares)
-        private
-        view
-        returns (uint256 sharesToMint, uint256 sharesToBurn)
-    {
-        (sharesToMint, sharesToBurn) = __updateBuffer(_getBufferStorage(), _totalAssets, totalShares);
     }
 
     /// @dev Copies `memory` buffer into storage.
@@ -185,7 +177,7 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
         buffer.assetsCached = _totalAssets;
     }
 
-    /// @dev Number of shares that should be burned to account for rewards to be released by the $.
+    /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
     /// Use it to implement `totalSupply()`.
     function _sharesToBurn(BufferStorage memory buffer) private view returns (uint256 sharesReleased) {
         uint256 timestampNow = block.timestamp;
@@ -229,10 +221,6 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
         returns (uint256 sharesToBurn)
     {
         uint256 loss = checkedSub(buffer.assetsCached, _totalAssets, FILE_ID, 11);
-        if (loss == 0) {
-            return 0;
-        }
-
         uint256 lossInShares = loss.mulDiv(totalShares, buffer.assetsCached, Math.Rounding.Ceil);
 
         // If we need to burn more than `buffer.bufferedShares` shares to retain price-per-share,
