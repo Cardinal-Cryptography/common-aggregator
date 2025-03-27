@@ -43,11 +43,13 @@ contract CommonAggregator is
     uint256 public constant SET_TRADER_TIMELOCK = 5 days;
     uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
     uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 14 days;
+    uint256 public constant CONTRACT_UPGRADE_TIMELOCK = 14 days;
 
     enum TimelockTypes {
         SET_TRADER,
         ADD_VAULT,
-        FORCE_REMOVE_VAULT
+        FORCE_REMOVE_VAULT,
+        CONTRACT_UPGRADE
     }
 
     /// @custom:storage-location erc7201:common.storage.aggregator
@@ -795,7 +797,37 @@ contract CommonAggregator is
         _disableInitializers();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER) {}
+    event ContractUpgradeSubmitted(address newImplementation, uint256 timelock);
+    event ContractUpgradeCancelled(address newImplementation);
+    event ContractUpgradeAuthorized(address newImplementation);
+
+    function submitUpgrade(address newImplementation)
+        external
+        onlyRole(OWNER)
+        registersTimelockedAction(
+            keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)),
+            CONTRACT_UPGRADE_TIMELOCK
+        )
+    {
+        emit ContractUpgradeSubmitted(newImplementation, block.timestamp + CONTRACT_UPGRADE_TIMELOCK);
+    }
+
+    function cancelUpgrade(address newImplementation)
+        external
+        onlyGuardianOrHigherRole
+        cancelsAction(keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)))
+    {
+        emit ContractUpgradeCancelled(newImplementation);
+    }
+
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyRole(OWNER)
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)))
+    {
+        emit ContractUpgradeAuthorized(newImplementation);
+    }
 
     modifier onlyRebalancerOrHigherRole() {
         if (!hasRole(REBALANCER, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
