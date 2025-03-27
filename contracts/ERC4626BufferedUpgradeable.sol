@@ -118,17 +118,24 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
                 $.bufferedShares = checkedSub($.bufferedShares, lossInShares, FILE_ID, 4);
             }
 
-            uint256 cancelledOut = sharesToBurn.min(sharesToMint);
-            sharesToBurn = checkedSub(sharesToBurn, cancelledOut, FILE_ID, 5);
-            sharesToMint = checkedSub(sharesToMint, cancelledOut, FILE_ID, 6);
+            // It's possible that we will have `sharesToBurn > 0 && sharesToMint > 0`.
+            // We still want to perform both mint and burn, since fee is calculated based on minted shares.
+            // If only the difference would be minted/burned then, with steady inflow of rewards, vault would take almost no fees.
+
+            if (sharesToBurn > 0) {
+                // Burn fees from the buffer
+                _burn(address(this), sharesToBurn);
+            }
 
             if (sharesToMint > 0) {
                 uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
+
+                // Mint performance fee
                 $.bufferedShares -= fee;
                 _mint(address(this), sharesToMint - fee);
+
+                // Mint shares for rewards buffering
                 _mint($.protocolFeeReceiver, fee);
-            } else if (sharesToBurn > 0) {
-                _burn(address(this), sharesToBurn);
             }
 
             $.assetsCached = _totalAssets;
@@ -158,8 +165,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         return ($.assetsCached.min(newTotalAssets), currentTotalSupply - sharesToBurn);
     }
 
-    function _updateBuffer(ERC4626BufferedStorage storage $, uint256 _totalAssets, uint256 totalShares) private {}
-
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
     /// Use it to implement `totalSupply()`.
     function _sharesToBurn(ERC4626BufferedStorage memory buffer) private view returns (uint256 sharesReleased) {
@@ -172,8 +177,8 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
             return 0;
         }
 
-        uint256 duration = checkedSub(end, start, FILE_ID, 7);
-        uint256 elapsed = checkedSub(timestampNow, start, FILE_ID, 8);
+        uint256 duration = checkedSub(end, start, FILE_ID, 5);
+        uint256 elapsed = checkedSub(timestampNow, start, FILE_ID, 6);
 
         if (elapsed >= duration) {
             sharesReleased = bufferedShares;
@@ -186,14 +191,14 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         private
         returns (uint256 sharesToMint)
     {
-        uint256 gain = checkedSub(_totalAssets, $.assetsCached, FILE_ID, 9);
+        uint256 gain = checkedSub(_totalAssets, $.assetsCached, FILE_ID, 7);
         sharesToMint = gain.mulDiv(totalShares, $.assetsCached);
 
         if (sharesToMint == 0) {
             return 0;
         }
 
-        uint256 newUnlockEnd = checkedAdd(block.timestamp, DEFAULT_BUFFERING_DURATION, FILE_ID, 10);
+        uint256 newUnlockEnd = checkedAdd(block.timestamp, DEFAULT_BUFFERING_DURATION, FILE_ID, 8);
         $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint);
     }
 
@@ -206,7 +211,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
             return 0;
         }
 
-        uint256 loss = checkedSub(buffer.assetsCached, currentTotalAssets, FILE_ID, 11);
+        uint256 loss = checkedSub(buffer.assetsCached, currentTotalAssets, FILE_ID, 9);
         uint256 lossInShares = loss.mulDiv(currentTotalShares, buffer.assetsCached, Math.Rounding.Ceil);
 
         // If we need to burn more than `buffer.bufferedShares` shares to retain price-per-share,
