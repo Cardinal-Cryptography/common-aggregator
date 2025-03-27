@@ -22,14 +22,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     uint256 public constant DEFAULT_BUFFERING_DURATION = 20 days;
 
-    // keccak256(abi.encode(uint256(keccak256("common.storage.buffer")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant BUFFER_STORAGE_LOCATION =
-        0xef5481445e9fe7b0c63b33af7a02ad6f9d34b7cb55d1e3d76cff004354e0e400;
-
-    /// @dev MUST be initialized with non-zero value of `assetsCached` - vault should send some
-    /// assets (together with corresponding shares) to an unreachable address (in the constructor).
-    ///
-    /// Use `_newBuffer` in order to create new buffer instance.
     struct ERC4626BufferedStorage {
         uint256 assetsCached;
         uint256 bufferedShares;
@@ -40,6 +32,16 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         IERC20 _asset;
         uint8 _underlyingDecimals;
         uint8 _decimalsOffset;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("common.storage.buffer")) - 1)) & ~bytes32(uint256(0xff));
+    bytes32 private constant BUFFER_STORAGE_LOCATION =
+        0xef5481445e9fe7b0c63b33af7a02ad6f9d34b7cb55d1e3d76cff004354e0e400;
+
+    function _getERC4626BufferedStorage() internal pure returns (ERC4626BufferedStorage storage $) {
+        assembly {
+            $.slot := BUFFER_STORAGE_LOCATION
+        }
     }
 
     // ----- Initialization -----
@@ -74,7 +76,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         $.assetsCached -= assets;
     }
 
-    /// @notice Updates holdinds state, by reporting on every vault how many assets it has.
+    /// @notice Updates holdings state based on currently held assets and time elapsed from last update.
     /// Profits are smoothed out by the reward buffer, and ditributed to the holders.
     /// Protocol fee is taken from the profits. Potential losses are first covered by the buffer.
     function updateHoldingsState() public {
@@ -244,12 +246,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     constructor() {
         _disableInitializers();
-    }
-
-    function _getERC4626BufferedStorage() internal pure returns (ERC4626BufferedStorage storage $) {
-        assembly {
-            $.slot := BUFFER_STORAGE_LOCATION
-        }
     }
 
     // ----- ERC-4626 -----
