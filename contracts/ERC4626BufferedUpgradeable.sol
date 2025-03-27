@@ -517,8 +517,8 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         // shares are burned and after the assets are transferred, which is a valid state.
         _preWithdrawal(assets);
         _burn(owner, shares);
-        SafeERC20.safeTransfer($._asset, receiver, assets);
         _decreaseAssets(assets);
+        SafeERC20.safeTransfer($._asset, receiver, assets);
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
