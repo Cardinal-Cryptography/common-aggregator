@@ -84,10 +84,9 @@ contract CommonAggregator is
     }
 
     function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
-        __AccessControl_init();
-        __UUPSUpgradeable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
         __ERC4626_init(asset);
+        // other initializers are empty
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(OWNER, owner);
@@ -100,7 +99,6 @@ contract CommonAggregator is
             $.allocationLimitBps[address(vaults[i])] = MAX_BPS;
         }
 
-        $.protocolFeeBps = 0;
         $.protocolFeeReceiver = address(1);
     }
 
