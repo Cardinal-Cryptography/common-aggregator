@@ -46,6 +46,10 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     // ----- Initialization -----
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(IERC20 _asset, address protocolFeeReceiver) public initializer {
         __ERC4626Buffered_init(_asset, protocolFeeReceiver);
     }
@@ -61,6 +65,8 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         $._underlyingDecimals = success ? assetDecimals : 18;
         $._asset = _asset;
     }
+
+    // ----- Buffering logic -----
 
     /// @dev Increases the buffer's `assetsCached` field.
     /// Used when deposit or mint has been made to the vault.
@@ -240,12 +246,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         if (account == address(this)) {
             balance -= _sharesToBurn(_getERC4626BufferedStorage());
         }
-    }
-
-    // ----- Etc -----
-
-    constructor() {
-        _disableInitializers();
     }
 
     // ----- ERC-4626 -----
