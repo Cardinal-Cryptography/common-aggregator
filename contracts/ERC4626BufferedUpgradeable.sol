@@ -297,24 +297,16 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     // ----- OZ 4626 -----
 
-    /**
-     * @dev Attempted to deposit more assets than the max amount for `receiver`.
-     */
+    /// @dev Attempted to deposit more assets than the max amount for `receiver`.
     error ERC4626ExceededMaxDeposit(address receiver, uint256 assets, uint256 max);
 
-    /**
-     * @dev Attempted to mint more shares than the max amount for `receiver`.
-     */
+    /// @dev Attempted to mint more shares than the max amount for `receiver`.
     error ERC4626ExceededMaxMint(address receiver, uint256 shares, uint256 max);
 
-    /**
-     * @dev Attempted to withdraw more assets than the max amount for `receiver`.
-     */
+    /// @dev Attempted to withdraw more assets than the max amount for `receiver`.
     error ERC4626ExceededMaxWithdraw(address owner, uint256 assets, uint256 max);
 
-    /**
-     * @dev Attempted to redeem more shares than the max amount for `receiver`.
-     */
+    /// @dev Attempted to redeem more shares than the max amount for `receiver`.
     error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
 
     function __ERC4626_init_unchained(IERC20 asset_) internal onlyInitializing {}
@@ -346,52 +338,40 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         return $._underlyingDecimals + _decimalsOffset();
     }
 
-    /**
-     * @dev See {IERC4626-asset}.
-     */
+    /// @inheritdoc IERC4626
     function asset() public view virtual returns (address) {
         BufferStorage storage $ = _getBufferStorage();
         return address($._asset);
     }
 
-    /**
-     * @dev See {IERC4626-convertToShares}.
-     */
+    /// @inheritdoc IERC4626
     function convertToShares(uint256 assets) public view virtual returns (uint256) {
         return _convertToShares(assets, Math.Rounding.Floor);
     }
 
-    /**
-     * @dev See {IERC4626-convertToAssets}.
-     */
+    /// @inheritdoc IERC4626
     function convertToAssets(uint256 shares) public view virtual returns (uint256) {
         return _convertToAssets(shares, Math.Rounding.Floor);
     }
 
-    /**
-     * @dev See {IERC4626-maxDeposit}.
-     */
+    /// @inheritdoc IERC4626
     function maxDeposit(address) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
-    /**
+    /// @inheritdoc IERC4626
      * @dev See {IERC4626-maxMint}.
      */
     function maxMint(address) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
-    /**
-     * @dev See {IERC4626-maxWithdraw}.
-     */
+    /// @inheritdoc IERC4626
     function maxWithdraw(address owner) public view virtual returns (uint256) {
         return _convertToAssets(balanceOf(owner), Math.Rounding.Floor);
     }
 
-    /**
-     * @dev See {IERC4626-maxRedeem}.
-     */
+    /// @inheritdoc IERC4626
     function maxRedeem(address owner) public view virtual returns (uint256) {
         return balanceOf(owner);
     }
@@ -463,32 +443,20 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         return assets;
     }
 
-    /**
-     * @dev Internal conversion function (from assets to shares) with support for rounding direction.
-     */
+    /// @dev Internal conversion function (from assets to shares) with support for rounding direction.
     function _convertToShares(uint256 assets, Math.Rounding rounding) internal view virtual returns (uint256) {
         return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding);
     }
 
-    /**
-     * @dev Internal conversion function (from shares to assets) with support for rounding direction.
-     */
+    /// @dev Internal conversion function (from shares to assets) with support for rounding direction.
     function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view virtual returns (uint256) {
         return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
     }
 
-    /**
-     * @dev Deposit/mint common workflow.
-     */
+    /// @dev Deposit/mint common workflow.
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal virtual {
         BufferStorage storage $ = _getBufferStorage();
-        // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
-        // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
-        // calls the vault, which is assumed not malicious.
-        //
-        // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
-        // assets are transferred and before the shares are minted, which is a valid state.
-        // slither-disable-next-line reentrancy-no-eth
+
         SafeERC20.safeTransferFrom($._asset, caller, address(this), assets);
         _mint(receiver, shares);
         _postDeposit(assets);
@@ -497,9 +465,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         emit Deposit(caller, receiver, assets, shares);
     }
 
-    /**
-     * @dev Withdraw/redeem common workflow.
-     */
+    /// @dev Withdraw/redeem common workflow.
     function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
         internal
         virtual
@@ -509,12 +475,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
             _spendAllowance(owner, caller, shares);
         }
 
-        // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
-        // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
-        // calls the vault, which is assumed not malicious.
-        //
-        // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
-        // shares are burned and after the assets are transferred, which is a valid state.
         _preWithdrawal(assets);
         _burn(owner, shares);
         _decreaseAssets(assets);
