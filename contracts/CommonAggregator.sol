@@ -12,8 +12,8 @@ import {
     IERC20Metadata,
     SafeERC20,
     ERC20Upgradeable,
-    ERC4626Upgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+    ERC4626BufferedUpgradeable
+} from "./ERC4626BufferedUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import {ERC4626BufferedUpgradeable} from "./ERC4626BufferedUpgradeable.sol";
@@ -113,7 +113,7 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Returns the maximum deposit amount of the given address at the current time.
-    function maxDeposit(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function maxDeposit(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
         }
@@ -122,7 +122,7 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Returns the maximum mint amount of the given address at the current time.
-    function maxMint(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function maxMint(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
         }
@@ -131,7 +131,7 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Returns the maximum withdraw amount of the given address at the current time.
-    function maxWithdraw(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function maxWithdraw(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
         }
@@ -140,7 +140,7 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Returns the maximum redeem amount of the given address at the current time.
-    function maxRedeem(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function maxRedeem(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
         }
@@ -163,7 +163,51 @@ contract CommonAggregator is
         return availableFunds;
     }
 
-    function _postDeposit(uint256 assets) internal override whenNotPaused {
+    /// @inheritdoc IERC4626
+    function deposit(uint256 assets, address receiver)
+        public
+        virtual
+        override(ERC4626BufferedUpgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
+        return super.deposit(assets, receiver);
+    }
+
+    /// @inheritdoc IERC4626
+    function mint(uint256 shares, address receiver)
+        public
+        virtual
+        override(ERC4626BufferedUpgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
+        return super.mint(shares, receiver);
+    }
+
+    /// @inheritdoc IERC4626
+    function withdraw(uint256 assets, address receiver, address owner)
+        public
+        virtual
+        override(ERC4626BufferedUpgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
+        return super.withdraw(assets, receiver, owner);
+    }
+
+    /// @inheritdoc IERC4626
+    function redeem(uint256 shares, address receiver, address owner)
+        public
+        virtual
+        override(ERC4626BufferedUpgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
+        return super.redeem(shares, receiver, owner);
+    }
+
+    function _postDeposit(uint256 assets) internal override {
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 cachedTotalAssets = totalAssets();
         if (cachedTotalAssets > 0) {
@@ -179,7 +223,7 @@ contract CommonAggregator is
         }
     }
 
-    function _preWithdrawal(uint256 assets) internal override whenNotPaused {
+    function _preWithdrawal(uint256 assets) internal override {
         try CommonAggregator(address(this)).pullFundsProportional(assets) {}
         catch {
             emit ProportionalWithdrawalFailed(assets);

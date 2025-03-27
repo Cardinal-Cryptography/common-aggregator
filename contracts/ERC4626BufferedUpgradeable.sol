@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import {
-    IERC20,
-    IERC4626,
-    ERC20Upgradeable,
-    ERC4626Upgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {checkedAdd, checkedDiv, checkedMul, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
@@ -15,7 +15,7 @@ uint256 constant FILE_ID = 10044883199429504109510964582554469701684221682022847
 
 /// @title Buffer structure implementation for gradual reward release.
 /// Intended for usage within ERC-4626 vault implementations.
-contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
+contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626 {
     using Math for uint256;
 
     error AssetsCachedIsZero();
@@ -37,22 +37,26 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
         uint256 currentBufferEnd;
         address protocolFeeReceiver;
         uint256 protocolFeeBps;
+        IERC20 _asset;
+        uint8 _underlyingDecimals;
     }
 
     // ----- Initialization -----
 
-    function initialize(IERC20 asset, address protocolFeeReceiver) public initializer {
-        __ERC4626Buffered_init(asset, protocolFeeReceiver);
+    function initialize(IERC20 _asset, address protocolFeeReceiver) public initializer {
+        __ERC4626Buffered_init(_asset, protocolFeeReceiver);
     }
 
-    function __ERC4626Buffered_init(IERC20 asset, address protocolFeeReceiver) internal onlyInitializing {
-        __ERC4626_init(asset);
-
+    function __ERC4626Buffered_init(IERC20 _asset, address protocolFeeReceiver) internal onlyInitializing {
         BufferStorage storage $ = _getBufferStorage();
         $.lastUpdate = block.timestamp;
         $.currentBufferEnd = block.timestamp;
         $.protocolFeeBps = 0;
         $.protocolFeeReceiver = protocolFeeReceiver;
+
+        (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(_asset);
+        $._underlyingDecimals = success ? assetDecimals : 18;
+        $._asset = _asset;
     }
 
     /// @dev Increases the buffer's `assetsCached` field.
@@ -244,94 +248,36 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
     // ----- ERC4626 -----
 
     /// @notice Returns cached assets from the last holdings state update.
-    function totalAssets() public view override(ERC4626Upgradeable) returns (uint256) {
+    function totalAssets() public view override(IERC4626) returns (uint256) {
         return _getBufferStorage().assetsCached;
     }
 
     /// @inheritdoc IERC4626
     /// @dev Updates holdings state before the preview.
-    function previewDeposit(uint256 assets) public view override(ERC4626Upgradeable) returns (uint256) {
+    function previewDeposit(uint256 assets) public view override(IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
         return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Floor);
     }
 
     /// @inheritdoc IERC4626
     /// @dev Updates holdings state before the preview.
-    function previewMint(uint256 shares) public view override(ERC4626Upgradeable) returns (uint256) {
+    function previewMint(uint256 shares) public view override(IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
         return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
     }
 
     /// @inheritdoc IERC4626
     /// @dev Updates holdings state before the preview.
-    function previewWithdraw(uint256 assets) public view override(ERC4626Upgradeable) returns (uint256) {
+    function previewWithdraw(uint256 assets) public view override(IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
         return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Ceil);
     }
 
     /// @inheritdoc IERC4626
     /// @dev Updates holdings state before the preview.
-    function previewRedeem(uint256 shares) public view override(ERC4626Upgradeable) returns (uint256) {
+    function previewRedeem(uint256 shares) public view override(IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
         return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Floor);
-    }
-
-    /// TODO: Add pausing back to deposit
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before depositing.
-    function deposit(uint256 assets, address account) public override(ERC4626Upgradeable) returns (uint256) {
-        updateHoldingsState();
-        uint256 shares = super.deposit(assets, account);
-
-        _postDeposit(assets);
-        _increaseAssets(assets);
-
-        return shares;
-    }
-
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before minting.
-    function mint(uint256 shares, address account) public override(ERC4626Upgradeable) returns (uint256) {
-        updateHoldingsState();
-        uint256 assets = super.mint(shares, account);
-
-        _postDeposit(assets);
-        _increaseAssets(assets);
-
-        return assets;
-    }
-
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before withdrawing.
-    function withdraw(uint256 assets, address account, address owner)
-        public
-        override(ERC4626Upgradeable)
-        returns (uint256)
-    {
-        updateHoldingsState();
-        _preWithdrawal(assets);
-        uint256 shares = super.withdraw(assets, account, owner);
-
-        _decreaseAssets(assets);
-
-        return shares;
-    }
-
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before redeeming.
-    function redeem(uint256 shares, address account, address owner)
-        public
-        override(ERC4626Upgradeable)
-        returns (uint256)
-    {
-        updateHoldingsState();
-        uint256 assetsNeeded = convertToAssets(shares);
-        _preWithdrawal(assetsNeeded);
-        uint256 assets = super.redeem(shares, account, owner);
-
-        _decreaseAssets(assets);
-
-        return assets;
     }
 
     function _postDeposit(uint256 assets) internal virtual {}
@@ -347,5 +293,241 @@ contract ERC4626BufferedUpgradeable is ERC4626Upgradeable {
         assembly {
             $.slot := BUFFER_STORAGE_LOCATION
         }
+    }
+
+    // ----- OZ 4626 -----
+
+    /**
+     * @dev Attempted to deposit more assets than the max amount for `receiver`.
+     */
+    error ERC4626ExceededMaxDeposit(address receiver, uint256 assets, uint256 max);
+
+    /**
+     * @dev Attempted to mint more shares than the max amount for `receiver`.
+     */
+    error ERC4626ExceededMaxMint(address receiver, uint256 shares, uint256 max);
+
+    /**
+     * @dev Attempted to withdraw more assets than the max amount for `receiver`.
+     */
+    error ERC4626ExceededMaxWithdraw(address owner, uint256 assets, uint256 max);
+
+    /**
+     * @dev Attempted to redeem more shares than the max amount for `receiver`.
+     */
+    error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
+
+    function __ERC4626_init_unchained(IERC20 asset_) internal onlyInitializing {}
+
+    /**
+     * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
+     */
+    function _tryGetAssetDecimals(IERC20 asset_) private view returns (bool ok, uint8 assetDecimals) {
+        (bool success, bytes memory encodedDecimals) =
+            address(asset_).staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
+        if (success && encodedDecimals.length >= 32) {
+            uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
+            if (returnedDecimals <= type(uint8).max) {
+                return (true, uint8(returnedDecimals));
+            }
+        }
+        return (false, 0);
+    }
+
+    /**
+     * @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
+     * "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
+     * asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
+     *
+     * See {IERC20Metadata-decimals}.
+     */
+    function decimals() public view virtual override(IERC20Metadata, ERC20Upgradeable) returns (uint8) {
+        BufferStorage storage $ = _getBufferStorage();
+        return $._underlyingDecimals + _decimalsOffset();
+    }
+
+    /**
+     * @dev See {IERC4626-asset}.
+     */
+    function asset() public view virtual returns (address) {
+        BufferStorage storage $ = _getBufferStorage();
+        return address($._asset);
+    }
+
+    /**
+     * @dev See {IERC4626-convertToShares}.
+     */
+    function convertToShares(uint256 assets) public view virtual returns (uint256) {
+        return _convertToShares(assets, Math.Rounding.Floor);
+    }
+
+    /**
+     * @dev See {IERC4626-convertToAssets}.
+     */
+    function convertToAssets(uint256 shares) public view virtual returns (uint256) {
+        return _convertToAssets(shares, Math.Rounding.Floor);
+    }
+
+    /**
+     * @dev See {IERC4626-maxDeposit}.
+     */
+    function maxDeposit(address) public view virtual returns (uint256) {
+        return type(uint256).max;
+    }
+
+    /**
+     * @dev See {IERC4626-maxMint}.
+     */
+    function maxMint(address) public view virtual returns (uint256) {
+        return type(uint256).max;
+    }
+
+    /**
+     * @dev See {IERC4626-maxWithdraw}.
+     */
+    function maxWithdraw(address owner) public view virtual returns (uint256) {
+        return _convertToAssets(balanceOf(owner), Math.Rounding.Floor);
+    }
+
+    /**
+     * @dev See {IERC4626-maxRedeem}.
+     */
+    function maxRedeem(address owner) public view virtual returns (uint256) {
+        return balanceOf(owner);
+    }
+
+    /// @inheritdoc IERC4626
+    function deposit(uint256 assets, address receiver) public virtual override(IERC4626) returns (uint256) {
+        updateHoldingsState();
+
+        uint256 maxAssets = maxDeposit(receiver);
+        if (assets > maxAssets) {
+            revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
+        }
+
+        uint256 shares = previewDeposit(assets);
+        _deposit(_msgSender(), receiver, assets, shares);
+        _postDeposit(assets);
+        _increaseAssets(assets);
+
+        return shares;
+    }
+
+    /// @inheritdoc IERC4626
+    function mint(uint256 shares, address receiver) public virtual override(IERC4626) returns (uint256) {
+        updateHoldingsState();
+        uint256 maxShares = maxMint(receiver);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxMint(receiver, shares, maxShares);
+        }
+
+        uint256 assets = previewMint(shares);
+        _deposit(_msgSender(), receiver, assets, shares);
+        _postDeposit(assets);
+        _increaseAssets(assets);
+
+        return assets;
+    }
+
+    /// @inheritdoc IERC4626
+    function withdraw(uint256 assets, address receiver, address owner)
+        public
+        virtual
+        override(IERC4626)
+        returns (uint256)
+    {
+        updateHoldingsState();
+        _preWithdrawal(assets);
+        uint256 maxAssets = maxWithdraw(owner);
+        if (assets > maxAssets) {
+            revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
+        }
+
+        uint256 shares = previewWithdraw(assets);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+        _decreaseAssets(assets);
+
+        return shares;
+    }
+
+    /// @inheritdoc IERC4626
+    function redeem(uint256 shares, address receiver, address owner)
+        public
+        virtual
+        override(IERC4626)
+        returns (uint256)
+    {
+        updateHoldingsState();
+        _preWithdrawal(convertToAssets(shares));
+        uint256 maxShares = maxRedeem(owner);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
+        }
+
+        uint256 assets = previewRedeem(shares);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+        _decreaseAssets(assets);
+
+        return assets;
+    }
+
+    /**
+     * @dev Internal conversion function (from assets to shares) with support for rounding direction.
+     */
+    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view virtual returns (uint256) {
+        return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding);
+    }
+
+    /**
+     * @dev Internal conversion function (from shares to assets) with support for rounding direction.
+     */
+    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view virtual returns (uint256) {
+        return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
+    }
+
+    /**
+     * @dev Deposit/mint common workflow.
+     */
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal virtual {
+        BufferStorage storage $ = _getBufferStorage();
+        // If _asset is ERC-777, `transferFrom` can trigger a reentrancy BEFORE the transfer happens through the
+        // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
+        // assets are transferred and before the shares are minted, which is a valid state.
+        // slither-disable-next-line reentrancy-no-eth
+        SafeERC20.safeTransferFrom($._asset, caller, address(this), assets);
+        _mint(receiver, shares);
+
+        emit Deposit(caller, receiver, assets, shares);
+    }
+
+    /**
+     * @dev Withdraw/redeem common workflow.
+     */
+    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
+        internal
+        virtual
+    {
+        BufferStorage storage $ = _getBufferStorage();
+        if (caller != owner) {
+            _spendAllowance(owner, caller, shares);
+        }
+
+        // If _asset is ERC-777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
+        // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
+        // shares are burned and after the assets are transferred, which is a valid state.
+        _burn(owner, shares);
+        SafeERC20.safeTransfer($._asset, receiver, assets);
+
+        emit Withdraw(caller, receiver, owner, assets, shares);
+    }
+
+    function _decimalsOffset() internal view virtual returns (uint8) {
+        return 0;
     }
 }
