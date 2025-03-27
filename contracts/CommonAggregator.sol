@@ -535,7 +535,7 @@ contract CommonAggregator is
     function setProtocolFee(uint256 protocolFeeBps) external onlyRole(OWNER) {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
 
-        BufferStorage storage buffer$ = _getBufferStorage();
+        ERC4626BufferedStorage storage buffer$ = _getERC4626BufferedStorage();
         uint256 oldProtocolFee = buffer$.protocolFeeBps;
 
         if (oldProtocolFee == protocolFeeBps) return;
@@ -548,7 +548,7 @@ contract CommonAggregator is
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
         require(protocolFeeReceiver != address(0), ZeroProtocolFeeReceiver());
 
-        BufferStorage storage buffer$ = _getBufferStorage();
+        ERC4626BufferedStorage storage buffer$ = _getERC4626BufferedStorage();
         address oldProtocolFeeReceiver = buffer$.protocolFeeReceiver;
 
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;

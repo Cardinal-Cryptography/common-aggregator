@@ -30,7 +30,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     /// assets (together with corresponding shares) to an unreachable address (in the constructor).
     ///
     /// Use `_newBuffer` in order to create new buffer instance.
-    struct BufferStorage {
+    struct ERC4626BufferedStorage {
         uint256 assetsCached;
         uint256 bufferedShares;
         uint256 lastUpdate;
@@ -48,7 +48,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     }
 
     function __ERC4626Buffered_init(IERC20 _asset, address protocolFeeReceiver) internal onlyInitializing {
-        BufferStorage storage $ = _getBufferStorage();
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         $.lastUpdate = block.timestamp;
         $.currentBufferEnd = block.timestamp;
         $.protocolFeeBps = 0;
@@ -62,14 +62,14 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     /// @dev Increases the buffer's `assetsCached` field.
     /// Used when deposit or mint has been made to the vault.
     function _increaseAssets(uint256 assets) internal {
-        BufferStorage storage $ = _getBufferStorage();
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         $.assetsCached += assets;
     }
 
     /// @dev Increases the buffer's `assetsCached` field.
     /// Used when withdrawal or redemption has been made to the vault.
     function _decreaseAssets(uint256 assets) internal {
-        BufferStorage storage $ = _getBufferStorage();
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         $.assetsCached -= assets;
     }
 
@@ -77,7 +77,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     /// Profits are smoothed out by the reward buffer, and ditributed to the holders.
     /// Protocol fee is taken from the profits. Potential losses are first covered by the buffer.
     function updateHoldingsState() public {
-        BufferStorage storage $ = _getBufferStorage();
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         uint256 oldCachedAssets = $.assetsCached;
 
         if (oldCachedAssets == 0) {
@@ -101,7 +101,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     /// @notice Preview the holdings state update, without actually updating it.
     /// Returns `totalAssets` and `totalSupply` that there would be after the update.
     function _previewUpdateHoldingsState() internal view returns (uint256, uint256) {
-        BufferStorage storage $ = _getBufferStorage();
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         uint256 _totalSupply = super.totalSupply();
 
         if ($.assetsCached == 0) {
@@ -132,21 +132,21 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         private
         returns (uint256 sharesToMint, uint256 sharesToBurn)
     {
-        BufferStorage memory memBuf = _getBufferStorage();
+        ERC4626BufferedStorage memory memBuf = _getERC4626BufferedStorage();
         (sharesToMint, sharesToBurn) = __updateBuffer(memBuf, _totalAssets, totalShares);
         _toStorage(memBuf);
     }
 
     /// @dev Copies `memory` buffer into storage.
-    function _toStorage(BufferStorage memory buffer) internal {
-        BufferStorage storage $ = _getBufferStorage();
+    function _toStorage(ERC4626BufferedStorage memory buffer) internal {
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         $.assetsCached = buffer.assetsCached;
         $.bufferedShares = buffer.bufferedShares;
         $.lastUpdate = buffer.lastUpdate;
         $.currentBufferEnd = buffer.currentBufferEnd;
     }
 
-    function __updateBuffer(BufferStorage memory buffer, uint256 _totalAssets, uint256 totalShares)
+    function __updateBuffer(ERC4626BufferedStorage memory buffer, uint256 _totalAssets, uint256 totalShares)
         private
         view
         returns (uint256 sharesToMint, uint256 sharesToBurn)
@@ -183,7 +183,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
     /// Use it to implement `totalSupply()`.
-    function _sharesToBurn(BufferStorage memory buffer) private view returns (uint256 sharesReleased) {
+    function _sharesToBurn(ERC4626BufferedStorage memory buffer) private view returns (uint256 sharesReleased) {
         uint256 timestampNow = block.timestamp;
         uint256 start = buffer.lastUpdate;
         uint256 end = buffer.currentBufferEnd;
@@ -203,7 +203,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         }
     }
 
-    function _handleGain(BufferStorage memory buffer, uint256 totalShares, uint256 _totalAssets)
+    function _handleGain(ERC4626BufferedStorage memory buffer, uint256 totalShares, uint256 _totalAssets)
         private
         view
         returns (uint256 sharesToMint, uint256 newBufferEnd)
@@ -219,7 +219,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         newBufferEnd = weightedAvg(buffer.currentBufferEnd, buffer.bufferedShares, newUnlockEnd, sharesToMint);
     }
 
-    function _handleLoss(BufferStorage memory buffer, uint256 totalShares, uint256 _totalAssets)
+    function _handleLoss(ERC4626BufferedStorage memory buffer, uint256 totalShares, uint256 _totalAssets)
         private
         pure
         returns (uint256 sharesToBurn)
@@ -235,13 +235,13 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     // ----- ERC20 -----
 
     function totalSupply() public view override(ERC20Upgradeable, IERC20) returns (uint256) {
-        return super.totalSupply() - _sharesToBurn(_getBufferStorage());
+        return super.totalSupply() - _sharesToBurn(_getERC4626BufferedStorage());
     }
 
     function balanceOf(address account) public view override(ERC20Upgradeable, IERC20) returns (uint256 balance) {
         balance = super.balanceOf(account);
         if (account == address(this)) {
-            balance -= _sharesToBurn(_getBufferStorage());
+            balance -= _sharesToBurn(_getERC4626BufferedStorage());
         }
     }
 
@@ -249,7 +249,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     /// @notice Returns cached assets from the last holdings state update.
     function totalAssets() public view override(IERC4626) returns (uint256) {
-        return _getBufferStorage().assetsCached;
+        return _getERC4626BufferedStorage().assetsCached;
     }
 
     /// @inheritdoc IERC4626
@@ -289,7 +289,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         _disableInitializers();
     }
 
-    function _getBufferStorage() internal pure returns (BufferStorage storage $) {
+    function _getERC4626BufferedStorage() internal pure returns (ERC4626BufferedStorage storage $) {
         assembly {
             $.slot := BUFFER_STORAGE_LOCATION
         }
@@ -334,13 +334,13 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
      * See {IERC20Metadata-decimals}.
      */
     function decimals() public view virtual override(IERC20Metadata, ERC20Upgradeable) returns (uint8) {
-        BufferStorage storage $ = _getBufferStorage();
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         return $._underlyingDecimals + _decimalsOffset();
     }
 
     /// @inheritdoc IERC4626
     function asset() public view virtual returns (address) {
-        BufferStorage storage $ = _getBufferStorage();
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         return address($._asset);
     }
 
@@ -360,8 +360,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     }
 
     /// @inheritdoc IERC4626
-     * @dev See {IERC4626-maxMint}.
-     */
     function maxMint(address) public view virtual returns (uint256) {
         return type(uint256).max;
     }
@@ -455,7 +453,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     /// @dev Deposit/mint common workflow.
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal virtual {
-        BufferStorage storage $ = _getBufferStorage();
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
 
         SafeERC20.safeTransferFrom($._asset, caller, address(this), assets);
         _mint(receiver, shares);
@@ -470,7 +468,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         internal
         virtual
     {
-        BufferStorage storage $ = _getBufferStorage();
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
