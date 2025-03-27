@@ -39,6 +39,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         uint256 protocolFeeBps;
         IERC20 _asset;
         uint8 _underlyingDecimals;
+        uint8 _decimalsOffset;
     }
 
     // ----- Initialization -----
@@ -295,7 +296,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         }
     }
 
-    // ----- OZ 4626 -----
+    // ----- ERC-4626 -----
 
     /// @dev Attempted to deposit more assets than the max amount for `receiver`.
     error ERC4626ExceededMaxDeposit(address receiver, uint256 assets, uint256 max);
@@ -346,12 +347,12 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     /// @inheritdoc IERC4626
     function convertToShares(uint256 assets) public view virtual returns (uint256) {
-        return _convertToShares(assets, Math.Rounding.Floor);
+        return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1);
     }
 
     /// @inheritdoc IERC4626
     function convertToAssets(uint256 shares) public view virtual returns (uint256) {
-        return _convertToAssets(shares, Math.Rounding.Floor);
+        return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset());
     }
 
     /// @inheritdoc IERC4626
@@ -366,7 +367,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
     /// @inheritdoc IERC4626
     function maxWithdraw(address owner) public view virtual returns (uint256) {
-        return _convertToAssets(balanceOf(owner), Math.Rounding.Floor);
+        return convertToAssets(balanceOf(owner));
     }
 
     /// @inheritdoc IERC4626
@@ -439,16 +440,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
-    }
-
-    /// @dev Internal conversion function (from assets to shares) with support for rounding direction.
-    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view virtual returns (uint256) {
-        return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding);
-    }
-
-    /// @dev Internal conversion function (from shares to assets) with support for rounding direction.
-    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view virtual returns (uint256) {
-        return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
     }
 
     /// @dev Deposit/mint common workflow.
