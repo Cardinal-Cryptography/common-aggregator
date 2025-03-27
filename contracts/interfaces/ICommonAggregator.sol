@@ -17,6 +17,19 @@ interface ICommonAggregator is IERC4626 {
 
     function updateHoldingsState() external;
 
+    // ----- Upgradeablity -----
+
+    event ContractUpgradeSubmitted(address newImplementation, uint256 unlockTimestamp);
+    event ContractUpgradeCancelled(address newImplementation);
+    event ContractUpgradeAuthorized(address newImplementation);
+
+    /// @notice Submits timelocked upgrade action to `newImplementation`.
+    /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
+    /// @dev After the timelock passes, upgrader can upgradeToAndCall on the new implementation with
+    /// any reinitializing data.
+    function submitUpgrade(address newImplementation) external;
+    function cancelUpgrade(address newImplementation) external;
+
     // ----- Vault management -----
 
     event VaultAdditionSubmitted(address indexed vault, uint256 unlockTimestamp);

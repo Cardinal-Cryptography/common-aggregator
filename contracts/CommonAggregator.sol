@@ -797,10 +797,6 @@ contract CommonAggregator is
         _disableInitializers();
     }
 
-    event ContractUpgradeSubmitted(address newImplementation, uint256 timelock);
-    event ContractUpgradeCancelled(address newImplementation);
-    event ContractUpgradeAuthorized(address newImplementation);
-
     function submitUpgrade(address newImplementation)
         external
         onlyRole(OWNER)
