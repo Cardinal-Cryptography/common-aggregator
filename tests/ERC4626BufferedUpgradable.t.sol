@@ -73,50 +73,62 @@ contract ERC4626BufferedUpgradeableTest is Test {
         assertEq(bufferedVault.totalSupply(), 15);
     }
 
-    /*function testSharesBurntAfterFullPeriodHasPassed() public {
-        buffer._updateBuffer(15, 100, 0);
+    function testSharesBurntAfterFullPeriodHasPassed() public {
+        _depositToVault(5);
+        _dropToVault(10);
+        bufferedVault.updateHoldingsState();
         vm.warp(STARTING_TIMESTAMP + 20 days);
-        assertEq(buffer._sharesToBurn(), 50);
-    }
-
-    function testBufferUpdateResultOnGain() public {
-        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(12, 100, 0);
-        assertEq(_toMint, 20);
-        assertEq(_toBurn, 0);
+        assertEq(bufferedVault.totalSupply(), 5);
     }
 
     function testBufferUpdateResultOnLoss() public {
-        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(4, 100, 0);
-        assertEq(_toMint, 0);
-        assertEq(_toBurn, 0);
+        _depositToVault(10);
+        asset.burn(address(bufferedVault), 6);
+        bufferedVault.updateHoldingsState();
+
+        assertEq(bufferedVault.totalAssets(), 4);
+        assertEq(bufferedVault.totalSupply(), 10);
     }
 
     function testBufferUpdateResultOnLoss2() public {
-        buffer._updateBuffer(100, 100, 0);
-        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(70, 1000, 0);
-        assertEq(_toMint, 0);
-        assertEq(_toBurn, 300);
+        _depositToVault(5);
+        _dropToVault(10);
+        bufferedVault.updateHoldingsState();
+        asset.burn(address(bufferedVault), 4);
+        bufferedVault.updateHoldingsState();
+        assertEq(bufferedVault.totalAssets(), 11);
+        assertEq(bufferedVault.totalSupply(), 11);
     }
 
-    function testFeeOnGain() public {
-        (uint256 _toMint,) = buffer._updateBuffer(12, 100, MAX_BPS / 10);
-        assertEq(_toMint, 20);
-
-        uint256 mintedMinusFee = 18;
-
-        vm.warp(STARTING_TIMESTAMP + 20 days);
-        (, uint256 _toBurn) = buffer._updateBuffer(12, 100 + mintedMinusFee, MAX_BPS / 10);
-        assertEq(_toBurn, 18);
+    function testBufferUpdateResultOnLoss3() public {
+        _depositToVault(5);
+        _dropToVault(2);
+        bufferedVault.updateHoldingsState();
+        asset.burn(address(bufferedVault), 4);
+        bufferedVault.updateHoldingsState();
+        assertEq(bufferedVault.totalAssets(), 3);
+        assertEq(bufferedVault.totalSupply(), 5);
     }
 
-    function testFeeOnLoss() public {
-        buffer._updateBuffer(100, 100, MAX_BPS / 10);
-        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(70, 1000, MAX_BPS / 10);
-        assertEq(_toMint, 0);
-        assertEq(_toBurn, 300);
-    }
+    // function testFeeOnGain() public {
+    //     (uint256 _toMint,) = buffer._updateBuffer(12, 100, MAX_BPS / 10);
+    //     assertEq(_toMint, 20);
 
-    function testBufferEndFirstUpdate() public {
+    //     uint256 mintedMinusFee = 18;
+
+    //     vm.warp(STARTING_TIMESTAMP + 20 days);
+    //     (, uint256 _toBurn) = buffer._updateBuffer(12, 100 + mintedMinusFee, MAX_BPS / 10);
+    //     assertEq(_toBurn, 18);
+    // }
+
+    // function testFeeOnLoss() public {
+    //     buffer._updateBuffer(100, 100, MAX_BPS / 10);
+    //     (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(70, 1000, MAX_BPS / 10);
+    //     assertEq(_toMint, 0);
+    //     assertEq(_toBurn, 300);
+    // }
+
+    /*function testBufferEndFirstUpdate() public {
         buffer._updateBuffer(100, 100, 0);
         assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 20 days);
     }
