@@ -19,10 +19,8 @@ no_match_path = "tests/aggregator/UpgradesOpenZeppelin.t.sol"
 [rpc_endpoints]
 aleph_evm_testnet = "${ALEPH_EVM_TESTNET_RPC_URL}"
 
-
 # Includes also openzeppelin foundry upgrades
 [profile.full]
-inherits = "default"
 ffi = true
 ast = true
 build_info = true
@@ -31,4 +29,9 @@ fs_permissions = [{ access = "read", path = "artifacts" }]
 no_match_path = "../"
 
 [profile.ci]
-inherits = "full"
+ffi = true
+ast = true
+build_info = true
+extra_output = ["storageLayout"]
+fs_permissions = [{ access = "read", path = "artifacts" }]
+no_match_path = "../"
