@@ -4,8 +4,7 @@ pragma solidity ^0.8.28;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {checkedAdd, checkedDiv, checkedMul, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
-/// @dev Id for checked function identification: uint256(keccak256("RewardBuffer"));
-uint256 constant FILE_ID = 100448831994295041095109645825544697016842216820228479017213834858332751627035;
+uint256 constant FILE_ID = 1;
 
 /// @title Buffer structure implementation for gradual reward release.
 /// Intended for usage within ERC-4626 vault implementations.
