@@ -8,7 +8,11 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
+import {IERC4626Buffered} from "./interfaces/IERC4626Buffered.sol";
 import {checkedAdd, checkedDiv, checkedMul, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
+
+// TODO: Consider moving rewards trading to this contract - it might make this contract useful on it's own.
 
 // TODO: Update hash
 /// @dev Id for checked function identification: uint256(keccak256("RewardBuffer"));
@@ -17,7 +21,7 @@ uint256 constant FILE_ID = 10044883199429504109510964582554469701684221682022847
 // TODO: This probably should be an abstract contract. Also, we might want to define interface for it.
 /// @title Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
 /// It adds buffering to any asset rewards/airdrops received.
-contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626 {
+contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626Buffered {
     using Math for uint256;
 
     // TODO: consider making it an immutable variable or a virtual function so that
@@ -137,6 +141,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
             if (sharesToMint > 0) {
                 uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
 
+                // TODO: Make fees optional.
                 // Mint performance fee
                 $.bufferedShares -= fee;
                 _mint(address(this), sharesToMint - fee);
@@ -147,7 +152,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
             $.assetsCached = _totalAssets;
 
-            // TODO: emit HoldingsStateUpdated(oldCachedAssets, newAssets);
+            emit HoldingsStateUpdated(oldCachedAssets, _totalAssets);
         }
     }
 
