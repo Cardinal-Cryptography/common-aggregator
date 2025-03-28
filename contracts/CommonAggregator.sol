@@ -233,24 +233,24 @@ contract CommonAggregator is
 
     /// @dev Function is exposed as external but only callable by aggregator, because we want to be able
     /// to easily revert all changes in case of it's failure - it is not possible for internal functions.
-    function pullFundsProportional(uint256 amount) external onlyAggregator {
+    function pullFundsProportional(uint256 assetsRequired) external onlyAggregator {
         require(totalAssets() != 0, NotEnoughFunds());
 
         IERC20 asset = IERC20(asset());
         uint256 idle = asset.balanceOf(address(this));
-        uint256 amountIdle = amount.mulDiv(idle, totalAssets());
+        uint256 amountIdle = assetsRequired.mulDiv(idle, totalAssets());
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256[] memory amountsVaults = new uint256[]($.vaults.length);
 
         uint256 totalGathered = amountIdle;
         for (uint256 i = 0; i < $.vaults.length; ++i) {
-            amountsVaults[i] = amount.mulDiv(_aggregatedVaultAssets($.vaults[i]), totalAssets());
+            amountsVaults[i] = assetsRequired.mulDiv(_aggregatedVaultAssets($.vaults[i]), totalAssets());
             totalGathered += amountsVaults[i];
         }
 
-        if (totalGathered < amount) {
-            uint256 missing = amount - totalGathered;
+        if (totalGathered < assetsRequired) {
+            uint256 missing = assetsRequired - totalGathered;
             uint256 additionalIdleContribution = missing.min(idle - amountIdle);
             missing -= additionalIdleContribution;
             amountIdle += additionalIdleContribution;
@@ -276,23 +276,26 @@ contract CommonAggregator is
         }
     }
 
-    function _pullFundsSequential(uint256 assets) internal {
+    function _pullFundsSequential(uint256 assetsRequired) internal {
         AggregatorStorage storage $ = _getAggregatorStorage();
 
-        for (uint256 i = 0; i < $.vaults.length && assets > 0; i++) {
+        uint256 currentIdle = IERC20(asset()).balanceOf(address(this));
+        uint256 assetsToPull = assetsRequired - assetsRequired.min(currentIdle);
+
+        for (uint256 i = 0; i < $.vaults.length && assetsToPull > 0; i++) {
             IERC4626 vault = $.vaults[i];
             uint256 vaultMaxWithdraw = vault.maxWithdraw(address(this));
-            uint256 assetsToPullFromVault = assets.min(vaultMaxWithdraw);
+            uint256 assetsToPullFromVault = assetsToPull.min(vaultMaxWithdraw);
             try vault.withdraw(assetsToPullFromVault, address(this), address(this)) {
-                assets -= assetsToPullFromVault;
+                assetsToPull -= assetsToPullFromVault;
             } catch {
                 emit VaultWithdrawFailed(vault);
             }
         }
 
         // Fail if too little assets were withdrawn.
-        if (assets > 0) {
-            revert InsufficientAssetsForWithdrawal(assets);
+        if (assetsToPull > 0) {
+            revert InsufficientAssetsForWithdrawal(assetsToPull);
         }
     }
 
