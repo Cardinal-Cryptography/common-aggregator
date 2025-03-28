@@ -17,10 +17,9 @@ import {checkedAdd, checkedDiv, checkedMul, checkedSub, MAX_BPS, weightedAvg} fr
 /// @dev Id for checked function identification: uint256(keccak256("ERC4626BufferedUpgradeable"));
 uint256 constant FILE_ID = 0x4d39717a83c084e47ddfe24c6a25ca9abf9ec8fe47a1c7989073cd2247be5447;
 
-// TODO: This probably should be an abstract contract. Also, we might want to define interface for it.
 /// @title Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
 /// It adds buffering to any asset rewards/airdrops received.
-contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626Buffered {
+abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626Buffered {
     using Math for uint256;
 
     // TODO: consider making it an immutable variable or a virtual function so that
@@ -51,14 +50,6 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     }
 
     // ----- Initialization -----
-
-    constructor() {
-        _disableInitializers();
-    }
-
-    function initialize(IERC20 _asset, address protocolFeeReceiver) public initializer {
-        __ERC4626Buffered_init(_asset, protocolFeeReceiver);
-    }
 
     function __ERC4626Buffered_init(IERC20 _asset, address protocolFeeReceiver) internal onlyInitializing {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();

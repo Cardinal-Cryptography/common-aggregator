@@ -6,8 +6,19 @@ import {ERC4626BufferedUpgradeable} from "../contracts/ERC4626BufferedUpgradeabl
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "../contracts/Math.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
+
+contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(IERC20 _asset, address protocolFeeReceiver) public initializer {
+        __ERC4626Buffered_init(_asset, protocolFeeReceiver);
+    }
+}
 
 contract ERC4626BufferedUpgradeableTest is Test {
     using Math for uint256;
@@ -23,9 +34,10 @@ contract ERC4626BufferedUpgradeableTest is Test {
 
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
-        ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeable();
+        ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeableConcrete();
 
-        bytes memory initializeData = abi.encodeWithSelector(ERC4626BufferedUpgradeable.initialize.selector, asset, bob);
+        bytes memory initializeData =
+            abi.encodeWithSelector(ERC4626BufferedUpgradeableConcrete.initialize.selector, asset, bob);
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
         bufferedVault = ERC4626BufferedUpgradeable(address(proxy));
