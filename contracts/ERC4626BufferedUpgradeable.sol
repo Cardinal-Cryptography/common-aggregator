@@ -41,10 +41,9 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         uint8 _decimalsOffset;
     }
 
-    // TODO: consider changing the string from which we derive the hash.
-    // keccak256(abi.encode(uint256(keccak256("common.storage.buffer")) - 1)) & ~bytes32(uint256(0xff));
+    // keccak256(abi.encode(uint256(keccak256("common.storage.erc4626buffered")) - 1)) & ~bytes32(uint256(0xff));
     bytes32 private constant BUFFER_STORAGE_LOCATION =
-        0xef5481445e9fe7b0c63b33af7a02ad6f9d34b7cb55d1e3d76cff004354e0e400;
+        0x0235e80c5858f4ebad04d9b77f76c15ea730f2e16f4abf26dfa455f5a2f93f00;
 
     function _getERC4626BufferedStorage() internal pure returns (ERC4626BufferedStorage storage $) {
         assembly {
