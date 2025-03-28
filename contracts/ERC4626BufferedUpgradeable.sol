@@ -264,14 +264,10 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return (false, 0);
     }
 
-    // TODO: update doc
-    /**
-     * @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
-     * "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
-     * asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
-     *
-     * See {IERC20Metadata-decimals}.
-     */
+    /// @inheritdoc IERC20Metadata
+    /// @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
+    /// "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
+    /// asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
     function decimals() public view virtual override(IERC20Metadata, ERC20Upgradeable) returns (uint8) {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         return $._underlyingDecimals + _decimalsOffset();
