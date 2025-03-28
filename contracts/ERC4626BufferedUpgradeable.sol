@@ -22,10 +22,6 @@ uint256 constant FILE_ID = 0x4d39717a83c084e47ddfe24c6a25ca9abf9ec8fe47a1c798907
 abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626Buffered {
     using Math for uint256;
 
-    // TODO: consider making it an immutable variable or a virtual function so that
-    // it's possible to set different values per instance/concrete contract implementation.
-    uint256 public constant DEFAULT_BUFFERING_DURATION = 20 days;
-
     // TODO: It might be worth it to have a separate struct for buffering-related vars, consider it.
     struct ERC4626BufferedStorage {
         uint256 assetsCached;
@@ -204,7 +200,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             return 0;
         }
 
-        uint256 newUnlockEnd = checkedAdd(block.timestamp, DEFAULT_BUFFERING_DURATION, FILE_ID, 8);
+        uint256 newUnlockEnd = checkedAdd(block.timestamp, _defaultBufferingDuration(), FILE_ID, 8);
         $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint);
     }
 
@@ -447,10 +443,6 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
-    function _decimalsOffset() internal view virtual returns (uint8) {
-        return 0;
-    }
-
     // ----- Hooks -----
 
     /// @dev Defines calculation for amount of assets currently held by the vault (disregarding cache).
@@ -463,4 +455,14 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     /// @dev Can be used to define action that should be run before each withdraw/redeem.
     function _preWithdrawal(uint256 assets) internal virtual {}
+
+    /// @dev Specifies number of additional (compared to `asset`) decimal places of the share token.
+    function _decimalsOffset() internal view virtual returns (uint8) {
+        return 0;
+    }
+
+    /// @dev Specifies time interval over which the new rewards are supposed to be distributed (before taking the mean).
+    function _defaultBufferingDuration() internal view virtual returns (uint256) {
+        return 20 days;
+    }
 }
