@@ -11,12 +11,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
 contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
-    constructor() {
-        _disableInitializers();
-    }
-
     function initialize(IERC20 _asset, address protocolFeeReceiver) public initializer {
         __ERC4626Buffered_init(_asset, protocolFeeReceiver);
+    }
+
+    function currentBufferEnd() external view returns (uint256) {
+        return _getERC4626BufferedStorage().currentBufferEnd;
     }
 }
 
@@ -26,7 +26,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100;
     uint256 constant STARTING_BALANCE = 10;
 
-    ERC4626BufferedUpgradeable bufferedVault;
+    ERC4626BufferedUpgradeableConcrete bufferedVault;
     ERC20Mock asset = new ERC20Mock();
 
     address alice = address(0x456);
@@ -40,7 +40,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
             abi.encodeWithSelector(ERC4626BufferedUpgradeableConcrete.initialize.selector, asset, bob);
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
-        bufferedVault = ERC4626BufferedUpgradeable(address(proxy));
+        bufferedVault = ERC4626BufferedUpgradeableConcrete(address(proxy));
     }
 
     function testAssetsAfterInit() public view {
@@ -140,28 +140,38 @@ contract ERC4626BufferedUpgradeableTest is Test {
     //     assertEq(_toBurn, 300);
     // }
 
-    /*function testBufferEndFirstUpdate() public {
-        buffer._updateBuffer(100, 100, 0);
-        assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 20 days);
+    function testBufferEndFirstUpdate() public {
+        _depositToVault(1);
+        _dropToVault(90);
+        bufferedVault.updateHoldingsState();
+        assertEq(bufferedVault.currentBufferEnd(), STARTING_TIMESTAMP + 20 days);
     }
 
     function testBufferEndSecondUpdateOldActive() public {
-        buffer._updateBuffer(20, 100, 0);
+        _depositToVault(10);
+        _dropToVault(10);
+        bufferedVault.updateHoldingsState();
         vm.warp(STARTING_TIMESTAMP + 4 days);
-        buffer._updateBuffer(40, 200, 0);
+        _dropToVault(20);
+        bufferedVault.updateHoldingsState();
 
-        assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 4 days + uint256((16 days * 2 + 20 days * 5)) / 7);
+        assertEq(
+            bufferedVault.currentBufferEnd(), STARTING_TIMESTAMP + 4 days + uint256((16 days * 2 + 20 days * 5)) / 7
+        );
     }
 
     function testBufferEndSecondUpdateElapsed() public {
-        buffer._updateBuffer(20, 100, 0);
+        _depositToVault(10);
+        _dropToVault(10);
+        bufferedVault.updateHoldingsState();
         vm.warp(STARTING_TIMESTAMP + 40 days);
-        buffer._updateBuffer(40, 200, 0);
+        _dropToVault(20);
+        bufferedVault.updateHoldingsState();
 
-        assertEq(buffer.currentBufferEnd, STARTING_TIMESTAMP + 40 days + 20 days);
+        assertEq(bufferedVault.currentBufferEnd(), STARTING_TIMESTAMP + 40 days + 20 days);
     }
 
-    function testBigNumbers() public {
+    /*function testBigNumbers() public {
         (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(10 + (1 << 120), (1 << 5), 0);
         assertEq(_toMint, uint256(1 << 125) / 10);
         assertEq(_toBurn, 0);

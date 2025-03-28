@@ -79,6 +79,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         $.assetsCached -= assets;
     }
 
+    // TODO: Use virtual shares in the holdings state update.
+
     /// @notice Updates holdings state based on currently held assets and time elapsed from last update.
     /// Profits are smoothed out by the reward buffer, and ditributed to the holders.
     /// Protocol fee is taken from the profits. Potential losses are first covered by the buffer.
@@ -100,7 +102,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
             // -- Rewards unlock --
 
-            // TODO: This section my use a slight refactor (?)
+            // TODO: This section might use a slight refactor (?)
             uint256 sharesToMint;
             uint256 sharesToBurn = _sharesToBurn($);
             $.bufferedShares = checkedSub($.bufferedShares, sharesToBurn, FILE_ID, 1);
