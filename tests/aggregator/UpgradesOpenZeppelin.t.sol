@@ -42,7 +42,7 @@ contract CommonAggregatorCorrectUpgrade is CommonAggregator {
         }
     }
 
-    function _pause() internal override {
+    function _pause() internal pure override {
         revert ContractIsNoLongerPauseable();
     }
 
@@ -58,7 +58,7 @@ contract CommonAggregatorUpgradeMissingNamespaceStorage is UUPSUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
+    function initialize(address, IERC20Metadata, IERC4626[] memory) public initializer {
         __UUPSUpgradeable_init();
     }
 
@@ -88,7 +88,7 @@ contract CommonAggregatorUpgradeMissingStorageFields is
         _disableInitializers();
     }
 
-    function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
+    function initialize(address, IERC20Metadata asset, IERC4626[] memory) public initializer {
         __ERC20_init("", "");
         __ERC4626_init(asset);
         __Pausable_init();

@@ -84,11 +84,11 @@ contract CommonAggregator is
     }
 
     function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
-        __AccessControl_init();
         __UUPSUpgradeable_init();
-        __Pausable_init();
+        __AccessControl_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
         __ERC4626_init(asset);
+        __Pausable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(OWNER, owner);
@@ -521,7 +521,7 @@ contract CommonAggregator is
     }
 
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
-        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        (bool isVaultOnTheList,) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
         require(
             !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
@@ -565,7 +565,7 @@ contract CommonAggregator is
             FORCE_REMOVE_VAULT_TIMELOCK
         )
     {
-        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        (bool isVaultOnTheList,) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
 
         // Try redeeming as much shares of the removed vault as possible
