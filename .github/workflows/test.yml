@@ -32,7 +32,6 @@ jobs:
 
       - name: Run Forge build
         run: |
-          export FOUNDRY_PROFILE=full
           forge --version
           forge build --sizes
         id: build
