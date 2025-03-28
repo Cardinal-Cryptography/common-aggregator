@@ -20,7 +20,8 @@ no_match_path = "tests/aggregator/UpgradesOpenZeppelin.t.sol"
 aleph_evm_testnet = "${ALEPH_EVM_TESTNET_RPC_URL}"
 
 
-[profile.upgrades]
+# Includes also openzeppelin foundry upgrades
+[profile.full]
 ffi = true
 ast = true
 build_info = true

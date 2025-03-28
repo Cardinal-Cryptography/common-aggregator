@@ -84,10 +84,11 @@ contract CommonAggregator is
     }
 
     function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+        __Pausable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
         __ERC4626_init(asset);
-        __Pausable_init();
-        __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(OWNER, owner);
@@ -547,11 +548,10 @@ contract CommonAggregator is
         delete $.allocationLimitBps[address(vault)];
 
         // Remove the vault from the list, shifting the rest of the array.
-        unchecked {
-            for (uint256 i = index; i < $.vaults.length - 1; i++) {
-                $.vaults[i] = $.vaults[i + 1];
-            }
+        for (uint256 i = index; i < $.vaults.length - 1; i++) {
+            $.vaults[i] = $.vaults[i + 1];
         }
+
         $.vaults.pop();
     }
 
