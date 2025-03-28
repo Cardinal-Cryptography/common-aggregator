@@ -14,9 +14,8 @@ import {checkedAdd, checkedDiv, checkedMul, checkedSub, MAX_BPS, weightedAvg} fr
 
 // TODO: Consider moving rewards trading to this contract - it might make this contract useful on it's own.
 
-// TODO: Update hash
-/// @dev Id for checked function identification: uint256(keccak256("RewardBuffer"));
-uint256 constant FILE_ID = 100448831994295041095109645825544697016842216820228479017213834858332751627035;
+/// @dev Id for checked function identification: uint256(keccak256("ERC4626BufferedUpgradeable"));
+uint256 constant FILE_ID = 0x4d39717a83c084e47ddfe24c6a25ca9abf9ec8fe47a1c7989073cd2247be5447;
 
 // TODO: This probably should be an abstract contract. Also, we might want to define interface for it.
 /// @title Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
