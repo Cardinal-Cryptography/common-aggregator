@@ -10,16 +10,21 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {checkedAdd, checkedDiv, checkedMul, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
+// TODO: Update hash
 /// @dev Id for checked function identification: uint256(keccak256("RewardBuffer"));
 uint256 constant FILE_ID = 100448831994295041095109645825544697016842216820228479017213834858332751627035;
 
-/// @title Buffer structure implementation for gradual reward release.
-/// Intended for usage within ERC-4626 vault implementations.
+// TODO: This probably should be an abstract contract. Also, we might want to define interface for it.
+/// @title Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
+/// It adds buffering to any asset rewards/airdrops received.
 contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626 {
     using Math for uint256;
 
+    // TODO: consider making it an immutable variable or a virtual function so that
+    // it's possible to set different values per instance/concrete contract implementation.
     uint256 public constant DEFAULT_BUFFERING_DURATION = 20 days;
 
+    // TODO: It might be worth it to have a separate struct for buffering-related vars, consider it.
     struct ERC4626BufferedStorage {
         uint256 assetsCached;
         uint256 bufferedShares;
@@ -32,6 +37,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         uint8 _decimalsOffset;
     }
 
+    // TODO: consider changing the string from which we derive the hash.
     // keccak256(abi.encode(uint256(keccak256("common.storage.buffer")) - 1)) & ~bytes32(uint256(0xff));
     bytes32 private constant BUFFER_STORAGE_LOCATION =
         0xef5481445e9fe7b0c63b33af7a02ad6f9d34b7cb55d1e3d76cff004354e0e400;
@@ -101,6 +107,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
 
             // -- Rewards unlock --
 
+            // TODO: This section my use a slight refactor (?)
             uint256 sharesToMint;
             uint256 sharesToBurn = _sharesToBurn($);
             $.bufferedShares = checkedSub($.bufferedShares, sharesToBurn, FILE_ID, 1);
@@ -155,7 +162,10 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         uint256 currentTotalSupply = super.totalSupply();
         uint256 newTotalAssets = _totalAssetsNotCached();
 
-        // We don't sync `bufferedShares` between methods, so we could get that we need to burn more that is in the buffer.
+        // TODO: This is slightly controversial since we don't return the same exact values as those set by mutating version.
+        // We only ensure that price-per-share is the same. Make sure that it's OK. Update function doc afterwards.
+
+        // We don't sync `bufferedShares` between methods here, so we could get that we need to burn more that is in the buffer.
         // We need a guard against that.
         uint256 sharesToBurn =
             $.bufferedShares.min(_sharesToBurn($) + _sharesToBurnOnLoss($, currentTotalSupply, newTotalAssets));
@@ -246,6 +256,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
     /// @dev Attempted to redeem more shares than the max amount for `receiver`.
     error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
 
+    // TODO: It might be better to simply pass this value in the constructor (if we care about bytecode size).
     /**
      * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
      */
@@ -261,6 +272,7 @@ contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626
         return (false, 0);
     }
 
+    // TODO: update doc
     /**
      * @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
      * "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
