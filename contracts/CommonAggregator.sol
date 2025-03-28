@@ -259,7 +259,7 @@ contract CommonAggregator is
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 cachedTotalAssets = totalAssets();
         if (cachedTotalAssets > 0) {
-            for (uint256 i = 0; i < $.vaults.length;  ++i) {
+            for (uint256 i = 0; i < $.vaults.length; ++i) {
                 IERC4626 vault = $.vaults[i];
                 uint256 assetsToDepositToVault = assets.mulDiv(_aggregatedVaultAssets(vault), cachedTotalAssets);
                 uint256 maxVaultDeposit = vault.maxDeposit(address(this));

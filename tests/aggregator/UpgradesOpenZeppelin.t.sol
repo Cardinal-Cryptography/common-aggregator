@@ -25,7 +25,6 @@ import {
 import "contracts/RewardBuffer.sol";
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 
-
 error ContractIsNoLongerPauseable();
 
 /// @custom:oz-upgrades-from contracts/CommonAggregator.sol:CommonAggregator
@@ -35,8 +34,7 @@ contract CommonAggregatorCorrectUpgrade is CommonAggregator {
         bool newField;
     }
 
-    bytes32 private constant NEW_STORAGE_LOCATION =
-        0x749198412094812840710389102840de12034892471284071385013704182041;
+    bytes32 private constant NEW_STORAGE_LOCATION = 0x749198412094812840710389102840de12034892471284071385013704182041;
 
     function _getNewStorage() private pure returns (AggregatorStorage storage $) {
         assembly {
@@ -64,14 +62,17 @@ contract CommonAggregatorUpgradeMissingNamespaceStorage is UUPSUpgradeable {
         __UUPSUpgradeable_init();
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-    {}
+    function _authorizeUpgrade(address newImplementation) internal override {}
 }
 
 /// @custom:oz-upgrades-from contracts/CommonAggregator.sol:CommonAggregator
-contract CommonAggregatorUpgradeMissingStorageFields is UUPSUpgradeable, ERC4626Upgradeable, AccessControlUpgradeable, PausableUpgradeable, CommonTimelocks {
+contract CommonAggregatorUpgradeMissingStorageFields is
+    UUPSUpgradeable,
+    ERC4626Upgradeable,
+    AccessControlUpgradeable,
+    PausableUpgradeable,
+    CommonTimelocks
+{
     /// @custom:storage-location erc7201:common.storage.aggregator
     struct AggregatorStorage {
         RewardBuffer.Buffer rewardBuffer;
@@ -94,10 +95,7 @@ contract CommonAggregatorUpgradeMissingStorageFields is UUPSUpgradeable, ERC4626
         __AccessControl_init();
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-    {}
+    function _authorizeUpgrade(address newImplementation) internal override {}
 }
 
 contract CommonAggregatorTest is Test {
@@ -111,8 +109,7 @@ contract CommonAggregatorTest is Test {
     function testValidation() public {
         vaults[0] = new ERC4626Mock(address(asset));
         proxy = Upgrades.deployUUPSProxy(
-            "CommonAggregator.sol",
-            abi.encodeCall(CommonAggregator.initialize, (owner, asset, vaults))
+            "CommonAggregator.sol", abi.encodeCall(CommonAggregator.initialize, (owner, asset, vaults))
         );
 
         Options memory options;
@@ -122,8 +119,7 @@ contract CommonAggregatorTest is Test {
     function testValidationWithMissingNamespaceStorage() public {
         vaults[0] = new ERC4626Mock(address(asset));
         proxy = Upgrades.deployUUPSProxy(
-            "CommonAggregator.sol",
-            abi.encodeCall(CommonAggregator.initialize, (owner, asset, vaults))
+            "CommonAggregator.sol", abi.encodeCall(CommonAggregator.initialize, (owner, asset, vaults))
         );
 
         vm.expectRevert();
@@ -133,8 +129,7 @@ contract CommonAggregatorTest is Test {
     function testValidationWithMissingStorageFields() public {
         vaults[0] = new ERC4626Mock(address(asset));
         proxy = Upgrades.deployUUPSProxy(
-            "CommonAggregator.sol",
-            abi.encodeCall(CommonAggregator.initialize, (owner, asset, vaults))
+            "CommonAggregator.sol", abi.encodeCall(CommonAggregator.initialize, (owner, asset, vaults))
         );
 
         vm.expectRevert();
