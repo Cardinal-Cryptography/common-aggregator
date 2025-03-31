@@ -18,6 +18,14 @@ contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
     function currentBufferEnd() external view returns (uint256) {
         return _getERC4626BufferedStorage().currentBufferEnd;
     }
+
+    function lastUpdate() external view returns (uint256) {
+        return _getERC4626BufferedStorage().lastUpdate;
+    }
+
+    function previewUpdateHoldingsState() external view returns (uint256, uint256) {
+        return _previewUpdateHoldingsState();
+    }
 }
 
 contract ERC4626BufferedUpgradeableTest is Test {
@@ -171,11 +179,17 @@ contract ERC4626BufferedUpgradeableTest is Test {
         assertEq(bufferedVault.currentBufferEnd(), STARTING_TIMESTAMP + 40 days + 20 days);
     }
 
-    /*function testBigNumbers() public {
-        (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(10 + (1 << 120), (1 << 5), 0);
-        assertEq(_toMint, uint256(1 << 125) / 10);
-        assertEq(_toBurn, 0);
-    }
+    // function testBigNumbers() public {
+    //     _depositToVault(1<<5);
+    //     uint256 startingShares = bufferedVault.totalSupply();
+    //     assertEq(bufferedVault.totalAssets(), 1<<5);
+
+    //     _dropToVault(10 + (1 << 120) - (1<<5));
+    //     bufferedVault.updateHoldingsState();
+
+    //     uint256 sharesMinted = bufferedVault.totalSupply() - startingShares;
+    //     assertEq(sharesMinted, uint256(1 << 125) / 10) ;
+    // }
 
     uint256 constant UPDATE_NUM = 10;
 
@@ -184,22 +198,17 @@ contract ERC4626BufferedUpgradeableTest is Test {
         uint120[UPDATE_NUM] calldata _gain
     ) public {
         uint256 _currentTime = STARTING_TIMESTAMP;
-        uint256 _totalAssets = STARTING_BALANCE;
-        uint256 _totalShares = 100;
 
+        _depositToVault(STARTING_BALANCE);
         for (uint256 i = 0; i < UPDATE_NUM; ++i) {
             _currentTime += _timeElapsed[i];
             vm.warp(_currentTime);
 
-            _totalAssets += _gain[i];
-            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares, 0);
+            _dropToVault(_gain[i]);
+            bufferedVault.updateHoldingsState();
 
-            assertLe(_toBurn, _totalShares);
-
-            _totalShares += _toMint;
-            _totalShares -= _toBurn;
-
-            assertLe(buffer.lastUpdate, buffer.currentBufferEnd);
+            assertEq(bufferedVault.lastUpdate(), _currentTime);
+            assertLe(bufferedVault.lastUpdate(), bufferedVault.currentBufferEnd());
         }
     }
 
@@ -208,31 +217,25 @@ contract ERC4626BufferedUpgradeableTest is Test {
         uint120[UPDATE_NUM] calldata _gain
     ) public {
         uint256 _currentTime = STARTING_TIMESTAMP;
-        uint256 _totalAssets = STARTING_BALANCE;
-        uint256 _totalShares = 100;
+        _depositToVault(STARTING_BALANCE);
 
-        uint256 _lastAssets = _totalAssets;
-        uint256 _lastShares = _totalShares;
+        uint256 _lastAssets = STARTING_BALANCE;
+        uint256 _lastShares = bufferedVault.totalSupply();
 
         for (uint256 i = 0; i < UPDATE_NUM; ++i) {
             _currentTime += _timeElapsed[i];
             vm.warp(_currentTime);
 
-            _totalAssets += _gain[i];
-            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares, 0);
+            _dropToVault(_gain[i]);
+            bufferedVault.updateHoldingsState();
 
-            assertLe(_toBurn, _totalShares);
+            assertLe(_lastAssets * bufferedVault.totalSupply(), bufferedVault.totalAssets() * _lastShares);
 
-            _totalShares += _toMint;
-            _totalShares -= _toBurn;
-
-            assertLe(_lastAssets * _totalShares, _totalAssets * _lastShares);
-
-            _lastAssets = _totalAssets;
-            _lastShares = _totalShares;
+            _lastAssets = bufferedVault.totalAssets();
+            _lastShares = bufferedVault.totalSupply();
         }
     }
-
+    /*
     function testFuzz_BigValues(
         uint120[UPDATE_NUM] calldata _timeElapsed,
         uint128[UPDATE_NUM] calldata _gain,
@@ -261,7 +264,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
             _totalShares += _toMint;
             _totalShares -= _toBurn;
         }
-    }
+    }*/
 
     function testFuzz_WithUserActions(
         uint120[UPDATE_NUM] calldata _timeElapsed,
@@ -270,36 +273,70 @@ contract ERC4626BufferedUpgradeableTest is Test {
         uint120[UPDATE_NUM] calldata _withdraw
     ) public {
         uint256 _currentTime = STARTING_TIMESTAMP;
+
+        _depositToVault(STARTING_BALANCE);
         uint256 _totalAssets = STARTING_BALANCE;
-        uint256 _totalShares = 10000;
 
         for (uint256 i = 0; i < UPDATE_NUM; ++i) {
             _currentTime += _timeElapsed[i];
             vm.warp(_currentTime);
 
+            _dropToVault(_gain[i]);
+            _depositToVault(_deposit[i]);
+
+            uint256 toWithdraw = bound(_withdraw[i], 0, bufferedVault.maxWithdraw(alice));
+
+            vm.prank(alice);
+            bufferedVault.withdraw(toWithdraw, alice, alice);
+
             _totalAssets += _gain[i];
-            (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(_totalAssets, _totalShares, 0);
-
-            assertLe(_toBurn, _totalShares);
-
-            _totalShares += _toMint;
-            _totalShares -= _toBurn;
-
-            uint256 _depositShares = uint256(_deposit[i]).mulDiv(_totalShares, _totalAssets);
             _totalAssets += _deposit[i];
-            _totalShares += _depositShares;
-            buffer.assetsCached += _deposit[i];
-
-            uint256 _withdrawShares = uint256(_withdraw[i]).mulDiv(_totalShares, _totalAssets);
-            vm.assume(_withdrawShares < _totalShares - buffer.bufferedShares);
-            _totalAssets -= _withdraw[i];
-            _totalShares -= _withdrawShares;
-            buffer.assetsCached -= _withdraw[i];
+            _totalAssets -= toWithdraw;
         }
-    }*/
+        _currentTime += 20 days;
+        vm.warp(_currentTime);
+        bufferedVault.updateHoldingsState();
+
+        uint256 oneSharePrice = bufferedVault.convertToAssets(1) + 1;
+        assertEq(bufferedVault.totalAssets(), _totalAssets, "totalAssets");
+        assertLe(bufferedVault.totalAssets(), bufferedVault.maxWithdraw(alice) + oneSharePrice, "maxWithdraw");
+    }
+
+    function testFuzz_TotalSupply(
+        uint120[UPDATE_NUM] calldata _timeElapsed,
+        uint120[UPDATE_NUM] calldata _gain,
+        uint120[UPDATE_NUM] calldata _loss
+    ) public {
+        uint256 _currentTime = STARTING_TIMESTAMP;
+        _depositToVault(STARTING_BALANCE);
+
+        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
+            _currentTime += _timeElapsed[i];
+            vm.warp(_currentTime);
+
+            uint256 newTotalAssets = bufferedVault.totalAssets();
+            uint256 newTotalShares = bufferedVault.totalSupply();
+            uint256 newBufferShares = bufferedVault.balanceOf(address(bufferedVault));
+
+            bufferedVault.updateHoldingsState();
+
+            assertEq(bufferedVault.totalAssets(), newTotalAssets, "totalAssets");
+            assertEq(bufferedVault.totalSupply(), newTotalShares, "totalSupply");
+            assertEq(bufferedVault.balanceOf(address(bufferedVault)), newBufferShares, "buffer shares");
+
+            _dropToVault(_gain[i]);
+            uint256 loss = bound(_loss[i], 0, bufferedVault.totalAssets());
+            _takeFromVault(loss);
+            bufferedVault.updateHoldingsState();
+        }
+    }
 
     function _dropToVault(uint256 amount) private {
         asset.mint(address(bufferedVault), amount);
+    }
+
+    function _takeFromVault(uint256 amount) private {
+        asset.burn(address(bufferedVault), amount);
     }
 
     function _depositToVault(uint256 amount) private {
