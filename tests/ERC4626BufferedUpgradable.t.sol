@@ -163,6 +163,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
         _dropToVault(20);
         bufferedVault.updateHoldingsState();
 
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 28);
         assertEq(
             bufferedVault.currentBufferEnd(), STARTING_TIMESTAMP + 4 days + uint256((16 days * 2 + 20 days * 5)) / 7
         );

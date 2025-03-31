@@ -87,86 +87,69 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// when difference between `assetsCached` and `totalAssets()` becomes significant.
     function updateHoldingsState() public {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        uint256 oldCachedAssets = $.assetsCached;
+        uint256 oldTotalAssets = $.assetsCached;
 
-        if (oldCachedAssets == 0) {
-            // We have to wait for the deposit to happen
+        if ($.assetsCached == 0) {
             return;
-        } else {
-            uint256 _totalAssets = _totalAssetsNotCached();
-            uint256 _totalShares = super.totalSupply();
+        }
+        (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint) = _holdingsUpdate();
 
-            // -- Rewards unlock --
+        $.currentBufferEnd = $.currentBufferEnd.max(block.timestamp);
 
-            // TODO: This section might use a slight refactor (?)
-            uint256 sharesToMint;
-            uint256 sharesToBurn = _releasedShares($);
-            $.bufferedShares = checkedSub($.bufferedShares, sharesToBurn, FILE_ID, 1);
-            $.lastUpdate = block.timestamp;
-            $.currentBufferEnd = $.currentBufferEnd.max(block.timestamp);
+        // It's possible that we will have `sharesToBurn > 0 && sharesToMint > 0`.
+        // We still want to perform both mint and burn, since fee is calculated based on minted shares.
+        // If only the difference would be minted/burned then, with steady inflow of rewards, vault would take almost no fees.
+        uint256 sharesToBurn = releasedShares + lostShares;
+        if (sharesToBurn > 0) {
+            // Burn fees from the buffer
+            _burn(address(this), sharesToBurn);
+            $.bufferedShares = checkedSub($.bufferedShares, sharesToBurn, FILE_ID, 4);
+        }
 
-            // -- Buffer update (new rewards/loss) --
+        if (sharesToMint > 0) {
+            uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
 
-            if ($.assetsCached <= _totalAssets) {
-                sharesToMint = _handleGain($, _totalShares, _totalAssets);
-                $.bufferedShares = checkedAdd($.bufferedShares, sharesToMint, FILE_ID, 2);
-            } else {
-                uint256 lossInShares = _sharesToBurnOnLoss($.assetsCached, $.bufferedShares, _totalShares, _totalAssets);
-                sharesToBurn = checkedAdd(sharesToBurn, lossInShares, FILE_ID, 3);
-                $.bufferedShares = checkedSub($.bufferedShares, lossInShares, FILE_ID, 4);
-            }
-
-            // It's possible that we will have `sharesToBurn > 0 && sharesToMint > 0`.
-            // We still want to perform both mint and burn, since fee is calculated based on minted shares.
-            // If only the difference would be minted/burned then, with steady inflow of rewards, vault would take almost no fees.
-
-            if (sharesToBurn > 0) {
-                // Burn fees from the buffer
-                _burn(address(this), sharesToBurn);
-            }
-
-            if (sharesToMint > 0) {
-                uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
-
-                // TODO: Make fees optional.
-                // Mint performance fee
-                $.bufferedShares -= fee;
-                _mint(address(this), sharesToMint - fee);
-
-                // Mint shares for rewards buffering
+            _mint(address(this), sharesToMint - fee);
+            if ($.protocolFeeReceiver != address(0)) {
                 _mint($.protocolFeeReceiver, fee);
             }
 
-            $.assetsCached = _totalAssets;
-
-            emit HoldingsStateUpdated(oldCachedAssets, _totalAssets);
+            uint256 newUnlockEnd = checkedAdd(block.timestamp, _defaultBufferingDuration(), FILE_ID, 8);
+            $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint);
+            $.bufferedShares = checkedAdd($.bufferedShares, sharesToMint - fee, FILE_ID, 5);
         }
+
+        $.lastUpdate = block.timestamp;
+        $.assetsCached = newTotalAssets;
+        emit HoldingsStateUpdated(oldTotalAssets, newTotalAssets);
     }
 
     /// @notice Preview the holdings state update, without actually updating it.
     /// Returns `totalAssets` and `totalSupply` that there would be after the update.
     function _previewUpdateHoldingsState() internal view returns (uint256, uint256) {
+        (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint) = _holdingsUpdate();
+        return (newTotalAssets, super.totalSupply() - releasedShares - lostShares + sharesToMint);
+    }
+
+    function _holdingsUpdate()
+        internal
+        view
+        returns (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint)
+    {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        if ($.assetsCached == 0) {
-            return (0, super.totalSupply());
+        if ($.assetsCached != 0) {
+            newTotalAssets = _totalAssetsNotCached();
+            uint256 oldTotalShares = super.totalSupply();
+
+            releasedShares = _releasedShares($);
+            uint256 newBufferedShares = $.bufferedShares - releasedShares;
+
+            if ($.assetsCached <= newTotalAssets) {
+                sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares);
+            } else {
+                lostShares = _sharesToBurnOnLoss($.assetsCached, newTotalAssets, oldTotalShares, newBufferedShares);
+            }
         }
-
-        uint256 newTotalAssets = _totalAssetsNotCached();
-        uint256 currentTotalShares = super.totalSupply();
-
-        uint256 releasedShares = _releasedShares($);
-        uint256 newBufferedShares = $.bufferedShares - releasedShares;
-
-        uint256 sharesToMint = 0;
-        uint256 lossInShares = 0;
-        if ($.assetsCached <= newTotalAssets) {
-            uint256 gain = checkedSub(newTotalAssets, $.assetsCached, FILE_ID, 7);
-            sharesToMint = gain.mulDiv(currentTotalShares, $.assetsCached);
-        } else {
-            lossInShares = _sharesToBurnOnLoss($.assetsCached, newBufferedShares, currentTotalShares, newTotalAssets);
-        }
-
-        return (newTotalAssets, currentTotalShares - releasedShares + sharesToMint - lossInShares);
     }
 
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
@@ -190,33 +173,27 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         }
     }
 
-    function _handleGain(ERC4626BufferedStorage storage $, uint256 totalShares, uint256 _totalAssets)
+    function _sharesToMintOnGain(uint256 oldTotalAssets, uint256 newTotalAssets, uint256 oldTotalShares)
         private
+        pure
         returns (uint256 sharesToMint)
     {
-        uint256 gain = checkedSub(_totalAssets, $.assetsCached, FILE_ID, 7);
-        sharesToMint = gain.mulDiv(totalShares, $.assetsCached);
-
-        if (sharesToMint == 0) {
-            return 0;
-        }
-
-        uint256 newUnlockEnd = checkedAdd(block.timestamp, _defaultBufferingDuration(), FILE_ID, 8);
-        $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint);
+        uint256 gain = checkedSub(newTotalAssets, oldTotalAssets, FILE_ID, 7);
+        return gain.mulDiv(oldTotalShares, oldTotalAssets);
     }
 
     function _sharesToBurnOnLoss(
-        uint256 previousTotalAssets,
-        uint256 bufferedShares,
-        uint256 currentTotalShares,
-        uint256 currentTotalAssets
+        uint256 oldTotalAssets,
+        uint256 newTotalAssets,
+        uint256 oldTotalShares,
+        uint256 bufferedShares
     ) private pure returns (uint256 sharesToBurn) {
-        if (previousTotalAssets <= currentTotalAssets) {
+        if (oldTotalAssets <= newTotalAssets) {
             return 0;
         }
 
-        uint256 loss = checkedSub(previousTotalAssets, currentTotalAssets, FILE_ID, 9);
-        uint256 lossInShares = loss.mulDiv(currentTotalShares, previousTotalAssets, Math.Rounding.Ceil);
+        uint256 loss = checkedSub(oldTotalAssets, newTotalAssets, FILE_ID, 9);
+        uint256 lossInShares = loss.mulDiv(oldTotalShares, oldTotalAssets, Math.Rounding.Ceil);
 
         // If we need to burn more than `buffer.bufferedShares` shares to retain price-per-share,
         // then it's impossible to cover that from the buffer, and sharp PPS drop is to be expected.
