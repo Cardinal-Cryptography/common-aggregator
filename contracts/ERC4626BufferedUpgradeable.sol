@@ -100,7 +100,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
             // TODO: This section might use a slight refactor (?)
             uint256 sharesToMint;
-            uint256 sharesToBurn = _sharesToBurn($);
+            uint256 sharesToBurn = _releasedShares($);
             $.bufferedShares = checkedSub($.bufferedShares, sharesToBurn, FILE_ID, 1);
             $.lastUpdate = block.timestamp;
             $.currentBufferEnd = $.currentBufferEnd.max(block.timestamp);
@@ -111,7 +111,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
                 sharesToMint = _handleGain($, _totalShares, _totalAssets);
                 $.bufferedShares = checkedAdd($.bufferedShares, sharesToMint, FILE_ID, 2);
             } else {
-                uint256 lossInShares = _sharesToBurnOnLoss($, _totalShares, _totalAssets);
+                uint256 lossInShares = _sharesToBurnOnLoss($.assetsCached, $.bufferedShares, _totalShares, _totalAssets);
                 sharesToBurn = checkedAdd(sharesToBurn, lossInShares, FILE_ID, 3);
                 $.bufferedShares = checkedSub($.bufferedShares, lossInShares, FILE_ID, 4);
             }
@@ -151,25 +151,26 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             return (0, super.totalSupply());
         }
 
-        uint256 currentTotalSupply = super.totalSupply();
         uint256 newTotalAssets = _totalAssetsNotCached();
+        uint256 currentTotalShares = super.totalSupply();
 
-        // TODO: This is slightly controversial since we don't return the same exact values as those set by mutating version.
-        // We only ensure that price-per-share is the same. Make sure that it's OK. Update function doc afterwards.
+        uint256 releasedShares = _releasedShares($);
+        uint256 newBufferedShares = $.bufferedShares - releasedShares;
 
-        // We don't sync `bufferedShares` between methods here, so we could get that we need to burn more that is in the buffer.
-        // We need a guard against that.
-        uint256 sharesToBurn =
-            $.bufferedShares.min(_sharesToBurn($) + _sharesToBurnOnLoss($, currentTotalSupply, newTotalAssets));
+        uint256 sharesToMint = 0;
+        uint256 lossInShares = 0;
+        if ($.assetsCached <= newTotalAssets) {
+            uint256 gain = checkedSub(newTotalAssets, $.assetsCached, FILE_ID, 7);
+            sharesToMint = gain.mulDiv(currentTotalShares, $.assetsCached);
+        } else {
+            lossInShares = _sharesToBurnOnLoss($.assetsCached, newBufferedShares, currentTotalShares, newTotalAssets);
+        }
 
-        // We can omit share gain update, since it doesn't change the price-per-share.
-        // This means that we don't update assets if there was gain + we don't mint shares.
-        return ($.assetsCached.min(newTotalAssets), currentTotalSupply - sharesToBurn);
+        return (newTotalAssets, currentTotalShares - releasedShares + sharesToMint - lossInShares);
     }
 
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
-    /// Use it to implement `totalSupply()`.
-    function _sharesToBurn(ERC4626BufferedStorage memory buffer) private view returns (uint256 sharesReleased) {
+    function _releasedShares(ERC4626BufferedStorage memory buffer) private view returns (uint256 sharesReleased) {
         uint256 timestampNow = block.timestamp;
         uint256 start = buffer.lastUpdate;
         uint256 end = buffer.currentBufferEnd;
@@ -205,32 +206,33 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     }
 
     function _sharesToBurnOnLoss(
-        ERC4626BufferedStorage memory buffer,
+        uint256 previousTotalAssets,
+        uint256 bufferedShares,
         uint256 currentTotalShares,
         uint256 currentTotalAssets
     ) private pure returns (uint256 sharesToBurn) {
-        if (buffer.assetsCached <= currentTotalAssets) {
+        if (previousTotalAssets <= currentTotalAssets) {
             return 0;
         }
 
-        uint256 loss = checkedSub(buffer.assetsCached, currentTotalAssets, FILE_ID, 9);
-        uint256 lossInShares = loss.mulDiv(currentTotalShares, buffer.assetsCached, Math.Rounding.Ceil);
+        uint256 loss = checkedSub(previousTotalAssets, currentTotalAssets, FILE_ID, 9);
+        uint256 lossInShares = loss.mulDiv(currentTotalShares, previousTotalAssets, Math.Rounding.Ceil);
 
         // If we need to burn more than `buffer.bufferedShares` shares to retain price-per-share,
         // then it's impossible to cover that from the buffer, and sharp PPS drop is to be expected.
-        sharesToBurn = lossInShares.min(buffer.bufferedShares);
+        sharesToBurn = lossInShares.min(bufferedShares);
     }
 
     // ----- ERC20 -----
 
     function totalSupply() public view override(ERC20Upgradeable, IERC20) returns (uint256) {
-        return super.totalSupply() - _sharesToBurn(_getERC4626BufferedStorage());
+        return super.totalSupply() - _releasedShares(_getERC4626BufferedStorage());
     }
 
     function balanceOf(address account) public view override(ERC20Upgradeable, IERC20) returns (uint256 balance) {
         balance = super.balanceOf(account);
         if (account == address(this)) {
-            balance -= _sharesToBurn(_getERC4626BufferedStorage());
+            balance -= _releasedShares(_getERC4626BufferedStorage());
         }
     }
 

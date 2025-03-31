@@ -318,6 +318,9 @@ contract ERC4626BufferedUpgradeableTest is Test {
             uint256 newTotalShares = bufferedVault.totalSupply();
             uint256 newBufferShares = bufferedVault.balanceOf(address(bufferedVault));
 
+            (, uint256 previewNewTotalShares) = bufferedVault.previewUpdateHoldingsState();
+            assertEq(newTotalShares, previewNewTotalShares, "previewUpdateHoldingsState");
+
             bufferedVault.updateHoldingsState();
 
             assertEq(bufferedVault.totalAssets(), newTotalAssets, "totalAssets");
@@ -328,6 +331,30 @@ contract ERC4626BufferedUpgradeableTest is Test {
             uint256 loss = bound(_loss[i], 0, bufferedVault.totalAssets());
             _takeFromVault(loss);
             bufferedVault.updateHoldingsState();
+        }
+    }
+
+    /// forge-config: default.fuzz.runs = 1024
+    function testFuzz_PreviewBufferUpdate(
+        uint120[UPDATE_NUM] calldata _timeElapsed,
+        uint120[UPDATE_NUM] calldata _gain,
+        uint120[UPDATE_NUM] calldata _loss
+    ) public {
+        uint256 _currentTime = STARTING_TIMESTAMP;
+        _depositToVault(STARTING_BALANCE);
+
+        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
+            _currentTime += _timeElapsed[i];
+            vm.warp(_currentTime);
+
+            _dropToVault(_gain[i]);
+            uint256 loss = bound(_loss[i], 0, bufferedVault.totalAssets());
+            _takeFromVault(loss);
+
+            (uint256 newTotalAssets, uint256 newTotalShares) = bufferedVault.previewUpdateHoldingsState();
+            bufferedVault.updateHoldingsState();
+            assertEq(bufferedVault.totalAssets(), newTotalAssets);
+            assertEq(bufferedVault.totalSupply(), newTotalShares);
         }
     }
 
