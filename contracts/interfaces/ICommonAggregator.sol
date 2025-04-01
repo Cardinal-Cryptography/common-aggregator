@@ -10,10 +10,27 @@ interface ICommonAggregator is IERC4626Buffered {
     event VaultWithdrawFailed(IERC4626 vault);
 
     error InsufficientAssetsForWithdrawal(uint256 missing);
-    error VaultAddressCantBeZero();
     error IncorrectAsset(address expected, address actual);
     error VaultAlreadyAdded(IERC4626 vault);
     error VaultLimitExceeded();
+
+    // ----- Upgradeablity -----
+
+    event ContractUpgradeSubmitted(address newImplementation, uint256 unlockTimestamp);
+    event ContractUpgradeCancelled(address newImplementation);
+    event ContractUpgradeAuthorized(address newImplementation);
+
+    /// @notice Submits timelocked upgrade action to `newImplementation`.
+    /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
+    /// @dev After the timelock passes, upgrader can upgradeToAndCall on the new implementation with
+    /// any calldata. No check against missing some storage or selectors are done on the contract
+    /// level. It's recommended to use the `openzeppelin-foundry-upgrades` libarary for updates.
+    /// There could be many pending upgrades, so it's the guardian's responsibility to cancel
+    /// the invalid ones.
+    function submitUpgrade(address newImplementation) external;
+
+    /// @notice Cancels timelocked upgrade action to `newImplementation`.
+    function cancelUpgrade(address newImplementation) external;
 
     // ----- Vault management -----
 
