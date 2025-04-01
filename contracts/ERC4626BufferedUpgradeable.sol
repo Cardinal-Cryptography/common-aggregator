@@ -390,25 +390,22 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
-    function _setProtocolFee(uint256 feeBps) internal virtual {
+    function setProtocolFee(uint256 feeBps) public virtual override(IERC4626Buffered) {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         require($.protocolFeeBps <= MAX_BPS, IncorrectProtocolFee());
         $.protocolFeeBps = feeBps;
     }
 
-    error IncorrectProtocolFee();
-    error ZeroProtocolFeeReceiver();
-
-    function _setProtocolFeeReceiver(address receiver) internal virtual {
+    function setProtocolFeeReceiver(address receiver) public virtual override(IERC4626Buffered) {
         require(receiver != address(0), ZeroProtocolFeeReceiver());
         _getERC4626BufferedStorage().protocolFeeReceiver = receiver;
     }
 
-    function getProtocolFee() public view returns (uint256) {
+    function getProtocolFee() public view override(IERC4626Buffered) returns (uint256) {
         return _getERC4626BufferedStorage().protocolFeeBps;
     }
 
-    function getProtocolFeeReceiver() public view returns (address) {
+    function getProtocolFeeReceiver() public view override(IERC4626Buffered) returns (address) {
         return _getERC4626BufferedStorage().protocolFeeReceiver;
     }
 

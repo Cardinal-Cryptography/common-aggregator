@@ -26,10 +26,6 @@ contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
     function previewUpdateHoldingsState() external view returns (uint256, uint256) {
         return _previewUpdateHoldingsState();
     }
-
-    function setProtocolFee(uint256 protocolFeeBps) external {
-        _setProtocolFee(protocolFeeBps);
-    }
 }
 
 contract ERC4626BufferedUpgradeableTest is Test {

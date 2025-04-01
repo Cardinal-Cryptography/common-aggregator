@@ -7,4 +7,13 @@ interface IERC4626Buffered is IERC4626 {
     event HoldingsStateUpdated(uint256 oldCachedAssets, uint256 newCachedAssets);
 
     function updateHoldingsState() external;
+
+    function setProtocolFee(uint256 protocolFee) external;
+    function setProtocolFeeReceiver(address protocolFeeReceiver) external;
+
+    error IncorrectProtocolFee();
+    error ZeroProtocolFeeReceiver();
+
+    function getProtocolFee() external view returns (uint256);
+    function getProtocolFeeReceiver() external view returns (address);
 }

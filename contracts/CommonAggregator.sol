@@ -537,24 +537,32 @@ contract CommonAggregator is
     // ----- Fee management -----
 
     /// @inheritdoc ICommonAggregator
-    function setProtocolFee(uint256 protocolFeeBps) external onlyRole(OWNER) {
+    function setProtocolFee(uint256 protocolFeeBps)
+        public
+        override(ERC4626BufferedUpgradeable, ICommonAggregator)
+        onlyRole(OWNER)
+    {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
 
         uint256 oldProtocolFee = getProtocolFee();
         if (oldProtocolFee == protocolFeeBps) return;
 
-        super._setProtocolFee(protocolFeeBps);
+        super.setProtocolFee(protocolFeeBps);
         emit ProtocolFeeChanged(oldProtocolFee, protocolFeeBps);
     }
 
     /// @inheritdoc ICommonAggregator
-    function setProtocolFeeReceiver(address protocolFeeReceiver) external onlyRole(OWNER) {
+    function setProtocolFeeReceiver(address protocolFeeReceiver)
+        public
+        override(ERC4626BufferedUpgradeable, ICommonAggregator)
+        onlyRole(OWNER)
+    {
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
 
         address oldProtocolFeeReceiver = getProtocolFeeReceiver();
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;
 
-        super._setProtocolFeeReceiver(protocolFeeReceiver);
+        super.setProtocolFeeReceiver(protocolFeeReceiver);
         emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 
