@@ -43,11 +43,13 @@ contract CommonAggregator is
     uint256 public constant SET_TRADER_TIMELOCK = 5 days;
     uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
     uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 14 days;
+    uint256 public constant CONTRACT_UPGRADE_TIMELOCK = 14 days;
 
     enum TimelockTypes {
         SET_TRADER,
         ADD_VAULT,
-        FORCE_REMOVE_VAULT
+        FORCE_REMOVE_VAULT,
+        CONTRACT_UPGRADE
     }
 
     /// @custom:storage-location erc7201:common.storage.aggregator
@@ -82,10 +84,11 @@ contract CommonAggregator is
     }
 
     function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
-        __AccessControl_init();
         __UUPSUpgradeable_init();
+        __AccessControl_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
         __ERC4626_init(asset);
+        __Pausable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(OWNER, owner);
@@ -98,12 +101,10 @@ contract CommonAggregator is
             $.allocationLimitBps[address(vaults[i])] = MAX_BPS;
         }
 
-        $.protocolFeeBps = 0;
         $.protocolFeeReceiver = address(1);
     }
 
     function _ensureVaultCanBeAdded(IERC4626 vault) private view {
-        require(address(vault) != address(0), VaultAddressCantBeZero());
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
 
         AggregatorStorage storage $ = _getAggregatorStorage();
@@ -523,7 +524,7 @@ contract CommonAggregator is
     }
 
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
-        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        (bool isVaultOnTheList,) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
         require(
             !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
@@ -553,6 +554,7 @@ contract CommonAggregator is
         for (uint256 i = index; i < $.vaults.length - 1; i++) {
             $.vaults[i] = $.vaults[i + 1];
         }
+
         $.vaults.pop();
     }
 
@@ -566,7 +568,7 @@ contract CommonAggregator is
             FORCE_REMOVE_VAULT_TIMELOCK
         )
     {
-        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        (bool isVaultOnTheList,) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
 
         // Try redeeming as much shares of the removed vault as possible
@@ -794,11 +796,38 @@ contract CommonAggregator is
 
     // ----- Etc -----
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER) {}
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyRole(OWNER)
+        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)))
+    {
+        emit ContractUpgradeAuthorized(newImplementation);
+    }
+
+    function submitUpgrade(address newImplementation)
+        external
+        onlyRole(OWNER)
+        registersTimelockedAction(
+            keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)),
+            CONTRACT_UPGRADE_TIMELOCK
+        )
+    {
+        emit ContractUpgradeSubmitted(newImplementation, block.timestamp + CONTRACT_UPGRADE_TIMELOCK);
+    }
+
+    function cancelUpgrade(address newImplementation)
+        external
+        onlyGuardianOrHigherRole
+        cancelsAction(keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)))
+    {
+        emit ContractUpgradeCancelled(newImplementation);
+    }
 
     modifier onlyRebalancerOrHigherRole() {
         if (!hasRole(REBALANCER, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {

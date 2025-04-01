@@ -42,10 +42,10 @@ function weightedAvg(uint256 v1, uint256 w1, uint256 v2, uint256 w2) pure return
     (uint256 a, uint256 rA) = mulDivWithRemainder(v1, w1, weightSum);
     (uint256 b, uint256 rB) = mulDivWithRemainder(v2, w2, weightSum);
 
-    result = checkedAdd(a, b, 0, 2);
+    result = a + b;
 
     if (weightSum - rA <= rB) {
-        result = checkedAdd(result, 1, 0, 3);
+        ++result;
     }
 }
 
