@@ -145,9 +145,11 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             uint256 newBufferedShares = $.bufferedShares - releasedShares;
 
             if ($.assetsCached <= newTotalAssets) {
-                sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares);
+                sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares - releasedShares);
             } else {
-                lostShares = _sharesToBurnOnLoss($.assetsCached, newTotalAssets, oldTotalShares, newBufferedShares);
+                lostShares = _sharesToBurnOnLoss(
+                    $.assetsCached, newTotalAssets, oldTotalShares - releasedShares, newBufferedShares
+                );
             }
         }
     }
@@ -173,19 +175,19 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         }
     }
 
-    function _sharesToMintOnGain(uint256 oldTotalAssets, uint256 newTotalAssets, uint256 oldTotalShares)
+    function _sharesToMintOnGain(uint256 oldTotalAssets, uint256 newTotalAssets, uint256 totalSharesPriorToGain)
         private
         pure
         returns (uint256 sharesToMint)
     {
         uint256 gain = checkedSub(newTotalAssets, oldTotalAssets, FILE_ID, 7);
-        return gain.mulDiv(oldTotalShares, oldTotalAssets);
+        return gain.mulDiv(totalSharesPriorToGain, oldTotalAssets);
     }
 
     function _sharesToBurnOnLoss(
         uint256 oldTotalAssets,
         uint256 newTotalAssets,
-        uint256 oldTotalShares,
+        uint256 totalSharesPriorToLoss,
         uint256 bufferedShares
     ) private pure returns (uint256 sharesToBurn) {
         if (oldTotalAssets <= newTotalAssets) {
@@ -193,7 +195,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         }
 
         uint256 loss = checkedSub(oldTotalAssets, newTotalAssets, FILE_ID, 9);
-        uint256 lossInShares = loss.mulDiv(oldTotalShares, oldTotalAssets, Math.Rounding.Ceil);
+        uint256 lossInShares = loss.mulDiv(totalSharesPriorToLoss, oldTotalAssets, Math.Rounding.Ceil);
 
         // If we need to burn more than `buffer.bufferedShares` shares to retain price-per-share,
         // then it's impossible to cover that from the buffer, and sharp PPS drop is to be expected.

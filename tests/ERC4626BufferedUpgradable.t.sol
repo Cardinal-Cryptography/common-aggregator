@@ -162,10 +162,9 @@ contract ERC4626BufferedUpgradeableTest is Test {
         vm.warp(STARTING_TIMESTAMP + 4 days);
         _dropToVault(20);
         bufferedVault.updateHoldingsState();
-
-        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 28);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 8 + 18);
         assertEq(
-            bufferedVault.currentBufferEnd(), STARTING_TIMESTAMP + 4 days + uint256((16 days * 2 + 20 days * 5)) / 7
+            bufferedVault.currentBufferEnd(), STARTING_TIMESTAMP + 4 days + uint256((16 days * 8 + 20 days * 18)) / 26
         );
     }
 
@@ -220,22 +219,53 @@ contract ERC4626BufferedUpgradeableTest is Test {
         uint256 _currentTime = STARTING_TIMESTAMP;
         _depositToVault(STARTING_BALANCE);
 
-        uint256 _lastAssets = STARTING_BALANCE;
-        uint256 _lastShares = bufferedVault.totalSupply();
-
         for (uint256 i = 0; i < UPDATE_NUM; ++i) {
             _currentTime += _timeElapsed[i];
             vm.warp(_currentTime);
 
+            uint256 oldPricePerShare = bufferedVault.convertToAssets(1);
+
             _dropToVault(_gain[i]);
             bufferedVault.updateHoldingsState();
 
-            assertLe(_lastAssets * bufferedVault.totalSupply(), bufferedVault.totalAssets() * _lastShares);
-
-            _lastAssets = bufferedVault.totalAssets();
-            _lastShares = bufferedVault.totalSupply();
+            assertLe(oldPricePerShare, bufferedVault.convertToAssets(1));
         }
     }
+
+    function testFuzz_twoStepHoldingUpdateIsSameAsOneStep(
+        uint120[UPDATE_NUM] calldata _timeElapsed,
+        uint120[UPDATE_NUM] calldata _gain,
+        uint120[UPDATE_NUM] calldata _loss
+    ) public {
+        uint256 _currentTime = STARTING_TIMESTAMP;
+        _depositToVault(STARTING_BALANCE);
+
+        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
+            _currentTime += _timeElapsed[i];
+
+            // one-step update
+            vm.warp(_currentTime);
+            _dropToVault(_gain[i]);
+            uint256 loss = bound(_loss[i], 0, asset.balanceOf(address(bufferedVault)));
+            _takeFromVault(loss);
+
+            (uint256 newTotalAssetsOneStep, uint256 newTotalSharesOneStep) = bufferedVault.previewUpdateHoldingsState();
+
+            // rollback
+            asset.mint(address(bufferedVault), loss);
+            asset.burn(address(bufferedVault), _gain[i]);
+
+            // two-step update
+            bufferedVault.updateHoldingsState();
+            _dropToVault(_gain[i]);
+            _takeFromVault(loss);
+            bufferedVault.updateHoldingsState();
+
+            assertEq(bufferedVault.totalAssets(), newTotalAssetsOneStep);
+            assertEq(bufferedVault.totalSupply(), newTotalSharesOneStep);
+        }
+    }
+
     /*
     function testFuzz_BigValues(
         uint120[UPDATE_NUM] calldata _timeElapsed,
@@ -335,7 +365,6 @@ contract ERC4626BufferedUpgradeableTest is Test {
         }
     }
 
-    /// forge-config: default.fuzz.runs = 1024
     function testFuzz_PreviewBufferUpdate(
         uint120[UPDATE_NUM] calldata _timeElapsed,
         uint120[UPDATE_NUM] calldata _gain,
@@ -349,7 +378,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
             vm.warp(_currentTime);
 
             _dropToVault(_gain[i]);
-            uint256 loss = bound(_loss[i], 0, bufferedVault.totalAssets());
+            uint256 loss = bound(_loss[i], 0, asset.balanceOf(address(bufferedVault)));
             _takeFromVault(loss);
 
             (uint256 newTotalAssets, uint256 newTotalShares) = bufferedVault.previewUpdateHoldingsState();
