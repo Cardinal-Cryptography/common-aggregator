@@ -218,6 +218,32 @@ contract ERC4626BufferedUpgradeableTest is Test {
         assertEq(bufferedVault.maxWithdraw(alice), 214);
     }
 
+    function testFeeWithBufferEnd() public {
+        bufferedVault.setProtocolFee(MAX_BPS / 2);
+
+        _dropToVault(250);
+        bufferedVault.updateHoldingsState();
+
+        vm.warp(STARTING_TIMESTAMP + 4 days);
+
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 100);
+
+        _dropToVault(500);
+
+        bufferedVault.updateHoldingsState();
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 100 + 225, "buffer");
+        assertEq(bufferedVault.balanceOf(address(1)), 125 + 225, "feeReceiver");
+        assertEq(
+            bufferedVault.currentBufferEnd(),
+            STARTING_TIMESTAMP + 4 days + uint256((16 days * 100 + 20 days * 225)) / (100 + 225),
+            "bufferEnd"
+        );
+
+        vm.warp(STARTING_TIMESTAMP + 24 days);
+
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 0, "no shares in buffer at the end");
+    }
+
     function testBufferEndFirstUpdate() public {
         _depositToVault(1);
         _dropToVault(90);

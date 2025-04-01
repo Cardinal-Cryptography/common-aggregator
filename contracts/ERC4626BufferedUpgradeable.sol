@@ -17,7 +17,6 @@ import {checkedAdd, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626Buffered {
     using Math for uint256;
 
-    // TODO: It might be worth it to have a separate struct for buffering-related vars, consider it.
     struct ERC4626BufferedStorage {
         uint256 assetsCached;
         uint256 bufferedShares;
