@@ -116,7 +116,6 @@ interface ICommonAggregator is IERC4626Buffered {
     function setProtocolFee(uint256 _protocolFeeBps) external;
 
     error SelfProtocolFeeReceiver();
-    error ZeroProtocolFeeReceiver();
 
     /// @notice Sets the protocol fee receiver.
     /// It's a no-op if `protocolFeeReceiver` is the same as the current `protocolFeeReceiver`.

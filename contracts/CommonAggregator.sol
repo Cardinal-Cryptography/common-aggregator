@@ -81,8 +81,7 @@ contract CommonAggregator is
         __AccessControl_init();
         __UUPSUpgradeable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
-        // TODO: set meaningful address here
-        __ERC4626Buffered_init(asset, address(1));
+        __ERC4626Buffered_init(asset);
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(OWNER, owner);
@@ -538,24 +537,21 @@ contract CommonAggregator is
     function setProtocolFee(uint256 protocolFeeBps) external onlyRole(OWNER) {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
 
-        ERC4626BufferedStorage storage buffer$ = _getERC4626BufferedStorage();
-        uint256 oldProtocolFee = buffer$.protocolFeeBps;
-
+        uint256 oldProtocolFee = getProtocolFee();
         if (oldProtocolFee == protocolFeeBps) return;
-        buffer$.protocolFeeBps = protocolFeeBps;
+
+        super._setProtocolFee(protocolFeeBps);
         emit ProtocolFeeChanged(oldProtocolFee, protocolFeeBps);
     }
 
     /// @inheritdoc ICommonAggregator
     function setProtocolFeeReceiver(address protocolFeeReceiver) external onlyRole(OWNER) {
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
-        require(protocolFeeReceiver != address(0), ZeroProtocolFeeReceiver());
 
-        ERC4626BufferedStorage storage buffer$ = _getERC4626BufferedStorage();
-        address oldProtocolFeeReceiver = buffer$.protocolFeeReceiver;
-
+        address oldProtocolFeeReceiver = getProtocolFeeReceiver();
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;
-        buffer$.protocolFeeReceiver = protocolFeeReceiver;
+
+        super._setProtocolFeeReceiver(protocolFeeReceiver);
         emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 

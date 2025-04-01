@@ -12,8 +12,6 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC4626Buffered} from "./interfaces/IERC4626Buffered.sol";
 import {checkedAdd, checkedDiv, checkedMul, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
-// TODO: Consider moving rewards trading to this contract - it might make this contract useful on it's own.
-
 /// @dev Id for checked function identification: uint256(keccak256("ERC4626BufferedUpgradeable"));
 uint256 constant FILE_ID = 0x4d39717a83c084e47ddfe24c6a25ca9abf9ec8fe47a1c7989073cd2247be5447;
 
@@ -47,12 +45,11 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     // ----- Initialization -----
 
-    function __ERC4626Buffered_init(IERC20 _asset, address protocolFeeReceiver) internal onlyInitializing {
+    function __ERC4626Buffered_init(IERC20 _asset) internal onlyInitializing {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         $.lastUpdate = block.timestamp;
         $.currentBufferEnd = block.timestamp;
-        $.protocolFeeBps = 0;
-        $.protocolFeeReceiver = protocolFeeReceiver;
+        $.protocolFeeReceiver = address(1);
 
         (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(_asset);
         $._underlyingDecimals = success ? assetDecimals : 18;
@@ -105,12 +102,10 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
 
             _mint(address(this), sharesToMint - fee);
-            if ($.protocolFeeReceiver != address(0)) {
-                _mint($.protocolFeeReceiver, fee);
-            }
+            _mint($.protocolFeeReceiver, fee);
 
             uint256 newUnlockEnd = checkedAdd(block.timestamp, _defaultBufferingDuration(), FILE_ID, 8);
-            $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint);
+            $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint - fee);
             $.bufferedShares = checkedAdd($.bufferedShares, sharesToMint - fee, FILE_ID, 5);
         }
 
@@ -400,6 +395,28 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         SafeERC20.safeTransfer($._asset, receiver, assets);
 
         emit Withdraw(caller, receiver, owner, assets, shares);
+    }
+
+    function _setProtocolFee(uint256 feeBps) internal virtual {
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
+        require($.protocolFeeBps <= MAX_BPS, IncorrectProtocolFee());
+        $.protocolFeeBps = feeBps;
+    }
+
+    error IncorrectProtocolFee();
+    error ZeroProtocolFeeReceiver();
+
+    function _setProtocolFeeReceiver(address receiver) internal virtual {
+        require(receiver != address(0), ZeroProtocolFeeReceiver());
+        _getERC4626BufferedStorage().protocolFeeReceiver = receiver;
+    }
+
+    function getProtocolFee() public view returns (uint256) {
+        return _getERC4626BufferedStorage().protocolFeeBps;
+    }
+
+    function getProtocolFeeReceiver() public view returns (address) {
+        return _getERC4626BufferedStorage().protocolFeeReceiver;
     }
 
     // ----- Hooks -----
