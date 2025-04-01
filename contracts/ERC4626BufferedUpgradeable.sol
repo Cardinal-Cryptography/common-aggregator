@@ -75,8 +75,6 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         $.assetsCached -= assets;
     }
 
-    // TODO: Use virtual shares in the holdings state update.
-
     /// @notice Updates holdings state based on currently held assets and time elapsed from last update.
     /// Profits are smoothed out by the reward buffer, and ditributed to the holders.
     /// Protocol fee is taken from the profits. Potential losses are first covered by the buffer.
@@ -89,9 +87,6 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         uint256 oldTotalAssets = $.assetsCached;
 
-        if ($.assetsCached == 0) {
-            return;
-        }
         (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint) = _holdingsUpdate();
 
         $.currentBufferEnd = $.currentBufferEnd.max(block.timestamp);
@@ -137,20 +132,17 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         returns (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint)
     {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        if ($.assetsCached != 0) {
-            newTotalAssets = _totalAssetsNotCached();
-            uint256 oldTotalShares = super.totalSupply();
+        newTotalAssets = _totalAssetsNotCached();
+        uint256 oldTotalShares = super.totalSupply();
 
-            releasedShares = _releasedShares($);
-            uint256 newBufferedShares = $.bufferedShares - releasedShares;
+        releasedShares = _releasedShares($);
+        uint256 newBufferedShares = $.bufferedShares - releasedShares;
 
-            if ($.assetsCached <= newTotalAssets) {
-                sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares - releasedShares);
-            } else {
-                lostShares = _sharesToBurnOnLoss(
-                    $.assetsCached, newTotalAssets, oldTotalShares - releasedShares, newBufferedShares
-                );
-            }
+        if ($.assetsCached <= newTotalAssets) {
+            sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares - releasedShares);
+        } else {
+            lostShares =
+                _sharesToBurnOnLoss($.assetsCached, newTotalAssets, oldTotalShares - releasedShares, newBufferedShares);
         }
     }
 
@@ -177,11 +169,11 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     function _sharesToMintOnGain(uint256 oldTotalAssets, uint256 newTotalAssets, uint256 totalSharesPriorToGain)
         private
-        pure
+        view
         returns (uint256 sharesToMint)
     {
         uint256 gain = checkedSub(newTotalAssets, oldTotalAssets, FILE_ID, 7);
-        return gain.mulDiv(totalSharesPriorToGain, oldTotalAssets);
+        return gain.mulDiv(totalSharesPriorToGain + 10 ** _decimalsOffset(), oldTotalAssets + 1);
     }
 
     function _sharesToBurnOnLoss(
@@ -189,13 +181,10 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         uint256 newTotalAssets,
         uint256 totalSharesPriorToLoss,
         uint256 bufferedShares
-    ) private pure returns (uint256 sharesToBurn) {
-        if (oldTotalAssets <= newTotalAssets) {
-            return 0;
-        }
-
+    ) private view returns (uint256 sharesToBurn) {
         uint256 loss = checkedSub(oldTotalAssets, newTotalAssets, FILE_ID, 9);
-        uint256 lossInShares = loss.mulDiv(totalSharesPriorToLoss, oldTotalAssets, Math.Rounding.Ceil);
+        uint256 lossInShares =
+            loss.mulDiv(totalSharesPriorToLoss + 10 ** _decimalsOffset(), oldTotalAssets + 1, Math.Rounding.Ceil);
 
         // If we need to burn more than `buffer.bufferedShares` shares to retain price-per-share,
         // then it's impossible to cover that from the buffer, and sharp PPS drop is to be expected.
