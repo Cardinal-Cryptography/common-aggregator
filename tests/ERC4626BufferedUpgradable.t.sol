@@ -11,8 +11,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
 contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
-    function initialize(IERC20 _asset, address protocolFeeReceiver) public initializer {
-        __ERC4626Buffered_init(_asset, protocolFeeReceiver);
+    function initialize(IERC20 _asset) public initializer {
+        __ERC4626Buffered_init(_asset);
     }
 
     function currentBufferEnd() external view returns (uint256) {
@@ -25,6 +25,10 @@ contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
 
     function previewUpdateHoldingsState() external view returns (uint256, uint256) {
         return _previewUpdateHoldingsState();
+    }
+
+    function setProtocolFee(uint256 protocolFeeBps) external {
+        _setProtocolFee(protocolFeeBps);
     }
 }
 
@@ -161,23 +165,58 @@ contract ERC4626BufferedUpgradeableTest is Test {
         assertEq(bufferedVault.totalSupply(), 5);
     }
 
-    // function testFeeOnGain() public {
-    //     (uint256 _toMint,) = buffer._updateBuffer(12, 100, MAX_BPS / 10);
-    //     assertEq(_toMint, 20);
+    function testFeeOnGain() public {
+        bufferedVault.setProtocolFee(MAX_BPS / 10);
 
-    //     uint256 mintedMinusFee = 18;
+        _depositToVault(200);
+        _dropToVault(100);
+        bufferedVault.updateHoldingsState();
 
-    //     vm.warp(STARTING_TIMESTAMP + 20 days);
-    //     (, uint256 _toBurn) = buffer._updateBuffer(12, 100 + mintedMinusFee, MAX_BPS / 10);
-    //     assertEq(_toBurn, 18);
-    // }
+        assertEq(asset.balanceOf(address(1)), 0);
+        assertEq(bufferedVault.balanceOf(address(1)), 10);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 90);
 
-    // function testFeeOnLoss() public {
-    //     buffer._updateBuffer(100, 100, MAX_BPS / 10);
-    //     (uint256 _toMint, uint256 _toBurn) = buffer._updateBuffer(70, 1000, MAX_BPS / 10);
-    //     assertEq(_toMint, 0);
-    //     assertEq(_toBurn, 300);
-    // }
+        vm.warp(STARTING_TIMESTAMP + 20 days);
+        bufferedVault.updateHoldingsState();
+
+        assertEq(asset.balanceOf(address(1)), 0);
+        assertEq(bufferedVault.balanceOf(address(1)), 10);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 0);
+    }
+
+    function testFeeOnSmallLoss() public {
+        bufferedVault.setProtocolFee(MAX_BPS / 20);
+
+        _depositToVault(300);
+        _dropToVault(100);
+        bufferedVault.updateHoldingsState();
+
+        _takeFromVault(80);
+        bufferedVault.updateHoldingsState();
+
+        assertEq(bufferedVault.balanceOf(address(1)), 5);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 95 - 80);
+
+        vm.warp(STARTING_TIMESTAMP + 20 days);
+        assertEq(bufferedVault.balanceOf(address(1)), 5);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 0);
+    }
+
+    function testFeeOnLargeLoss() public {
+        bufferedVault.setProtocolFee(MAX_BPS / 2);
+
+        _depositToVault(300);
+        _dropToVault(100);
+        bufferedVault.updateHoldingsState();
+
+        _takeFromVault(150);
+        bufferedVault.updateHoldingsState();
+
+        assertEq(bufferedVault.balanceOf(address(1)), 50);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 0);
+        assertEq(bufferedVault.totalSupply(), 350);
+        assertEq(bufferedVault.maxWithdraw(alice), 214);
+    }
 
     function testBufferEndFirstUpdate() public {
         _depositToVault(1);

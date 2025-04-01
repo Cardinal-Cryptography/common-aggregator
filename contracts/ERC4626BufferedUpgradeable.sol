@@ -10,10 +10,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IERC4626Buffered} from "./interfaces/IERC4626Buffered.sol";
-import {checkedAdd, checkedDiv, checkedMul, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
-
-/// @dev Id for checked function identification: uint256(keccak256("ERC4626BufferedUpgradeable"));
-uint256 constant FILE_ID = 0x4d39717a83c084e47ddfe24c6a25ca9abf9ec8fe47a1c7989073cd2247be5447;
+import {checkedAdd, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
 /// @title Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
 /// It adds buffering to any asset rewards/airdrops received.
@@ -95,7 +92,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         if (sharesToBurn > 0) {
             // Burn fees from the buffer
             _burn(address(this), sharesToBurn);
-            $.bufferedShares = checkedSub($.bufferedShares, sharesToBurn, FILE_ID, 4);
+            $.bufferedShares = $.bufferedShares - sharesToBurn;
         }
 
         if (sharesToMint > 0) {
@@ -104,9 +101,9 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             _mint(address(this), sharesToMint - fee);
             _mint($.protocolFeeReceiver, fee);
 
-            uint256 newUnlockEnd = checkedAdd(block.timestamp, _defaultBufferingDuration(), FILE_ID, 8);
+            uint256 newUnlockEnd = block.timestamp + _defaultBufferingDuration();
             $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint - fee);
-            $.bufferedShares = checkedAdd($.bufferedShares, sharesToMint - fee, FILE_ID, 5);
+            $.bufferedShares = checkedAdd($.bufferedShares, sharesToMint - fee, 1);
         }
 
         $.lastUpdate = block.timestamp;
@@ -152,8 +149,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             return 0;
         }
 
-        uint256 duration = checkedSub(end, start, FILE_ID, 5);
-        uint256 elapsed = checkedSub(timestampNow, start, FILE_ID, 6);
+        uint256 duration = checkedSub(end, start, 2);
+        uint256 elapsed = checkedSub(timestampNow, start, 3);
 
         if (elapsed >= duration) {
             sharesReleased = bufferedShares;
@@ -167,7 +164,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         view
         returns (uint256 sharesToMint)
     {
-        uint256 gain = checkedSub(newTotalAssets, oldTotalAssets, FILE_ID, 7);
+        uint256 gain = newTotalAssets - oldTotalAssets;
         return gain.mulDiv(totalSharesPriorToGain + 10 ** _decimalsOffset(), oldTotalAssets + 1);
     }
 
@@ -177,7 +174,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         uint256 totalSharesPriorToLoss,
         uint256 bufferedShares
     ) private view returns (uint256 sharesToBurn) {
-        uint256 loss = checkedSub(oldTotalAssets, newTotalAssets, FILE_ID, 9);
+        uint256 loss = oldTotalAssets - newTotalAssets;
         uint256 lossInShares =
             loss.mulDiv(totalSharesPriorToLoss + 10 ** _decimalsOffset(), oldTotalAssets + 1, Math.Rounding.Ceil);
 
@@ -206,10 +203,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     error ERC4626ExceededMaxWithdraw(address owner, uint256 assets, uint256 max);
     error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
 
-    // TODO: It might be better to simply pass this value in the constructor (if we care about bytecode size).
-    /**
-     * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
-     */
+    /// @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
     function _tryGetAssetDecimals(IERC20 asset_) private view returns (bool ok, uint8 assetDecimals) {
         (bool success, bytes memory encodedDecimals) =
             address(asset_).staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
