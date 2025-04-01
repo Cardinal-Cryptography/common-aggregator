@@ -12,7 +12,7 @@ import "forge-std/console.sol";
 /// @dev Requires FOUNDRY_PROFILE=full
 contract SubmitUpgradeAggregatorScript is Script {
     function run() public {
-        string memory contractName = "YOUR_UPGRADED_CONTRACT_NAME";
+        string memory contractName = vm.envString("UPGRADED_CONTRACT_NAME");
         CommonAggregator commonAggregator = CommonAggregator(vm.envAddress("COMMON_AGGREGATOR"));
 
         Options memory options;

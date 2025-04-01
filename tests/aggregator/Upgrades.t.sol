@@ -196,6 +196,9 @@ contract CommonAggregatorTest is Test {
         vm.prank(manager);
         expectAutorizationRevert(manager, keccak256("OWNER"));
         commonAggregator.upgradeToAndCall(newImplementation, "");
+
+        vm.prank(owner);
+        commonAggregator.upgradeToAndCall(newImplementation, "");
     }
 
     function testRolesCancelling() public {
