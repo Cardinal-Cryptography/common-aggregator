@@ -392,7 +392,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     function setProtocolFee(uint256 feeBps) public virtual override(IERC4626Buffered) {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        require($.protocolFeeBps <= MAX_BPS, IncorrectProtocolFee());
+        require(feeBps <= MAX_BPS, IncorrectProtocolFee());
         $.protocolFeeBps = feeBps;
     }
 

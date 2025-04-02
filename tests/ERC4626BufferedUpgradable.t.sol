@@ -2,12 +2,12 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ERC4626BufferedUpgradeable} from "../contracts/ERC4626BufferedUpgradeable.sol";
+import {ERC4626BufferedUpgradeable, IERC4626Buffered} from "../contracts/ERC4626BufferedUpgradeable.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "../contracts/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import {IERC20Errors} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
 contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
@@ -52,6 +52,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
     }
 
     function testAssetsAfterInit() public view {
+        assertEq(bufferedVault.asset(), address(asset));
         assertEq(bufferedVault.totalAssets(), 0);
     }
 
@@ -284,6 +285,72 @@ contract ERC4626BufferedUpgradeableTest is Test {
 
         uint256 sharesMinted = bufferedVault.totalSupply() - startingShares;
         assertEq(sharesMinted, 1 << 126);
+    }
+
+    function testShareTransferDoesntAffectBuffer() public {
+        _depositToVault(10);
+        _dropToVault(10);
+        bufferedVault.updateHoldingsState();
+
+        vm.warp(STARTING_TIMESTAMP + 4 days);
+        vm.prank(alice);
+        bufferedVault.transfer(address(bufferedVault), 5);
+        bufferedVault.updateHoldingsState();
+
+        assertEq(bufferedVault.balanceOf(alice), 5);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 13);
+
+        vm.warp(STARTING_TIMESTAMP + 20 days);
+        assertEq(bufferedVault.balanceOf(alice), 5);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 5);
+
+        vm.warp(STARTING_TIMESTAMP + 100 days);
+        assertEq(bufferedVault.balanceOf(alice), 5);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 5);
+    }
+
+    function testProtocolFeeSetters() public {
+        assertEq(bufferedVault.getProtocolFee(), 0);
+        assertEq(bufferedVault.getProtocolFeeReceiver(), address(1));
+
+        vm.expectRevert(IERC4626Buffered.IncorrectProtocolFee.selector);
+        bufferedVault.setProtocolFee(MAX_BPS + 1);
+
+        bufferedVault.setProtocolFee(0);
+        assertEq(bufferedVault.getProtocolFee(), 0);
+        bufferedVault.setProtocolFee(MAX_BPS);
+        assertEq(bufferedVault.getProtocolFee(), MAX_BPS);
+
+        vm.expectRevert(IERC4626Buffered.ZeroProtocolFeeReceiver.selector);
+        bufferedVault.setProtocolFeeReceiver(address(0));
+
+        bufferedVault.setProtocolFeeReceiver(alice);
+        assertEq(bufferedVault.getProtocolFeeReceiver(), alice);
+    }
+
+    function testWithdrawSpendAllowance() public {
+        _depositToVault(100);
+
+        vm.prank(alice);
+        bufferedVault.approve(bob, 50);
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, bob, 50, 51));
+        bufferedVault.withdraw(51, bob, alice);
+
+        vm.prank(bob);
+        bufferedVault.withdraw(49, bob, alice);
+
+        vm.prank(bob);
+        bufferedVault.withdraw(1, alice, alice);
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, bob, 0, 1));
+        bufferedVault.withdraw(1, bob, alice);
+
+        assertEq(asset.balanceOf(bob), 49);
+        assertEq(asset.balanceOf(alice), 1);
+        assertEq(bufferedVault.balanceOf(alice), 50);
     }
 
     uint256 constant UPDATE_NUM = 10;
