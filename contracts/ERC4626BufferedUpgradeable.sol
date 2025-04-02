@@ -126,7 +126,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         newTotalAssets = _totalAssetsNotCached();
         uint256 oldTotalShares = super.totalSupply();
 
-        releasedShares = _releasedShares($);
+        releasedShares = _releasedShares();
         uint256 newBufferedShares = $.bufferedShares - releasedShares;
 
         if ($.assetsCached <= newTotalAssets) {
@@ -138,11 +138,12 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     }
 
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
-    function _releasedShares(ERC4626BufferedStorage memory buffer) private view returns (uint256 sharesReleased) {
+    function _releasedShares() private view returns (uint256 sharesReleased) {
+        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
+
         uint256 timestampNow = block.timestamp;
-        uint256 start = buffer.lastUpdate;
-        uint256 end = buffer.currentBufferEnd;
-        uint256 bufferedShares = buffer.bufferedShares;
+        uint256 start = $.lastUpdate;
+        uint256 end = $.currentBufferEnd;
 
         if (end == start || timestampNow == start) {
             return 0;
@@ -152,9 +153,9 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         uint256 elapsed = checkedSub(timestampNow, start, 3);
 
         if (elapsed >= duration) {
-            sharesReleased = bufferedShares;
+            sharesReleased = $.bufferedShares;
         } else {
-            sharesReleased = bufferedShares.mulDiv(elapsed, duration);
+            sharesReleased = $.bufferedShares.mulDiv(elapsed, duration);
         }
     }
 
@@ -185,13 +186,13 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     // ----- ERC20 -----
 
     function totalSupply() public view override(ERC20Upgradeable, IERC20) returns (uint256) {
-        return super.totalSupply() - _releasedShares(_getERC4626BufferedStorage());
+        return super.totalSupply() - _releasedShares();
     }
 
     function balanceOf(address account) public view override(ERC20Upgradeable, IERC20) returns (uint256 balance) {
         balance = super.balanceOf(account);
         if (account == address(this)) {
-            balance -= _releasedShares(_getERC4626BufferedStorage());
+            balance -= _releasedShares();
         }
     }
 
