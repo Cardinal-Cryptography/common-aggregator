@@ -11,8 +11,11 @@ import {IERC20Errors} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC2
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
 contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
-    function initialize(IERC20 _asset) public initializer {
+    uint8 private decimalsOffset;
+
+    function initialize(uint8 decimalsOffset_, IERC20 _asset) public initializer {
         __ERC4626Buffered_init(_asset);
+        decimalsOffset = decimalsOffset_;
     }
 
     function currentBufferEnd() external view returns (uint256) {
@@ -26,30 +29,26 @@ contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
     function previewUpdateHoldingsState() external view returns (uint256, uint256) {
         return _previewUpdateHoldingsState();
     }
+
+    function _decimalsOffset() internal view override returns (uint8) {
+        return decimalsOffset;
+    }
 }
 
-contract ERC4626BufferedUpgradeableTest is Test {
+abstract contract ERC4626BufferedUpgradeableTest is Test {
     using Math for uint256;
 
     uint256 constant STARTING_TIMESTAMP = 100;
     uint256 constant STARTING_BALANCE = 10;
+
+    /// @dev 10**decimalsOffset. Override in immplementation to set the offset.
+    uint256 internal DECIMAL_OFFSET_POWER = 1;
 
     ERC4626BufferedUpgradeableConcrete bufferedVault;
     ERC20Mock asset = new ERC20Mock();
 
     address alice = address(0x456);
     address bob = address(0x678);
-
-    function setUp() public {
-        vm.warp(STARTING_TIMESTAMP);
-        ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeableConcrete();
-
-        bytes memory initializeData =
-            abi.encodeWithSelector(ERC4626BufferedUpgradeableConcrete.initialize.selector, asset, bob);
-
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
-        bufferedVault = ERC4626BufferedUpgradeableConcrete(address(proxy));
-    }
 
     function testAssetsAfterInit() public view {
         assertEq(bufferedVault.asset(), address(asset));
@@ -83,21 +82,21 @@ contract ERC4626BufferedUpgradeableTest is Test {
     function testSharesAfterDrop() public {
         _dropToVault(20);
         bufferedVault.updateHoldingsState();
-        assertEq(bufferedVault.totalSupply(), 20);
+        assertEq(bufferedVault.totalSupply(), 20 * DECIMAL_OFFSET_POWER);
     }
 
     function testSharesAfterDropAndTimeElapsed() public {
         _dropToVault(20);
         bufferedVault.updateHoldingsState();
         vm.warp(STARTING_TIMESTAMP + 2 days);
-        assertEq(bufferedVault.totalSupply(), 18);
+        assertEq(bufferedVault.totalSupply(), 18 * DECIMAL_OFFSET_POWER);
     }
 
     function testSharesAfterDropAndTimeElapsed2() public {
         _dropToVault(7);
         bufferedVault.updateHoldingsState();
         vm.warp(STARTING_TIMESTAMP + 7 days);
-        assertEq(bufferedVault.totalSupply(), 5);
+        assertEq(bufferedVault.totalSupply(), 7 * DECIMAL_OFFSET_POWER - (7 * 7 * DECIMAL_OFFSET_POWER / 20));
     }
 
     function testSharesAfterFullPeriodHasPassed() public {
@@ -112,7 +111,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
         _dropToVault(10);
         bufferedVault.updateHoldingsState();
 
-        assertEq(bufferedVault.totalSupply(), 20);
+        assertEq(bufferedVault.totalSupply(), 20 * DECIMAL_OFFSET_POWER);
     }
 
     function testSharesAfterDepositAndDropAndTimeElapsed() public {
@@ -121,7 +120,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
         bufferedVault.updateHoldingsState();
 
         vm.warp(STARTING_TIMESTAMP + 4 days);
-        assertEq(bufferedVault.totalSupply(), 18);
+        assertEq(bufferedVault.totalSupply(), 18 * DECIMAL_OFFSET_POWER);
     }
 
     function testSharesAfterDropAndDepositAndTimeElapsed() public {
@@ -130,7 +129,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
         bufferedVault.updateHoldingsState();
 
         vm.warp(STARTING_TIMESTAMP + 4 days);
-        assertEq(bufferedVault.totalSupply(), 18);
+        assertEq(bufferedVault.totalSupply(), 18 * DECIMAL_OFFSET_POWER);
     }
 
     function testBufferUpdateResultOnLoss() public {
@@ -139,7 +138,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
         bufferedVault.updateHoldingsState();
 
         assertEq(bufferedVault.totalAssets(), 4);
-        assertEq(bufferedVault.totalSupply(), 10);
+        assertEq(bufferedVault.totalSupply(), 10 * DECIMAL_OFFSET_POWER);
     }
 
     function testBufferUpdateResultOnLoss2() public {
@@ -149,7 +148,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
         asset.burn(address(bufferedVault), 4);
         bufferedVault.updateHoldingsState();
         assertEq(bufferedVault.totalAssets(), 11);
-        assertEq(bufferedVault.totalSupply(), 11);
+        assertEq(bufferedVault.totalSupply(), 11 * DECIMAL_OFFSET_POWER);
     }
 
     function testBufferUpdateResultOnLoss3() public {
@@ -159,7 +158,7 @@ contract ERC4626BufferedUpgradeableTest is Test {
         asset.burn(address(bufferedVault), 4);
         bufferedVault.updateHoldingsState();
         assertEq(bufferedVault.totalAssets(), 3);
-        assertEq(bufferedVault.totalSupply(), 5);
+        assertEq(bufferedVault.totalSupply(), 5 * DECIMAL_OFFSET_POWER);
     }
 
     function testFeeOnGain() public {
@@ -170,14 +169,14 @@ contract ERC4626BufferedUpgradeableTest is Test {
         bufferedVault.updateHoldingsState();
 
         assertEq(asset.balanceOf(address(1)), 0);
-        assertEq(bufferedVault.balanceOf(address(1)), 10);
-        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 90);
+        assertEq(bufferedVault.balanceOf(address(1)), 10 * DECIMAL_OFFSET_POWER);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 90 * DECIMAL_OFFSET_POWER);
 
         vm.warp(STARTING_TIMESTAMP + 20 days);
         bufferedVault.updateHoldingsState();
 
         assertEq(asset.balanceOf(address(1)), 0);
-        assertEq(bufferedVault.balanceOf(address(1)), 10);
+        assertEq(bufferedVault.balanceOf(address(1)), 10 * DECIMAL_OFFSET_POWER);
         assertEq(bufferedVault.balanceOf(address(bufferedVault)), 0);
     }
 
@@ -191,11 +190,11 @@ contract ERC4626BufferedUpgradeableTest is Test {
         _takeFromVault(80);
         bufferedVault.updateHoldingsState();
 
-        assertEq(bufferedVault.balanceOf(address(1)), 5);
-        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 95 - 80);
+        assertEq(bufferedVault.balanceOf(address(1)), 5 * DECIMAL_OFFSET_POWER);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), (95 - 80) * DECIMAL_OFFSET_POWER);
 
         vm.warp(STARTING_TIMESTAMP + 20 days);
-        assertEq(bufferedVault.balanceOf(address(1)), 5);
+        assertEq(bufferedVault.balanceOf(address(1)), 5 * DECIMAL_OFFSET_POWER);
         assertEq(bufferedVault.balanceOf(address(bufferedVault)), 0);
     }
 
@@ -209,30 +208,31 @@ contract ERC4626BufferedUpgradeableTest is Test {
         _takeFromVault(150);
         bufferedVault.updateHoldingsState();
 
-        assertEq(bufferedVault.balanceOf(address(1)), 50);
+        assertEq(bufferedVault.balanceOf(address(1)), 50 * DECIMAL_OFFSET_POWER);
         assertEq(bufferedVault.balanceOf(address(bufferedVault)), 0);
-        assertEq(bufferedVault.totalSupply(), 350);
+        assertEq(bufferedVault.totalSupply(), 350 * DECIMAL_OFFSET_POWER);
         assertEq(bufferedVault.maxWithdraw(alice), 214);
     }
 
     function testFeeWithBufferEnd() public {
         bufferedVault.setProtocolFee(MAX_BPS / 2);
 
-        _dropToVault(250);
+        _depositToVault(499);
+        _dropToVault(500);
         bufferedVault.updateHoldingsState();
 
         vm.warp(STARTING_TIMESTAMP + 4 days);
 
-        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 100);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 200 * DECIMAL_OFFSET_POWER);
 
-        _dropToVault(500);
+        _dropToVault(1000);
 
         bufferedVault.updateHoldingsState();
-        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 100 + 225, "buffer");
-        assertEq(bufferedVault.balanceOf(address(1)), 125 + 225, "feeReceiver");
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), (200 + 475) * DECIMAL_OFFSET_POWER, "buffer");
+        assertEq(bufferedVault.balanceOf(address(1)), (250 + 475) * DECIMAL_OFFSET_POWER, "feeReceiver");
         assertEq(
             bufferedVault.currentBufferEnd(),
-            STARTING_TIMESTAMP + 4 days + uint256((16 days * 100 + 20 days * 225)) / (100 + 225),
+            STARTING_TIMESTAMP + 4 days + uint256((16 days * 200 + 20 days * 475)) / (200 + 475),
             "bufferEnd"
         );
 
@@ -249,13 +249,13 @@ contract ERC4626BufferedUpgradeableTest is Test {
     }
 
     function testBufferEndSecondUpdateOldActive() public {
-        _depositToVault(10);
+        _depositToVault(9); // and 1 virtual asset
         _dropToVault(10);
         bufferedVault.updateHoldingsState();
         vm.warp(STARTING_TIMESTAMP + 4 days);
         _dropToVault(20);
         bufferedVault.updateHoldingsState();
-        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 8 + 18);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), (8 + 18) * DECIMAL_OFFSET_POWER);
         assertEq(
             bufferedVault.currentBufferEnd(), STARTING_TIMESTAMP + 4 days + uint256((16 days * 8 + 20 days * 18)) / 26
         );
@@ -278,13 +278,13 @@ contract ERC4626BufferedUpgradeableTest is Test {
         bufferedVault.updateHoldingsState();
 
         uint256 startingShares = bufferedVault.totalSupply();
-        assertEq(bufferedVault.convertToAssets(2000), 1000);
+        assertEq(bufferedVault.convertToAssets(2000 * DECIMAL_OFFSET_POWER), 1000);
 
         _dropToVault(1 << 125);
         bufferedVault.updateHoldingsState();
 
         uint256 sharesMinted = bufferedVault.totalSupply() - startingShares;
-        assertEq(sharesMinted, 1 << 126);
+        assertEq(sharesMinted, (1 << 126) * DECIMAL_OFFSET_POWER);
     }
 
     function testShareTransferDoesntAffectBuffer() public {
@@ -294,19 +294,19 @@ contract ERC4626BufferedUpgradeableTest is Test {
 
         vm.warp(STARTING_TIMESTAMP + 4 days);
         vm.prank(alice);
-        bufferedVault.transfer(address(bufferedVault), 5);
+        bufferedVault.transfer(address(bufferedVault), 5 * DECIMAL_OFFSET_POWER);
         bufferedVault.updateHoldingsState();
 
-        assertEq(bufferedVault.balanceOf(alice), 5);
-        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 13);
+        assertEq(bufferedVault.balanceOf(alice), 5 * DECIMAL_OFFSET_POWER);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 13 * DECIMAL_OFFSET_POWER);
 
         vm.warp(STARTING_TIMESTAMP + 20 days);
-        assertEq(bufferedVault.balanceOf(alice), 5);
-        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 5);
+        assertEq(bufferedVault.balanceOf(alice), 5 * DECIMAL_OFFSET_POWER);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 5 * DECIMAL_OFFSET_POWER);
 
         vm.warp(STARTING_TIMESTAMP + 100 days);
-        assertEq(bufferedVault.balanceOf(alice), 5);
-        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 5);
+        assertEq(bufferedVault.balanceOf(alice), 5 * DECIMAL_OFFSET_POWER);
+        assertEq(bufferedVault.balanceOf(address(bufferedVault)), 5 * DECIMAL_OFFSET_POWER);
     }
 
     function testProtocolFeeSetters() public {
@@ -332,10 +332,13 @@ contract ERC4626BufferedUpgradeableTest is Test {
         _depositToVault(100);
 
         vm.prank(alice);
-        bufferedVault.approve(bob, 50);
+        bufferedVault.approve(bob, 50 * DECIMAL_OFFSET_POWER);
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, bob, 50, 51));
+        bytes memory selector = abi.encodeWithSelector(
+            IERC20Errors.ERC20InsufficientAllowance.selector, bob, 50 * DECIMAL_OFFSET_POWER, 51 * DECIMAL_OFFSET_POWER
+        );
+        vm.expectRevert(selector);
         bufferedVault.withdraw(51, bob, alice);
 
         vm.prank(bob);
@@ -345,12 +348,14 @@ contract ERC4626BufferedUpgradeableTest is Test {
         bufferedVault.withdraw(1, alice, alice);
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, bob, 0, 1));
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, bob, 0, DECIMAL_OFFSET_POWER)
+        );
         bufferedVault.withdraw(1, bob, alice);
 
         assertEq(asset.balanceOf(bob), 49);
         assertEq(asset.balanceOf(alice), 1);
-        assertEq(bufferedVault.balanceOf(alice), 50);
+        assertEq(bufferedVault.balanceOf(alice), 50 * DECIMAL_OFFSET_POWER);
     }
 
     uint256 constant UPDATE_NUM = 10;
@@ -454,42 +459,6 @@ contract ERC4626BufferedUpgradeableTest is Test {
         }
     }
 
-    function testFuzz_WithUserActions(
-        uint120[UPDATE_NUM] calldata _timeElapsed,
-        uint120[UPDATE_NUM] calldata _gain,
-        uint120[UPDATE_NUM] calldata _deposit,
-        uint120[UPDATE_NUM] calldata _withdraw
-    ) public {
-        uint256 _currentTime = STARTING_TIMESTAMP;
-
-        _depositToVault(STARTING_BALANCE);
-        uint256 _totalAssets = STARTING_BALANCE;
-
-        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
-            _currentTime += _timeElapsed[i];
-            vm.warp(_currentTime);
-
-            _dropToVault(_gain[i]);
-            _depositToVault(_deposit[i]);
-
-            uint256 toWithdraw = bound(_withdraw[i], 0, bufferedVault.maxWithdraw(alice));
-
-            vm.prank(alice);
-            bufferedVault.withdraw(toWithdraw, alice, alice);
-
-            _totalAssets += _gain[i];
-            _totalAssets += _deposit[i];
-            _totalAssets -= toWithdraw;
-        }
-        _currentTime += 20 days;
-        vm.warp(_currentTime);
-        bufferedVault.updateHoldingsState();
-
-        uint256 oneSharePrice = bufferedVault.convertToAssets(1) + 1;
-        assertEq(bufferedVault.totalAssets(), _totalAssets, "totalAssets");
-        assertLe(bufferedVault.totalAssets(), bufferedVault.maxWithdraw(alice) + oneSharePrice, "maxWithdraw");
-    }
-
     function testFuzz_TotalSupply(
         uint120[UPDATE_NUM] calldata _timeElapsed,
         uint120[UPDATE_NUM] calldata _gain,
@@ -545,19 +514,86 @@ contract ERC4626BufferedUpgradeableTest is Test {
         }
     }
 
-    function _dropToVault(uint256 amount) private {
+    function _dropToVault(uint256 amount) internal {
         asset.mint(address(bufferedVault), amount);
     }
 
-    function _takeFromVault(uint256 amount) private {
+    function _takeFromVault(uint256 amount) internal {
         asset.burn(address(bufferedVault), amount);
     }
 
-    function _depositToVault(uint256 amount) private {
+    function _depositToVault(uint256 amount) internal {
         vm.startPrank(alice);
         asset.mint(alice, amount);
         asset.approve(address(bufferedVault), amount);
         bufferedVault.deposit(amount, alice);
         vm.stopPrank();
+    }
+}
+
+contract ERC4626BufferedUpgradeableTestNoDecimalOffset is Test, ERC4626BufferedUpgradeableTest {
+    function setUp() public {
+        uint8 decimalsOffset = 0;
+
+        DECIMAL_OFFSET_POWER = 10 ** decimalsOffset;
+        vm.warp(STARTING_TIMESTAMP);
+        ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeableConcrete();
+
+        bytes memory initializeData =
+            abi.encodeWithSelector(ERC4626BufferedUpgradeableConcrete.initialize.selector, decimalsOffset, asset);
+
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
+        bufferedVault = ERC4626BufferedUpgradeableConcrete(address(proxy));
+    }
+
+    function testFuzz_WithUserActions(
+        uint120[UPDATE_NUM] calldata _timeElapsed,
+        uint120[UPDATE_NUM] calldata _gain,
+        uint120[UPDATE_NUM] calldata _deposit,
+        uint120[UPDATE_NUM] calldata _withdraw
+    ) public {
+        uint256 _currentTime = STARTING_TIMESTAMP;
+
+        _depositToVault(STARTING_BALANCE);
+        uint256 _totalAssets = STARTING_BALANCE;
+
+        for (uint256 i = 0; i < UPDATE_NUM; ++i) {
+            _currentTime += _timeElapsed[i];
+            vm.warp(_currentTime);
+
+            _dropToVault(_gain[i]);
+            _depositToVault(_deposit[i]);
+
+            uint256 toWithdraw = bound(_withdraw[i], 0, bufferedVault.maxWithdraw(alice));
+
+            vm.prank(alice);
+            bufferedVault.withdraw(toWithdraw, alice, alice);
+
+            _totalAssets += _gain[i];
+            _totalAssets += _deposit[i];
+            _totalAssets -= toWithdraw;
+        }
+        _currentTime += 20 days;
+        vm.warp(_currentTime);
+        bufferedVault.updateHoldingsState();
+
+        uint256 oneSharePrice = bufferedVault.convertToAssets(1) + 1;
+        assertEq(bufferedVault.totalAssets(), _totalAssets, "totalAssets");
+        assertLe(bufferedVault.totalAssets(), bufferedVault.maxWithdraw(alice) + oneSharePrice, "maxWithdraw");
+    }
+}
+
+contract ERC4626BufferedUpgradeableWithDecimalOffset is Test, ERC4626BufferedUpgradeableTest {
+    function setUp() public {
+        uint8 decimalsOffset = 4;
+        DECIMAL_OFFSET_POWER = 10 ** decimalsOffset;
+        vm.warp(STARTING_TIMESTAMP);
+        ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeableConcrete();
+
+        bytes memory initializeData =
+            abi.encodeWithSelector(ERC4626BufferedUpgradeableConcrete.initialize.selector, decimalsOffset, asset);
+
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
+        bufferedVault = ERC4626BufferedUpgradeableConcrete(address(proxy));
     }
 }
