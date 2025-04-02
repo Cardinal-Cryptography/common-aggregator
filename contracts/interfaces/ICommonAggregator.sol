@@ -2,19 +2,17 @@
 pragma solidity ^0.8.28;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {IERC4626Buffered} from "./IERC4626Buffered.sol";
 
-interface ICommonAggregator is IERC4626 {
+interface ICommonAggregator is IERC4626Buffered {
     // ----- Reporting -----
 
-    event HoldingsStateUpdated(uint256 oldCachedAssets, uint256 newCachedAssets);
     event VaultWithdrawFailed(IERC4626 vault);
 
     error InsufficientAssetsForWithdrawal(uint256 missing);
     error IncorrectAsset(address expected, address actual);
     error VaultAlreadyAdded(IERC4626 vault);
     error VaultLimitExceeded();
-
-    function updateHoldingsState() external;
 
     // ----- Upgradeablity -----
 
@@ -135,7 +133,6 @@ interface ICommonAggregator is IERC4626 {
     function setProtocolFee(uint256 _protocolFeeBps) external;
 
     error SelfProtocolFeeReceiver();
-    error ZeroProtocolFeeReceiver();
 
     /// @notice Sets the protocol fee receiver.
     /// It's a no-op if `protocolFeeReceiver` is the same as the current `protocolFeeReceiver`.

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonAggregator, ICommonAggregator, ERC4626BufferedUpgradeable} from "contracts/CommonAggregator.sol";
 import {ERC1967Proxy, ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
@@ -22,7 +22,6 @@ import {
     ERC20Upgradeable,
     ERC4626Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import "contracts/RewardBuffer.sol";
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 
 error ContractIsNoLongerPauseable();
@@ -67,19 +66,16 @@ contract CommonAggregatorUpgradeMissingNamespaceStorage is UUPSUpgradeable {
 
 /// @custom:oz-upgrades-from contracts/CommonAggregator.sol:CommonAggregator
 contract CommonAggregatorUpgradeMissingStorageFields is
+    CommonTimelocks,
     UUPSUpgradeable,
-    ERC4626Upgradeable,
     AccessControlUpgradeable,
-    PausableUpgradeable,
-    CommonTimelocks
+    ERC4626BufferedUpgradeable,
+    PausableUpgradeable
 {
     /// @custom:storage-location erc7201:common.storage.aggregator
     struct AggregatorStorage {
-        RewardBuffer.Buffer rewardBuffer;
         IERC4626[] vaults; // Both for iterating and a fallback queue.
         mapping(address vault => uint256 limit) allocationLimitBps;
-        uint256 protocolFeeBps;
-        address protocolFeeReceiver;
         mapping(address rewardToken => address traderAddress) rewardTrader;
     }
 
@@ -90,7 +86,7 @@ contract CommonAggregatorUpgradeMissingStorageFields is
 
     function initialize(address, IERC20Metadata asset, IERC4626[] memory) public initializer {
         __ERC20_init("", "");
-        __ERC4626_init(asset);
+        __ERC4626Buffered_init(asset);
         __Pausable_init();
         __AccessControl_init();
     }

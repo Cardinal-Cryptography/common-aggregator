@@ -2,17 +2,19 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ICommonAggregator} from "contracts/interfaces/ICommonAggregator.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
+import {
+    CommonAggregator,
+    ICommonAggregator,
+    IERC4626,
+    IERC20,
+    ERC4626BufferedUpgradeable
+} from "contracts/CommonAggregator.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "contracts/Math.sol";
-import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 contract CommonAggregatorTest is Test {
     using Math for uint256;
@@ -153,7 +155,7 @@ contract CommonAggregatorTest is Test {
         vaults[0].setWithdrawLimit(10);
 
         vm.prank(address(commonAggregator));
-        vm.expectPartialRevert(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector);
+        vm.expectPartialRevert(ERC4626BufferedUpgradeable.ERC4626ExceededMaxWithdraw.selector);
         commonAggregator.pullFundsProportional(70);
     }
 

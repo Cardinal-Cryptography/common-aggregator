@@ -12,11 +12,11 @@ import {
     IERC20Metadata,
     SafeERC20,
     ERC20Upgradeable,
-    ERC4626Upgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+    ERC4626BufferedUpgradeable
+} from "./ERC4626BufferedUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
-import "./RewardBuffer.sol";
+import {ERC4626BufferedUpgradeable} from "./ERC4626BufferedUpgradeable.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
 
 contract CommonAggregator is
@@ -24,10 +24,9 @@ contract CommonAggregator is
     CommonTimelocks,
     UUPSUpgradeable,
     AccessControlUpgradeable,
-    ERC4626Upgradeable,
+    ERC4626BufferedUpgradeable,
     PausableUpgradeable
 {
-    using RewardBuffer for RewardBuffer.Buffer;
     using Math for uint256;
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC4626;
@@ -54,11 +53,8 @@ contract CommonAggregator is
 
     /// @custom:storage-location erc7201:common.storage.aggregator
     struct AggregatorStorage {
-        RewardBuffer.Buffer rewardBuffer;
         IERC4626[] vaults; // Both for iterating and a fallback queue.
         mapping(address vault => uint256 limit) allocationLimitBps;
-        uint256 protocolFeeBps;
-        address protocolFeeReceiver;
         mapping(address rewardToken => address traderAddress) rewardTrader;
         uint256 pendingVaultForceRemovals;
     }
@@ -87,7 +83,7 @@ contract CommonAggregator is
         __UUPSUpgradeable_init();
         __AccessControl_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
-        __ERC4626_init(asset);
+        __ERC4626Buffered_init(asset);
         __Pausable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
@@ -100,8 +96,6 @@ contract CommonAggregator is
             $.vaults.push(vaults[i]);
             $.allocationLimitBps[address(vaults[i])] = MAX_BPS;
         }
-
-        $.protocolFeeReceiver = address(1);
     }
 
     function _ensureVaultCanBeAdded(IERC4626 vault) private view {
@@ -112,21 +106,6 @@ contract CommonAggregator is
         require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 
-    // ----- ERC20 -----
-
-    function totalSupply() public view override(ERC20Upgradeable, IERC20) returns (uint256) {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        return super.totalSupply() - $.rewardBuffer._sharesToBurn();
-    }
-
-    function balanceOf(address account) public view override(ERC20Upgradeable, IERC20) returns (uint256 balance) {
-        balance = super.balanceOf(account);
-        if (account == address(this)) {
-            AggregatorStorage storage $ = _getAggregatorStorage();
-            balance -= $.rewardBuffer._sharesToBurn();
-        }
-    }
-
     // ----- ERC4626 -----
 
     function _decimalsOffset() internal pure override returns (uint8) {
@@ -134,15 +113,8 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc IERC4626
-    /// @notice Returns cached assets from the last holdings state update.
-    function totalAssets() public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        return $.rewardBuffer._getAssetsCached();
-    }
-
-    /// @inheritdoc IERC4626
     /// @notice Returns the maximum deposit amount of the given address at the current time.
-    function maxDeposit(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function maxDeposit(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
         }
@@ -151,7 +123,7 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Returns the maximum mint amount of the given address at the current time.
-    function maxMint(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function maxMint(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
         }
@@ -160,7 +132,7 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Returns the maximum withdraw amount of the given address at the current time.
-    function maxWithdraw(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function maxWithdraw(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
         }
@@ -169,7 +141,7 @@ contract CommonAggregator is
 
     /// @inheritdoc IERC4626
     /// @notice Returns the maximum redeem amount of the given address at the current time.
-    function maxRedeem(address owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    function maxRedeem(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
         }
@@ -193,70 +165,50 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewDeposit(uint256 assets) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Floor);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewWithdraw(uint256 assets) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Ceil);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
-    function previewRedeem(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
-        return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Floor);
-    }
-
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before depositing.
-    function deposit(uint256 assets, address account)
+    function deposit(uint256 assets, address receiver)
         public
-        override(ERC4626Upgradeable, IERC4626)
+        virtual
+        override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
         returns (uint256)
     {
-        updateHoldingsState();
-        uint256 shares = super.deposit(assets, account);
-
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        _distributeToVaults(assets);
-        $.rewardBuffer._increaseAssets(assets);
-
-        return shares;
+        return super.deposit(assets, receiver);
     }
 
     /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before minting.
-    function mint(uint256 shares, address account)
+    function mint(uint256 shares, address receiver)
         public
-        override(ERC4626Upgradeable, IERC4626)
+        virtual
+        override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
         returns (uint256)
     {
-        updateHoldingsState();
-        uint256 assets = super.mint(shares, account);
-
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        _distributeToVaults(assets);
-        $.rewardBuffer._increaseAssets(assets);
-
-        return assets;
+        return super.mint(shares, receiver);
     }
 
-    function _distributeToVaults(uint256 assets) internal {
+    /// @inheritdoc IERC4626
+    function withdraw(uint256 assets, address receiver, address owner)
+        public
+        virtual
+        override(ERC4626BufferedUpgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
+        return super.withdraw(assets, receiver, owner);
+    }
+
+    /// @inheritdoc IERC4626
+    function redeem(uint256 shares, address receiver, address owner)
+        public
+        virtual
+        override(ERC4626BufferedUpgradeable, IERC4626)
+        whenNotPaused
+        returns (uint256)
+    {
+        return super.redeem(shares, receiver, owner);
+    }
+
+    function _postDeposit(uint256 assets) internal override {
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 cachedTotalAssets = totalAssets();
         if (cachedTotalAssets > 0) {
@@ -272,48 +224,11 @@ contract CommonAggregator is
         }
     }
 
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before withdrawing.
-    function withdraw(uint256 assets, address account, address owner)
-        public
-        override(ERC4626Upgradeable, IERC4626)
-        whenNotPaused
-        returns (uint256)
-    {
-        updateHoldingsState();
-        _pullFundsForWithdrawal(assets);
-        uint256 shares = super.withdraw(assets, account, owner);
-
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        $.rewardBuffer._decreaseAssets(assets);
-
-        return shares;
-    }
-
-    /// @inheritdoc IERC4626
-    /// @notice Updates holdings state before redeeming.
-    function redeem(uint256 shares, address account, address owner)
-        public
-        override(ERC4626Upgradeable, IERC4626)
-        whenNotPaused
-        returns (uint256)
-    {
-        updateHoldingsState();
-        uint256 assetsNeeded = convertToAssets(shares);
-        _pullFundsForWithdrawal(assetsNeeded);
-        uint256 assets = super.redeem(shares, account, owner);
-
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        $.rewardBuffer._decreaseAssets(assets);
-
-        return assets;
-    }
-
-    function _pullFundsForWithdrawal(uint256 amount) internal {
-        try CommonAggregator(address(this)).pullFundsProportional(amount) {}
+    function _preWithdrawal(uint256 assets) internal override {
+        try CommonAggregator(address(this)).pullFundsProportional(assets) {}
         catch {
-            emit ProportionalWithdrawalFailed(amount);
-            _pullFundsSequential(amount);
+            emit ProportionalWithdrawalFailed(assets);
+            _pullFundsSequential(assets);
         }
     }
 
@@ -422,54 +337,14 @@ contract CommonAggregator is
             $.vaults[i].safeTransfer(account, vaultShares[i]);
         }
 
-        $.rewardBuffer._decreaseAssets(valueInAssets);
+        _decreaseAssets(valueInAssets);
 
         emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultShares);
     }
 
     // ----- Reporting -----
 
-    /// @notice Updates holdinds state, by reporting on every vault how many assets it has.
-    /// Profits are smoothed out by the reward buffer, and ditributed to the holders.
-    /// Protocol fee is taken from the profits. Potential losses are first covered by the buffer.
-    function updateHoldingsState() public override {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        uint256 oldCachedAssets = $.rewardBuffer._getAssetsCached();
-
-        if (oldCachedAssets == 0) {
-            // We have to wait for the deposit to happen
-            return;
-        } else {
-            uint256 newAssets = _totalAssetsNotCached();
-            (uint256 sharesToMint, uint256 sharesToBurn) =
-                $.rewardBuffer._updateBuffer(newAssets, super.totalSupply(), $.protocolFeeBps);
-            if (sharesToMint > 0) {
-                uint256 feePartOfMintedShares = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
-                _mint(address(this), sharesToMint - feePartOfMintedShares);
-                _mint($.protocolFeeReceiver, feePartOfMintedShares);
-            }
-            if (sharesToBurn > 0) {
-                _burn(address(this), sharesToBurn);
-            }
-            emit HoldingsStateUpdated(oldCachedAssets, newAssets);
-        }
-    }
-
-    /// @notice Preview the holdings state update, without actually updating it.
-    /// Returns `totalAssets` and `totalSupply` that there would be after the update.
-    function _previewUpdateHoldingsState() internal view returns (uint256 newTotalAssets, uint256 newTotalSupply) {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        if ($.rewardBuffer._getAssetsCached() == 0) {
-            return (0, super.totalSupply());
-        }
-
-        newTotalAssets = _totalAssetsNotCached();
-        (uint256 sharesToMint, uint256 sharesToBurn) =
-            $.rewardBuffer._simulateBufferUpdate(newTotalAssets, super.totalSupply(), $.protocolFeeBps);
-        return (newTotalAssets, super.totalSupply() + sharesToMint - sharesToBurn);
-    }
-
-    function _totalAssetsNotCached() internal view returns (uint256) {
+    function _totalAssetsNotCached() internal view override returns (uint256) {
         AggregatorStorage storage $ = _getAggregatorStorage();
 
         uint256 assets = IERC20(asset()).balanceOf(address(this));
@@ -662,27 +537,32 @@ contract CommonAggregator is
     // ----- Fee management -----
 
     /// @inheritdoc ICommonAggregator
-    function setProtocolFee(uint256 protocolFeeBps) external onlyRole(OWNER) {
+    function setProtocolFee(uint256 protocolFeeBps)
+        public
+        override(ERC4626BufferedUpgradeable, ICommonAggregator)
+        onlyRole(OWNER)
+    {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
 
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        uint256 oldProtocolFee = $.protocolFeeBps;
-
+        uint256 oldProtocolFee = getProtocolFee();
         if (oldProtocolFee == protocolFeeBps) return;
-        $.protocolFeeBps = protocolFeeBps;
+
+        super.setProtocolFee(protocolFeeBps);
         emit ProtocolFeeChanged(oldProtocolFee, protocolFeeBps);
     }
 
     /// @inheritdoc ICommonAggregator
-    function setProtocolFeeReceiver(address protocolFeeReceiver) external onlyRole(OWNER) {
+    function setProtocolFeeReceiver(address protocolFeeReceiver)
+        public
+        override(ERC4626BufferedUpgradeable, ICommonAggregator)
+        onlyRole(OWNER)
+    {
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
-        require(protocolFeeReceiver != address(0), ZeroProtocolFeeReceiver());
 
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        address oldProtocolFeeReceiver = $.protocolFeeReceiver;
-
+        address oldProtocolFeeReceiver = getProtocolFeeReceiver();
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;
-        $.protocolFeeReceiver = protocolFeeReceiver;
+
+        super.setProtocolFeeReceiver(protocolFeeReceiver);
         emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 
