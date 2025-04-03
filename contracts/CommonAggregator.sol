@@ -71,7 +71,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         }
     }
 
-    function ensureVaultCanBeAdded(IERC4626 vault) public view override {
+    function ensureVaultCanBeAdded(IERC4626 vault) public view {
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
 
         AggregatorStorage storage $ = _getAggregatorStorage();
@@ -79,13 +79,13 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 
-    function ensureVaultIsPresent(IERC4626 vault) public view override returns (uint256) {
+    function ensureVaultIsPresent(IERC4626 vault) public view returns (uint256) {
         (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
         require(isVaultOnTheList, VaultNotOnTheList(vault));
         return index;
     }
 
-    function ensureTokenSafeToTransfer(address rewardToken) public view override {
+    function ensureTokenSafeToTransfer(address rewardToken) public view {
         require(rewardToken != asset(), InvalidRewardToken(rewardToken));
         require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
         require(rewardToken != address(this), InvalidRewardToken(rewardToken));
@@ -502,13 +502,13 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
     /// to exit the aggregator.
-    function pauseUserInteractions() public override onlyManagement {
+    function pauseUserInteractions() public onlyManagement {
         _pause();
     }
 
     /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used after mitigating a potential emergency.
-    function unpauseUserInteractions() public override onlyManagement {
+    function unpauseUserInteractions() public onlyManagement {
         _unpause();
     }
 

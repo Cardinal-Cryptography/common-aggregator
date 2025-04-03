@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
+import {CommonAggregator} from "./CommonAggregator.sol";
 import {ICommonManagement} from "./interfaces/ICommonManagement.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -37,7 +37,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     struct ManagementStorage {
         mapping(address rewardToken => address traderAddress) rewardTrader;
         uint256 pendingVaultForceRemovals;
-        ICommonAggregator aggregator;
+        CommonAggregator aggregator;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.management")) - 1)) & ~bytes32(uint256(0xff));
@@ -50,7 +50,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         }
     }
 
-    function initialize(address owner, ICommonAggregator aggregator) public initializer {
+    function initialize(address owner, CommonAggregator aggregator) public initializer {
         __UUPSUpgradeable_init();
         __AccessControl_init();
 
@@ -336,11 +336,13 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         emit AggregatorUpgradeCancelled(newImplementation);
     }
 
-    function upgradeAggregator(address newImplementation)
+    function upgradeAggregator(address newImplementation, bytes memory callData)
         external
         onlyRole(OWNER)
         executesUnlockedAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE, newImplementation)))
     {
+        ManagementStorage storage $ = _getManagementStorage();
+        UUPSUpgradeable($.aggregator).upgradeToAndCall(newImplementation, callData);
         emit AggregatorUpgraded(newImplementation);
     }
 

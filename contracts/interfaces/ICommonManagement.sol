@@ -19,7 +19,7 @@ interface ICommonManagement {
     function cancelUpgradeAggregator(address newImplementation) external;
 
     /// @notice Executes the upgrade of the aggregator contract to the new implementation.
-    function upgradeAggregator(address newImplementation) external;
+    function upgradeAggregator(address newImplementation, bytes memory callData) external;
 
     // ----- Management Upgrades -----
 

@@ -117,17 +117,6 @@ interface ICommonAggregator is IERC4626Buffered {
         external
         returns (uint256 assets, uint256[] memory vaultsShares);
 
-    // ----- Checks -----
-
-    function ensureVaultCanBeAdded(IERC4626 vault) external view;
-    function ensureVaultIsPresent(IERC4626 vault) external view returns (uint256);
-    function ensureTokenSafeToTransfer(address rewardToken) external view;
-
-    // ----- Pausing -----
-
-    function pauseUserInteractions() external;
-    function unpauseUserInteractions() external;
-
     // ----- Access control -----
 
     error CallerNotManagement();
