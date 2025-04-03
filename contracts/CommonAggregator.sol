@@ -2,10 +2,9 @@
 pragma solidity ^0.8.28;
 
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
-import {CommonTimelocks} from "./CommonTimelocks.sol";
+import {ICommonManagement} from "./interfaces/ICommonManagement.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
     IERC20,
     IERC4626,
@@ -17,46 +16,20 @@ import {
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import {ERC4626BufferedUpgradeable} from "./ERC4626BufferedUpgradeable.sol";
-import {CommonTimelocks} from "./CommonTimelocks.sol";
 
-contract CommonAggregator is
-    ICommonAggregator,
-    CommonTimelocks,
-    UUPSUpgradeable,
-    AccessControlUpgradeable,
-    ERC4626BufferedUpgradeable,
-    PausableUpgradeable
-{
+contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626BufferedUpgradeable, PausableUpgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC4626;
 
-    bytes32 public constant OWNER = keccak256("OWNER");
-    bytes32 public constant MANAGER = keccak256("MANAGER");
-    bytes32 public constant REBALANCER = keccak256("REBALANCER");
-    bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
-
     uint256 public constant MAX_VAULTS = 5;
     uint256 public constant MAX_PROTOCOL_FEE_BPS = MAX_BPS / 2;
-
-    uint256 public constant SET_TRADER_TIMELOCK = 5 days;
-    uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
-    uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 14 days;
-    uint256 public constant CONTRACT_UPGRADE_TIMELOCK = 14 days;
-
-    enum TimelockTypes {
-        SET_TRADER,
-        ADD_VAULT,
-        FORCE_REMOVE_VAULT,
-        CONTRACT_UPGRADE
-    }
 
     /// @custom:storage-location erc7201:common.storage.aggregator
     struct AggregatorStorage {
         IERC4626[] vaults; // Both for iterating and a fallback queue.
         mapping(address vault => uint256 limit) allocationLimitBps;
-        mapping(address rewardToken => address traderAddress) rewardTrader;
-        uint256 pendingVaultForceRemovals;
+        ICommonManagement management;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
@@ -79,31 +52,43 @@ contract CommonAggregator is
         return $.allocationLimitBps[address(vault)];
     }
 
-    function initialize(address owner, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
+    function initialize(ICommonManagement management, IERC20Metadata asset, IERC4626[] memory vaults)
+        public
+        initializer
+    {
         __UUPSUpgradeable_init();
-        __AccessControl_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
         __ERC4626Buffered_init(asset);
         __Pausable_init();
 
-        _grantRole(DEFAULT_ADMIN_ROLE, owner);
-        _grantRole(OWNER, owner);
-
         AggregatorStorage storage $ = _getAggregatorStorage();
+        $.management = management;
 
         for (uint256 i = 0; i < vaults.length; i++) {
-            _ensureVaultCanBeAdded(vaults[i]);
+            ensureVaultCanBeAdded(vaults[i]);
             $.vaults.push(vaults[i]);
             $.allocationLimitBps[address(vaults[i])] = MAX_BPS;
         }
     }
 
-    function _ensureVaultCanBeAdded(IERC4626 vault) private view {
+    function ensureVaultCanBeAdded(IERC4626 vault) public view override {
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         require($.vaults.length < MAX_VAULTS, VaultLimitExceeded());
         require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
+    }
+
+    function ensureVaultIsPresent(IERC4626 vault) public view override returns (uint256) {
+        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        require(isVaultOnTheList, VaultNotOnTheList(vault));
+        return index;
+    }
+
+    function ensureTokenSafeToTransfer(address rewardToken) public view override {
+        require(rewardToken != asset(), InvalidRewardToken(rewardToken));
+        require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
+        require(rewardToken != address(this), InvalidRewardToken(rewardToken));
     }
 
     // ----- ERC4626 -----
@@ -361,69 +346,36 @@ contract CommonAggregator is
 
     // ----- Aggregated vaults management -----
 
-    /// @notice Submits a timelocked proposal to add a new vault to the list.
-    /// @dev There's no limit on the number of pending vaults that can be added, only on the number of fully added vaults.
-    /// Manager or Guardian should cancel mistaken and stale submissions.
-    function submitAddVault(IERC4626 vault)
-        external
-        override
-        onlyManagerOrOwner
-        registersTimelockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), ADD_VAULT_TIMELOCK)
-    {
-        _ensureVaultCanBeAdded(vault);
-
-        emit VaultAdditionSubmitted(address(vault), block.timestamp + ADD_VAULT_TIMELOCK);
-    }
-
-    function cancelAddVault(IERC4626 vault)
-        external
-        override
-        onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)))
-    {
-        emit VaultAdditionCancelled(address(vault));
-    }
-
-    function addVault(IERC4626 vault)
-        external
-        override
-        onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)))
-    {
-        _ensureVaultCanBeAdded(vault);
+    function addVault(IERC4626 vault) external override onlyManagement {
+        ensureVaultCanBeAdded(vault);
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.vaults.push(vault);
         updateHoldingsState();
-
-        emit VaultAdded(address(vault));
     }
 
-    function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
-        (bool isVaultOnTheList,) = _getVaultIndex(vault);
-        require(isVaultOnTheList, VaultNotOnTheList(vault));
-        require(
-            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
-            PendingVaultForceRemoval(vault)
-        );
+    function removeVault(IERC4626 vault) external override onlyManagement {
+        uint256 index = ensureVaultIsPresent(vault);
 
         // No need to updateHoldingsState, as we're not operating on assets.
         vault.redeem(vault.balanceOf(address(this)), address(this), address(this));
-
-        _removeVault(vault);
-
-        // No need to updateHoldingsState again, as we don't have any shares of the vault anymore.
-        emit VaultRemoved(address(vault));
+        _removeVault(index);
     }
 
-    /// @notice Removes vault from the list, without any timelocks or checks other than
-    /// the presence of the vault on the list. Updates storage and removes vault from mappings.
-    function _removeVault(IERC4626 vault) internal {
-        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
-        require(isVaultOnTheList, VaultNotOnTheList(vault));
+    /// @inheritdoc ICommonAggregator
+    function forceRemoveVault(IERC4626 vault) external override onlyManagement {
+        uint256 index = ensureVaultIsPresent(vault);
+        _removeVault(index);
 
+        // Some assets were lost, so we have to update the holdings state.
+        updateHoldingsState();
+    }
+
+    /// @notice Removes vault from the list by the given index in the vaults array, without any checks.
+    /// Updates the storage and removes the vault from mappings.
+    function _removeVault(uint256 index) internal {
         AggregatorStorage storage $ = _getAggregatorStorage();
 
-        delete $.allocationLimitBps[address(vault)];
+        delete $.allocationLimitBps[address($.vaults[index])];
 
         // Remove the vault from the list, shifting the rest of the array.
         for (uint256 i = index; i < $.vaults.length - 1; i++) {
@@ -433,95 +385,34 @@ contract CommonAggregator is
         $.vaults.pop();
     }
 
-    /// @inheritdoc ICommonAggregator
-    function submitForceRemoveVault(IERC4626 vault)
-        external
-        override
-        onlyManagerOrOwner
-        registersTimelockedAction(
-            keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)),
-            FORCE_REMOVE_VAULT_TIMELOCK
-        )
-    {
-        (bool isVaultOnTheList,) = _getVaultIndex(vault);
-        require(isVaultOnTheList, VaultNotOnTheList(vault));
-
-        // Try redeeming as much shares of the removed vault as possible
-        try vault.maxRedeem(address(this)) returns (uint256 redeemableShares) {
-            try vault.redeem(redeemableShares, address(this), address(this)) {} catch {}
-        } catch {}
-
-        if (!paused()) {
-            pauseUserInteractions();
-        }
-
-        _getAggregatorStorage().pendingVaultForceRemovals++;
-        emit VaultForceRemovalSubmitted(address(vault), block.timestamp + FORCE_REMOVE_VAULT_TIMELOCK);
-    }
-
-    /// @inheritdoc ICommonAggregator
-    function cancelForceRemoveVault(IERC4626 vault)
-        external
-        override
-        onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
-    {
-        _getAggregatorStorage().pendingVaultForceRemovals--;
-        emit VaultForceRemovalCancelled(address(vault));
-    }
-
-    /// @inheritdoc ICommonAggregator
-    function forceRemoveVault(IERC4626 vault)
-        external
-        override
-        onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
-    {
-        _removeVault(vault);
-
-        // Some assets were lost, so we have to update the holdings state.
-        updateHoldingsState();
-
-        _getAggregatorStorage().pendingVaultForceRemovals--;
-        emit VaultForceRemoved(address(vault));
-    }
     // ----- Rebalancing -----
 
     /// @inheritdoc ICommonAggregator
-    function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole whenNotPaused {
+    function pushFunds(uint256 assets, IERC4626 vault) external onlyManagement whenNotPaused {
         updateHoldingsState();
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
-
         IERC20(asset()).approve(address(vault), assets);
         vault.deposit(assets, address(this));
         _checkLimit(IERC4626(vault));
-
-        emit AssetsRebalanced(address(this), address(vault), assets);
     }
 
     /// @inheritdoc ICommonAggregator
-    function pullFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
+    function pullFunds(uint256 assets, IERC4626 vault) external onlyManagement {
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
-
         IERC4626(vault).withdraw(assets, address(this), address(this));
-
-        emit AssetsRebalanced(address(vault), address(this), assets);
     }
 
     /// @inheritdoc ICommonAggregator
-    function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyRebalancerOrHigherRole {
+    function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyManagement returns (uint256 assets) {
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
-
-        uint256 assets = vault.redeem(shares, address(this), address(this));
-
-        emit AssetsRebalanced(address(vault), address(this), assets);
+        assets = vault.redeem(shares, address(this), address(this));
     }
 
     // ----- Allocation Limits -----
 
     /// @inheritdoc ICommonAggregator
     /// @notice Doesn't rebalance the assets, after the action limits may be exceeded.
-    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyRole(OWNER) {
+    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyManagement {
         require(newLimitBps <= MAX_BPS, IncorrectMaxAllocationLimit());
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
 
@@ -540,7 +431,7 @@ contract CommonAggregator is
     function setProtocolFee(uint256 protocolFeeBps)
         public
         override(ERC4626BufferedUpgradeable, ICommonAggregator)
-        onlyRole(OWNER)
+        onlyManagement
     {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
 
@@ -555,7 +446,7 @@ contract CommonAggregator is
     function setProtocolFeeReceiver(address protocolFeeReceiver)
         public
         override(ERC4626BufferedUpgradeable, ICommonAggregator)
-        onlyRole(OWNER)
+        onlyManagement
     {
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
 
@@ -595,64 +486,15 @@ contract CommonAggregator is
     // ----- Non-asset rewards trading -----
 
     /// @inheritdoc ICommonAggregator
-    function submitSetRewardTrader(address rewardToken, address traderAddress)
+    function transferRewardsForSale(address rewardToken, address rewardTrader)
         external
-        onlyManagerOrOwner
-        registersTimelockedAction(
-            keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)),
-            SET_TRADER_TIMELOCK
-        )
+        onlyManagement
+        returns (uint256 amount)
     {
-        _ensureTokenSafeToTransfer(rewardToken);
-
-        emit SetRewardsTraderSubmitted(rewardToken, traderAddress, block.timestamp + SET_TRADER_TIMELOCK);
-    }
-
-    /// @inheritdoc ICommonAggregator
-    function setRewardTrader(address rewardToken, address traderAddress)
-        external
-        onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
-    {
-        _ensureTokenSafeToTransfer(rewardToken);
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        $.rewardTrader[rewardToken] = traderAddress;
-
-        emit RewardsTraderSet(rewardToken, traderAddress);
-    }
-
-    /// @inheritdoc ICommonAggregator
-    function cancelSetRewardTrader(address rewardToken, address traderAddress)
-        external
-        onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
-    {
-        emit SetRewardsTraderCancelled(rewardToken, traderAddress);
-    }
-
-    /// @inheritdoc ICommonAggregator
-    function transferRewardsForSale(address rewardToken) external {
-        _ensureTokenSafeToTransfer(rewardToken);
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        require($.rewardTrader[rewardToken] != address(0), NoTraderSetForToken(rewardToken));
-
+        ensureTokenSafeToTransfer(rewardToken);
         IERC20 transferrableToken = IERC20(rewardToken);
-        uint256 amount = transferrableToken.balanceOf(address(this));
-        address receiver = $.rewardTrader[rewardToken];
-
-        SafeERC20.safeTransfer(transferrableToken, receiver, amount);
-
-        emit RewardsTransferred(rewardToken, amount, receiver);
-    }
-
-    function _ensureTokenSafeToTransfer(address rewardToken) internal view {
-        require(rewardToken != asset(), InvalidRewardToken(rewardToken));
-        require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
-        require(rewardToken != address(this), InvalidRewardToken(rewardToken));
-        require(
-            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
-            InvalidRewardToken(rewardToken)
-        );
+        amount = transferrableToken.balanceOf(address(this));
+        SafeERC20.safeTransfer(transferrableToken, rewardTrader, amount);
     }
 
     // ----- Pausing user interactions -----
@@ -660,19 +502,15 @@ contract CommonAggregator is
     /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
     /// to exit the aggregator.
-    function pauseUserInteractions() public onlyGuardianOrHigherRole {
+    function pauseUserInteractions() public override onlyManagement {
         _pause();
     }
 
     /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used after mitigating a potential emergency.
-    function unpauseUserInteractions() public onlyGuardianOrHigherRole {
-        uint256 pendingVaultForceRemovals = _getAggregatorStorage().pendingVaultForceRemovals;
-        require(pendingVaultForceRemovals == 0, PendingVaultForceRemovals(pendingVaultForceRemovals));
+    function unpauseUserInteractions() public override onlyManagement {
         _unpause();
     }
-
-    error PendingVaultForceRemovals(uint256 count);
 
     // ----- Etc -----
 
@@ -681,57 +519,16 @@ contract CommonAggregator is
         _disableInitializers();
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(OWNER)
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)))
-    {
-        emit ContractUpgradeAuthorized(newImplementation);
-    }
-
-    function submitUpgrade(address newImplementation)
-        external
-        onlyRole(OWNER)
-        registersTimelockedAction(
-            keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)),
-            CONTRACT_UPGRADE_TIMELOCK
-        )
-    {
-        emit ContractUpgradeSubmitted(newImplementation, block.timestamp + CONTRACT_UPGRADE_TIMELOCK);
-    }
-
-    function cancelUpgrade(address newImplementation)
-        external
-        onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(TimelockTypes.CONTRACT_UPGRADE, newImplementation)))
-    {
-        emit ContractUpgradeCancelled(newImplementation);
-    }
-
-    modifier onlyRebalancerOrHigherRole() {
-        if (!hasRole(REBALANCER, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
-            revert CallerNotRebalancerOrWithHigherRole();
-        }
-        _;
-    }
+    function _authorizeUpgrade(address newImplementation) internal override onlyManagement {}
 
     modifier onlyAggregator() {
         require(msg.sender == address(this), CallerNotAggregator());
         _;
     }
 
-    modifier onlyGuardianOrHigherRole() {
-        if (!hasRole(GUARDIAN, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
-            revert CallerNotGuardianOrWithHigherRole();
-        }
-        _;
-    }
-
-    modifier onlyManagerOrOwner() {
-        if (!hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
-            revert CallerNotManagerNorOwner();
-        }
+    modifier onlyManagement() {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        require(msg.sender == address($.management), CallerNotManagement());
         _;
     }
 }

@@ -14,59 +14,11 @@ interface ICommonAggregator is IERC4626Buffered {
     error VaultAlreadyAdded(IERC4626 vault);
     error VaultLimitExceeded();
 
-    // ----- Upgradeablity -----
-
-    event ContractUpgradeSubmitted(address newImplementation, uint256 unlockTimestamp);
-    event ContractUpgradeCancelled(address newImplementation);
-    event ContractUpgradeAuthorized(address newImplementation);
-
-    /// @notice Submits timelocked upgrade action to `newImplementation`.
-    /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
-    /// @dev After the timelock passes, upgrader can upgradeToAndCall on the new implementation with
-    /// any calldata. No check against missing some storage or selectors are done on the contract
-    /// level. It's recommended to use the `openzeppelin-foundry-upgrades` libarary for updates.
-    /// There could be many pending upgrades, so it's the guardian's responsibility to cancel
-    /// the invalid ones.
-    function submitUpgrade(address newImplementation) external;
-
-    /// @notice Cancels timelocked upgrade action to `newImplementation`.
-    function cancelUpgrade(address newImplementation) external;
-
     // ----- Vault management -----
 
-    event VaultAdditionSubmitted(address indexed vault, uint256 unlockTimestamp);
-    event VaultAdditionCancelled(address indexed vault);
-    event VaultAdded(address indexed vault);
-
-    event VaultRemoved(address indexed vault);
-
-    event VaultForceRemovalSubmitted(address indexed vault, uint256 unlockTimestamp);
-    event VaultForceRemovalCancelled(address indexed vault);
-    event VaultForceRemoved(address indexed vault);
-
-    function submitAddVault(IERC4626 vault) external;
-    function cancelAddVault(IERC4626 vault) external;
     function addVault(IERC4626 vault) external;
-
     function removeVault(IERC4626 vault) external;
-
-    /// @notice Submits timelocked force removal action for `vault`.
-    /// Pauses user actions (deposit, mint, withdraw, redeem), allowing only for the emergency redeem, if
-    /// the aggregator is not already paused.
-    /// After `unlockTimestamp` passes, the `forceRemoveVault` can be called.
-    /// @dev Tries to redeem as many `vault`'s shares as possible.
-    function submitForceRemoveVault(IERC4626 vault) external;
-
-    /// @notice Cancels timelocked force removal action for `vault`.
-    /// Doesn't unpause protocol by itself.
-    function cancelForceRemoveVault(IERC4626 vault) external;
-
-    /// @notice Force-removes `vault` from the aggregator, lossing all the assets allocated to it.
-    /// Doesn't unpause protocol by itself.
     function forceRemoveVault(IERC4626 vault) external;
-
-    error PendingVaultForceRemoval(IERC4626 vault);
-    error VaultAdditionAlreadyPending(IERC4626 vault);
 
     // ----- Deposits -----
 
@@ -82,7 +34,9 @@ interface ICommonAggregator is IERC4626Buffered {
 
     // ----- Rebalancing -----
 
-    event AssetsRebalanced(address indexed from, address indexed to, uint256 amount);
+    /// @notice Deposits `assets` from aggregator's own balance into `vault`.
+    /// Vault must be present on the vault list. Allocation limits are checked.
+    function pushFunds(uint256 assets, IERC4626 vault) external;
 
     /// @notice Withdraws `assets` from `vault` into aggregator's own balance.
     /// Vault must be present on the vault list.
@@ -93,17 +47,9 @@ interface ICommonAggregator is IERC4626Buffered {
     /// @notice Redeems `shares` from `vault`, returning assets into
     /// aggregator's own balance. Vault must be present on the vault list.
     /// @dev Similarly to `pullFunds`, doesn't check the allocation limits.
-    function pullFundsByShares(uint256 shares, IERC4626 vault) external;
-
-    /// @notice Deposits `assets` from aggregator's own balance into `vault`.
-    /// Vault must be present on the vault list. Allocation limits are checked.
-    function pushFunds(uint256 assets, IERC4626 vault) external;
+    function pullFundsByShares(uint256 shares, IERC4626 vault) external returns (uint256 assets);
 
     error AllocationLimitExceeded(IERC4626 vault);
-
-    error CallerNotRebalancerOrWithHigherRole();
-    error CallerNotManagerNorOwner();
-    error CallerNotGuardianOrWithHigherRole();
 
     // ----- Allocation Limits -----
 
@@ -129,8 +75,8 @@ interface ICommonAggregator is IERC4626Buffered {
 
     /// @notice Sets bps-wise protocol fee.
     /// The protocol fee is applied on the profit made, with each holdings state update.
-    /// It's a no-op if `_protocolFeeBps` is the same as the current `protocolFeeBps`.
-    function setProtocolFee(uint256 _protocolFeeBps) external;
+    /// It's a no-op if `protocolFeeBps` is the same as the current `protocolFeeBps`.
+    function setProtocolFee(uint256 protocolFeeBps) external;
 
     error SelfProtocolFeeReceiver();
 
@@ -140,31 +86,10 @@ interface ICommonAggregator is IERC4626Buffered {
 
     // ----- Non-asset rewards trading -----
 
-    event SetRewardsTraderSubmitted(
-        address indexed rewardToken, address indexed traderAddress, uint256 unlockTimestamp
-    );
-    event SetRewardsTraderCancelled(address indexed rewardToken, address indexed traderAddress);
-    event RewardsTraderSet(address indexed rewardToken, address indexed traderAddress);
-    event RewardsTransferred(address indexed rewardToken, uint256 amount, address indexed receiver);
-
     error InvalidRewardToken(address token);
-    error NoTraderSetForToken(address token);
 
-    /// @notice Proposes execution of `setRewardTrader` with given parameters.
-    /// Caller must hold the `OWNER` role.
-    function submitSetRewardTrader(address rewardToken, address traderAddress) external;
-
-    /// @notice Allows transfering `rewardToken`s from aggregator to `traderAddress`
-    /// using `transferRewardsForSale` method.
-    /// Can only be called after timelock initiated in `submitSetRewardTrader` has elapsed.
-    function setRewardTrader(address rewardToken, address traderAddress) external;
-
-    /// @notice Cancels reward trader setting action.
-    /// Caller must hold `GUARDIAN`, `MANAGER` or `OWNER` role.
-    function cancelSetRewardTrader(address rewardToken, address traderAddress) external;
-
-    /// @notice Transfers all `token`s held in the aggregator to `rewardTrader[token]`
-    function transferRewardsForSale(address token) external;
+    /// @notice Transfers all `rewardToken`s held in the aggregator to `rewardTrader`
+    function transferRewardsForSale(address rewardToken, address rewardTrader) external returns (uint256 amount);
 
     // ----- Emergency redeem -----
 
@@ -191,4 +116,19 @@ interface ICommonAggregator is IERC4626Buffered {
     function emergencyRedeem(uint256 shares, address receiver, address owner)
         external
         returns (uint256 assets, uint256[] memory vaultsShares);
+
+    // ----- Checks -----
+
+    function ensureVaultCanBeAdded(IERC4626 vault) external view;
+    function ensureVaultIsPresent(IERC4626 vault) external view returns (uint256);
+    function ensureTokenSafeToTransfer(address rewardToken) external view;
+
+    // ----- Pausing -----
+
+    function pauseUserInteractions() external;
+    function unpauseUserInteractions() external;
+
+    // ----- Access control -----
+
+    error CallerNotManagement();
 }
