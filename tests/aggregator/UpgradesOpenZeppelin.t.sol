@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {CommonAggregator, ICommonAggregator, ERC4626BufferedUpgradeable} from "contracts/CommonAggregator.sol";
+import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy, ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
@@ -100,13 +101,15 @@ contract CommonAggregatorTest is Test {
     ERC20Mock asset = new ERC20Mock();
     IERC4626[] vaults = new IERC4626[](1);
 
-    address proxy;
+    address aggregatorProxy;
+    address managementProxy;
 
     function testValidation() public {
         vaults[0] = new ERC4626Mock(address(asset));
-        proxy = Upgrades.deployUUPSProxy(
-            "CommonAggregator.sol", abi.encodeCall(CommonAggregator.initialize, (owner, asset, vaults))
-        );
+        managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
+        aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
+        CommonManagement(managementProxy).initialize(owner, CommonAggregator(aggregatorProxy));
+        CommonAggregator(aggregatorProxy).initialize(ICommonManagement(managementProxy), asset, vaults);
 
         Options memory options;
         Upgrades.validateUpgrade("UpgradesOpenZeppelin.t.sol:CommonAggregatorCorrectUpgrade", options);
@@ -114,9 +117,10 @@ contract CommonAggregatorTest is Test {
 
     function testValidationWithMissingNamespaceStorage() public {
         vaults[0] = new ERC4626Mock(address(asset));
-        proxy = Upgrades.deployUUPSProxy(
-            "CommonAggregator.sol", abi.encodeCall(CommonAggregator.initialize, (owner, asset, vaults))
-        );
+        managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
+        aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
+        CommonManagement(managementProxy).initialize(owner, CommonAggregator(aggregatorProxy));
+        CommonAggregator(aggregatorProxy).initialize(ICommonManagement(managementProxy), asset, vaults);
 
         vm.expectRevert();
         this.validateUpgrade("UpgradesOpenZeppelin.t.sol:CommonAggregatorUpgradeMissingNamespaceStorage");
@@ -124,9 +128,10 @@ contract CommonAggregatorTest is Test {
 
     function testValidationWithMissingStorageFields() public {
         vaults[0] = new ERC4626Mock(address(asset));
-        proxy = Upgrades.deployUUPSProxy(
-            "CommonAggregator.sol", abi.encodeCall(CommonAggregator.initialize, (owner, asset, vaults))
-        );
+        managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
+        aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
+        CommonManagement(managementProxy).initialize(owner, CommonAggregator(aggregatorProxy));
+        CommonAggregator(aggregatorProxy).initialize(ICommonManagement(managementProxy), asset, vaults);
 
         vm.expectRevert();
         this.validateUpgrade("UpgradesOpenZeppelin.t.sol:CommonAggregatorUpgradeMissingStorageFields");

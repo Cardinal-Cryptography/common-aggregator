@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ICommonAggregator} from "contracts/interfaces/ICommonAggregator.sol";
-import {IERC4626, CommonAggregator} from "contracts/CommonAggregator.sol";
+import {IERC4626, CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -18,17 +18,21 @@ contract PausingTest is Test {
     address bob = address(0x789);
     ERC20Mock asset = new ERC20Mock();
     CommonAggregator aggregator;
+    CommonManagement management;
 
     function setUp() public {
-        CommonAggregator implementation = new CommonAggregator();
-        ERC4626Mock[] memory vaults = new ERC4626Mock[](2);
+        CommonAggregator aggregatorImplementation = new CommonAggregator();
+        CommonManagement managementImplementation = new CommonManagement();
+        IERC4626[] memory vaults = new IERC4626[](2);
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
-
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
-        aggregator = CommonAggregator(address(proxy));
+        ERC1967Proxy aggregatorProxy = new ERC1967Proxy(address(aggregatorImplementation), "");
+        ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
+        aggregator = CommonAggregator(address(aggregatorProxy));
+        management = CommonManagement(address(managementProxy));
+        aggregator.initialize(management, asset, vaults);
+        management.initialize(owner, aggregator);
         _grantRoles();
     }
 
@@ -55,7 +59,7 @@ contract PausingTest is Test {
 
     function testRegularUserCantPauseUnpauseGlobal() public {
         vm.prank(alice);
-        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
+        vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
 
         aggregator.pauseUserInteractions();
 
@@ -64,7 +68,7 @@ contract PausingTest is Test {
         aggregator.pauseUserInteractions();
 
         vm.prank(alice);
-        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
+        vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
         aggregator.unpauseUserInteractions();
     }
 
@@ -285,19 +289,19 @@ contract PausingTest is Test {
         IERC4626 vault0 = aggregator.getVaults()[0];
         IERC4626 vault1 = aggregator.getVaults()[1];
         vm.prank(owner);
-        aggregator.submitForceRemoveVault(vault0);
+        management.submitForceRemoveVault(vault0);
         vm.prank(owner);
-        aggregator.submitForceRemoveVault(vault1);
+        management.submitForceRemoveVault(vault1);
 
         vm.prank(guardian);
-        vm.expectRevert(abi.encodeWithSelector(CommonAggregator.PendingVaultForceRemovals.selector, 2));
+        vm.expectRevert(abi.encodeWithSelector(ICommonManagement.PendingVaultForceRemovals.selector, 2));
         aggregator.unpauseUserInteractions();
 
         vm.prank(guardian);
-        aggregator.cancelForceRemoveVault(vault0);
+        management.cancelForceRemoveVault(vault0);
 
         vm.prank(guardian);
-        vm.expectRevert(abi.encodeWithSelector(CommonAggregator.PendingVaultForceRemovals.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(ICommonManagement.PendingVaultForceRemovals.selector, 1));
         aggregator.unpauseUserInteractions();
 
         vm.warp(30 days);
@@ -312,8 +316,8 @@ contract PausingTest is Test {
 
     function _grantRoles() private {
         vm.prank(owner);
-        aggregator.grantRole(keccak256("MANAGER"), manager);
+        management.grantRole(keccak256("MANAGER"), manager);
         vm.prank(owner);
-        aggregator.grantRole(keccak256("GUARDIAN"), guardian);
+        management.grantRole(keccak256("GUARDIAN"), guardian);
     }
 }
