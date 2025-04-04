@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ICommonAggregator} from "contracts/interfaces/ICommonAggregator.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
 import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -29,29 +29,29 @@ contract VaultManagementTest is Test {
     }
 
     function testAddFirstVaultToEmptyAggregator() public {
-        CommonAggregator aggregator = _noVaultAggregator();
+        (CommonAggregator aggregator, CommonManagement management) = _noVaultAggregator();
         IERC4626 vault = new ERC4626Mock(address(asset));
-        _testAddVault(aggregator, vault);
+        _testAddVault(aggregator, management, vault);
         assertEq(aggregator.getVaults().length, 1);
     }
 
     function testAddVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626 vault = new ERC4626Mock(address(asset));
-        _testAddVault(aggregator, vault);
+        _testAddVault(aggregator, management, vault);
         assertEq(aggregator.getVaults().length, 4);
     }
 
-    function _testAddVault(CommonAggregator aggregator, IERC4626 vault) private {
+    function _testAddVault(CommonAggregator aggregator, CommonManagement management, IERC4626 vault) private {
         vm.expectEmit(true, true, true, true, address(aggregator), 1);
-        emit ICommonAggregator.VaultAdditionSubmitted(address(vault), vm.getBlockTimestamp() + 7 days);
+        emit ICommonManagement.VaultAdditionSubmitted(address(vault), vm.getBlockTimestamp() + 7 days);
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
         vm.warp(vm.getBlockTimestamp() + 7 days + 5 hours);
 
         vm.expectEmit(true, true, true, true, address(aggregator), 1);
-        emit ICommonAggregator.VaultAdded(address(vault));
+        emit ICommonManagement.VaultAdded(address(vault));
         vm.prank(manager);
         aggregator.addVault(vault);
 
@@ -61,16 +61,16 @@ contract VaultManagementTest is Test {
     }
 
     function testCantAddVaultTooEarly() public {
-        CommonAggregator aggregator = _noVaultAggregator();
+        (CommonAggregator aggregator, CommonManagement management) = _noVaultAggregator();
         IERC4626 vault = new ERC4626Mock(address(asset));
 
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
         // Limits are inclusive, so it's still too early
         vm.warp(STARTING_TIMESTAMP + 7 days);
 
-        bytes32 actionHash = keccak256(abi.encode(CommonAggregator.TimelockTypes.ADD_VAULT, vault));
+        bytes32 actionHash = keccak256(abi.encode(CommonManagement.TimelockTypes.ADD_VAULT, vault));
         vm.expectRevert(
             abi.encodeWithSelector(CommonTimelocks.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 7 days)
         );
@@ -79,39 +79,39 @@ contract VaultManagementTest is Test {
     }
 
     function testCantSubmitAddExistingVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626 vault = aggregator.getVaults()[0];
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultAlreadyAdded.selector, vault));
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
     }
 
     function testCantSubmitAddSameVaultTwice() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626 vault = new ERC4626Mock(address(asset));
 
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonTimelocks.ActionAlreadyRegistered.selector,
-                keccak256(abi.encode(CommonAggregator.TimelockTypes.ADD_VAULT, vault))
+                keccak256(abi.encode(CommonManagement.TimelockTypes.ADD_VAULT, vault))
             )
         );
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
         vm.expectRevert();
         vm.prank(manager);
         aggregator.addVault(vault);
 
         vm.prank(manager);
-        aggregator.cancelAddVault(vault);
+        management.cancelAddVault(vault);
 
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
         vm.warp(STARTING_TIMESTAMP + 8 days);
         vm.prank(manager);
@@ -122,17 +122,17 @@ contract VaultManagementTest is Test {
     }
 
     function testCancelAddVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626 vault = new ERC4626Mock(address(asset));
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
         vm.warp(STARTING_TIMESTAMP + 2 days);
 
         vm.expectEmit(true, true, true, true, address(aggregator), 1);
-        emit ICommonAggregator.VaultAdditionCancelled(address(vault));
+        emit ICommonManagement.VaultAdditionCancelled(address(vault));
         vm.prank(guardian);
-        aggregator.cancelAddVault(vault);
+        management.cancelAddVault(vault);
 
         vm.warp(STARTING_TIMESTAMP + 8 days);
         vm.expectRevert();
@@ -141,20 +141,20 @@ contract VaultManagementTest is Test {
     }
 
     function testAddManyVaults() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626 vaultA = new ERC4626Mock(address(asset));
         IERC4626 vaultB = new ERC4626Mock(address(asset));
         IERC4626 vaultC = new ERC4626Mock(address(asset));
 
         vm.prank(manager);
-        aggregator.submitAddVault(vaultA);
+        management.submitAddVault(vaultA);
 
         vm.warp(STARTING_TIMESTAMP + 1 days);
 
         vm.prank(manager);
-        aggregator.submitAddVault(vaultB);
+        management.submitAddVault(vaultB);
         vm.prank(manager);
-        aggregator.submitAddVault(vaultC);
+        management.submitAddVault(vaultC);
 
         vm.warp(STARTING_TIMESTAMP + 8 days + 1 seconds);
 
@@ -176,10 +176,10 @@ contract VaultManagementTest is Test {
     }
 
     function testChangeLimitAfterAddingAndRemovingVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626 vault = new ERC4626Mock(address(asset));
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
         vm.warp(STARTING_TIMESTAMP + 8 days);
         vm.prank(manager);
@@ -200,12 +200,12 @@ contract VaultManagementTest is Test {
     }
 
     function testRemoveVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626[] memory initialVaults = aggregator.getVaults();
 
         vm.prank(manager);
         vm.expectEmit(true, true, true, true, address(aggregator), 1);
-        emit ICommonAggregator.VaultRemoved(address(initialVaults[1]));
+        emit ICommonManagement.VaultRemoved(address(initialVaults[1]));
         aggregator.removeVault(initialVaults[1]);
 
         assertEq(aggregator.getVaults().length, 2);
@@ -220,7 +220,7 @@ contract VaultManagementTest is Test {
     }
 
     function testRemoveVaultRedeemsShares() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626[] memory initialVaults = aggregator.getVaults();
         ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
 
@@ -248,7 +248,7 @@ contract VaultManagementTest is Test {
     }
 
     function testRemoveVaultRedeemSharesWhenItCantRedeemAllOfThem() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626[] memory initialVaults = aggregator.getVaults();
         ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
 
@@ -273,32 +273,32 @@ contract VaultManagementTest is Test {
     }
 
     function testCantRemoveVaultWhenPendingForceRemoval() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626[] memory initialVaults = aggregator.getVaults();
         ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
 
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(toRemove);
+        management.submitForceRemoveVault(toRemove);
 
-        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.PendingVaultForceRemoval.selector, toRemove));
+        vm.expectRevert(abi.encodeWithSelector(ICommonManagement.PendingVaultForceRemoval.selector, toRemove));
         vm.prank(manager);
         aggregator.removeVault(toRemove);
     }
 
     function testForceRemoveVaultNotPaused() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
-        _testSimpleForceRemoveMiddleVault(aggregator);
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
+        _testSimpleForceRemoveMiddleVault(aggregator, management);
     }
 
     function testForceRemoveVaultPaused() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         vm.prank(owner);
         aggregator.pauseUserInteractions();
 
-        _testSimpleForceRemoveMiddleVault(aggregator);
+        _testSimpleForceRemoveMiddleVault(aggregator, management);
     }
 
-    function _testSimpleForceRemoveMiddleVault(CommonAggregator aggregator) private {
+    function _testSimpleForceRemoveMiddleVault(CommonAggregator aggregator, CommonManagement management) private {
         assertEq(aggregator.getVaults().length, 3, "Incorrect test usage");
 
         IERC4626[] memory initialVaults = aggregator.getVaults();
@@ -306,8 +306,8 @@ contract VaultManagementTest is Test {
 
         vm.prank(manager);
         vm.expectEmit(true, true, true, true, address(aggregator), 1);
-        emit ICommonAggregator.VaultForceRemovalSubmitted(address(toRemove), vm.getBlockTimestamp() + 14 days);
-        aggregator.submitForceRemoveVault(toRemove);
+        emit ICommonManagement.VaultForceRemovalSubmitted(address(toRemove), vm.getBlockTimestamp() + 14 days);
+        management.submitForceRemoveVault(toRemove);
 
         assertEq(aggregator.paused(), true);
 
@@ -315,7 +315,7 @@ contract VaultManagementTest is Test {
 
         vm.prank(manager);
         vm.expectEmit(true, true, true, true, address(aggregator), 1);
-        emit ICommonAggregator.VaultForceRemoved(address(toRemove));
+        emit ICommonManagement.VaultForceRemoved(address(toRemove));
         aggregator.forceRemoveVault(toRemove);
 
         assertEq(aggregator.getVaults().length, 2);
@@ -324,26 +324,26 @@ contract VaultManagementTest is Test {
     }
 
     function testCantForceRemoveVaultTooEarly() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626[] memory initialVaults = aggregator.getVaults();
         ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonTimelocks.ActionNotRegistered.selector,
-                keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
+                keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
             )
         );
         vm.prank(manager);
         aggregator.forceRemoveVault(toRemove);
 
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(toRemove);
+        management.submitForceRemoveVault(toRemove);
 
         // Limits are inclusive, so it's still too early
         vm.warp(STARTING_TIMESTAMP + 14 days);
 
-        bytes32 actionHash = keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove));
+        bytes32 actionHash = keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove));
         vm.expectRevert(
             abi.encodeWithSelector(CommonTimelocks.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 14 days)
         );
@@ -352,34 +352,34 @@ contract VaultManagementTest is Test {
     }
 
     function submitForceRemoveSameVaultTwiceFails() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626[] memory initialVaults = aggregator.getVaults();
         ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
 
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(toRemove);
+        management.submitForceRemoveVault(toRemove);
 
         vm.prank(manager);
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonTimelocks.ActionAlreadyRegistered.selector,
-                keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
+                keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
             )
         );
-        aggregator.submitForceRemoveVault(toRemove);
+        management.submitForceRemoveVault(toRemove);
     }
 
     function submitForceRemoveOfNonExistentVaultFails() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         ERC4626Mock fakeVault = new ERC4626Mock(address(3));
 
         vm.prank(manager);
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, fakeVault));
-        aggregator.submitForceRemoveVault(fakeVault);
+        management.submitForceRemoveVault(fakeVault);
     }
 
     function testCancelForceRemoveVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626[] memory initialVaults = aggregator.getVaults();
         ERC4626Mock toRemove = ERC4626Mock(address(initialVaults[1]));
 
@@ -387,65 +387,65 @@ contract VaultManagementTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonTimelocks.ActionNotRegistered.selector,
-                keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
+                keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
             )
         );
         vm.prank(guardian);
-        aggregator.cancelForceRemoveVault(toRemove);
+        management.cancelForceRemoveVault(toRemove);
 
         // Successfull submission and cancellation
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(toRemove);
+        management.submitForceRemoveVault(toRemove);
         vm.warp(STARTING_TIMESTAMP + 8 days);
         vm.expectEmit(true, true, true, true, address(aggregator), 1);
-        emit ICommonAggregator.VaultForceRemovalCancelled(address(toRemove));
+        emit ICommonManagement.VaultForceRemovalCancelled(address(toRemove));
         vm.prank(guardian);
-        aggregator.cancelForceRemoveVault(toRemove);
+        management.cancelForceRemoveVault(toRemove);
 
         // Cancelling for the second time fails
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonTimelocks.ActionNotRegistered.selector,
-                keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
+                keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
             )
         );
         vm.prank(guardian);
-        aggregator.cancelForceRemoveVault(toRemove);
+        management.cancelForceRemoveVault(toRemove);
 
         // Force removal doesn't work after cancelling
         vm.warp(STARTING_TIMESTAMP + 30 days);
-        bytes32 actionHash = keccak256(abi.encode(CommonAggregator.TimelockTypes.FORCE_REMOVE_VAULT, toRemove));
+        bytes32 actionHash = keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove));
         vm.expectRevert(abi.encodeWithSelector(CommonTimelocks.ActionNotRegistered.selector, actionHash));
         vm.prank(manager);
         aggregator.forceRemoveVault(toRemove);
     }
 
     function testForceRemoveVaultRemovesAssetsWhenVaultIsBroken() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         _firstDeposit(aggregator, 1000);
         _equalDistributionFromIdle(aggregator, true);
         assertEq(aggregator.totalAssets(), 1000);
 
         ERC4626Mock(address(aggregator.getVaults()[1])).setReverting(true);
-        _testSimpleForceRemoveMiddleVault(aggregator);
+        _testSimpleForceRemoveMiddleVault(aggregator, management);
 
         assertEq(aggregator.totalAssets(), 750);
     }
 
     function testForceRemoveVaultRedeemsSharesIfPossilbe() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         _firstDeposit(aggregator, 1000);
         _equalDistributionFromIdle(aggregator, true);
         assertEq(aggregator.totalAssets(), 1000);
 
         ERC4626Mock(address(aggregator.getVaults()[1])).setRedeemLimit(200);
-        _testSimpleForceRemoveMiddleVault(aggregator);
+        _testSimpleForceRemoveMiddleVault(aggregator, management);
 
         assertEq(aggregator.totalAssets(), 950);
     }
 
     function testSubmitForceRemoveVaultDoesntRemoveAssetsYet() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         _firstDeposit(aggregator, 1000);
         _equalDistributionFromIdle(aggregator, true);
         assertEq(aggregator.totalAssets(), 1000);
@@ -456,13 +456,13 @@ contract VaultManagementTest is Test {
         toRemove.setReverting(true);
 
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(toRemove);
+        management.submitForceRemoveVault(toRemove);
 
         assertEq(aggregator.totalAssets(), 1000);
     }
 
     function testUserCanEmergencyRedeemWhenPendingForceRemoval() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         _firstDeposit(aggregator, 1000);
         _equalDistributionFromIdle(aggregator, true);
 
@@ -476,7 +476,7 @@ contract VaultManagementTest is Test {
         toRemove.setReverting(true);
 
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(toRemove);
+        management.submitForceRemoveVault(toRemove);
 
         // Normal redeem should fail
         vm.prank(alice);
@@ -494,67 +494,67 @@ contract VaultManagementTest is Test {
     }
 
     function testRolesSubmitAddVault() public {
-        CommonAggregator aggregator = _noVaultAggregator();
+        (CommonAggregator aggregator, CommonManagement management) = _noVaultAggregator();
         IERC4626 vault = new ERC4626Mock(address(asset));
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(alice);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(guardian);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
         IERC4626 vault2 = new ERC4626Mock(address(asset));
         vm.prank(owner);
-        aggregator.submitAddVault(vault2);
+        management.submitAddVault(vault2);
     }
 
     function testRolesCancelAddVault() public {
-        CommonAggregator aggregator = _noVaultAggregator();
+        (CommonAggregator aggregator, CommonManagement management) = _noVaultAggregator();
         IERC4626 vault = new ERC4626Mock(address(asset));
 
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
 
-        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
+        vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
         vm.prank(alice);
-        aggregator.cancelAddVault(vault);
+        management.cancelAddVault(vault);
 
         vm.prank(guardian);
-        aggregator.cancelAddVault(vault);
+        management.cancelAddVault(vault);
 
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
         vm.prank(manager);
-        aggregator.cancelAddVault(vault);
+        management.cancelAddVault(vault);
 
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
         vm.prank(owner);
-        aggregator.cancelAddVault(vault);
+        management.cancelAddVault(vault);
     }
 
     function testRolesAddVault() public {
-        CommonAggregator aggregator = _noVaultAggregator();
+        (CommonAggregator aggregator, CommonManagement management) = _noVaultAggregator();
         IERC4626 vault = new ERC4626Mock(address(asset));
         IERC4626 vault2 = new ERC4626Mock(address(asset));
 
         vm.prank(manager);
-        aggregator.submitAddVault(vault);
+        management.submitAddVault(vault);
         vm.prank(manager);
-        aggregator.submitAddVault(vault2);
+        management.submitAddVault(vault2);
 
         vm.warp(STARTING_TIMESTAMP + 8 days);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(alice);
         aggregator.addVault(vault);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(guardian);
         aggregator.addVault(vault);
 
@@ -566,14 +566,14 @@ contract VaultManagementTest is Test {
     }
 
     function testRolesRemoveVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
 
         IERC4626 vaultToRemove = aggregator.getVaults()[0];
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(alice);
         aggregator.removeVault(vaultToRemove);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(guardian);
         aggregator.removeVault(vaultToRemove);
 
@@ -586,68 +586,68 @@ contract VaultManagementTest is Test {
     }
 
     function testRolesSubmitForceRemoveVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
 
         IERC4626 vault0 = aggregator.getVaults()[0];
         IERC4626 vault1 = aggregator.getVaults()[1];
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(alice);
-        aggregator.submitForceRemoveVault(vault0);
+        management.submitForceRemoveVault(vault0);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(guardian);
-        aggregator.submitForceRemoveVault(vault0);
+        management.submitForceRemoveVault(vault0);
 
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(vault0);
+        management.submitForceRemoveVault(vault0);
 
         vm.prank(owner);
-        aggregator.submitForceRemoveVault(vault1);
+        management.submitForceRemoveVault(vault1);
     }
 
     function testRolesCancelForceRemoveVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
 
         IERC4626 vaultToRemove = aggregator.getVaults()[0];
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(vaultToRemove);
+        management.submitForceRemoveVault(vaultToRemove);
 
-        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
+        vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
         vm.prank(alice);
-        aggregator.cancelForceRemoveVault(vaultToRemove);
+        management.cancelForceRemoveVault(vaultToRemove);
 
         vm.prank(guardian);
-        aggregator.cancelForceRemoveVault(vaultToRemove);
+        management.cancelForceRemoveVault(vaultToRemove);
 
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(vaultToRemove);
+        management.submitForceRemoveVault(vaultToRemove);
         vm.prank(manager);
-        aggregator.cancelForceRemoveVault(vaultToRemove);
+        management.cancelForceRemoveVault(vaultToRemove);
 
         vm.prank(owner);
-        aggregator.submitForceRemoveVault(vaultToRemove);
+        management.submitForceRemoveVault(vaultToRemove);
         vm.prank(owner);
-        aggregator.cancelForceRemoveVault(vaultToRemove);
+        management.cancelForceRemoveVault(vaultToRemove);
     }
 
     function testRolesForceRemoveVault() public {
-        CommonAggregator aggregator = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
 
         IERC4626 vault0 = aggregator.getVaults()[0];
         IERC4626 vault1 = aggregator.getVaults()[1];
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(vault0);
+        management.submitForceRemoveVault(vault0);
         vm.prank(manager);
-        aggregator.submitForceRemoveVault(vault1);
+        management.submitForceRemoveVault(vault1);
 
         vm.warp(STARTING_TIMESTAMP + 30 days);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(alice);
         aggregator.forceRemoveVault(vault0);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(guardian);
         aggregator.forceRemoveVault(vault0);
 
@@ -659,36 +659,41 @@ contract VaultManagementTest is Test {
         assertEq(aggregator.getVaults().length, 1);
     }
 
-    function _aggregatorWithThreeVaults() private returns (CommonAggregator) {
+    function _aggregatorWithThreeVaults() private returns (CommonAggregator aggregator, CommonManagement management) {
         IERC4626[] memory vaults = new IERC4626[](3);
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
         vaults[2] = new ERC4626Mock(address(asset));
 
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
-        CommonAggregator implementation = new CommonAggregator();
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
-        CommonAggregator aggregator = CommonAggregator(address(proxy));
-        _grantRoles(aggregator);
-        return aggregator;
+        CommonAggregator aggregatorImplementation = new CommonAggregator();
+        CommonManagement managementImplementation = new CommonManagement();
+        ERC1967Proxy aggregatorProxy = new ERC1967Proxy(address(aggregatorImplementation), "");
+        ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
+        aggregator = CommonAggregator(address(aggregatorProxy));
+        management = CommonManagement(address(managementProxy));
+        aggregator.initialize(management, asset, vaults);
+        management.initialize(owner, aggregator);
+        _grantRoles(management);
     }
 
-    function _noVaultAggregator() private returns (CommonAggregator) {
-        bytes memory initializeData =
-            abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, new ERC4626Mock[](0));
-        CommonAggregator implementation = new CommonAggregator();
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
-        CommonAggregator aggregator = CommonAggregator(address(proxy));
-        _grantRoles(aggregator);
-        return aggregator;
+    function _noVaultAggregator() private returns (CommonAggregator aggregator, CommonManagement management) {
+        CommonAggregator aggregatorImplementation = new CommonAggregator();
+        CommonManagement managementImplementation = new CommonManagement();
+        ERC1967Proxy aggregatorProxy = new ERC1967Proxy(address(aggregatorImplementation), "");
+        ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
+        aggregator = CommonAggregator(address(aggregatorProxy));
+        management = CommonManagement(address(managementProxy));
+        aggregator.initialize(management, asset, new IERC4626[](0));
+        management.initialize(owner, aggregator);
+        _grantRoles(management);
     }
 
-    function _grantRoles(CommonAggregator aggregator) private {
+    function _grantRoles(CommonManagement management) private {
         vm.prank(owner);
-        aggregator.grantRole(keccak256("MANAGER"), manager);
+        management.grantRole(keccak256("MANAGER"), manager);
 
         vm.prank(owner);
-        aggregator.grantRole(keccak256("GUARDIAN"), guardian);
+        management.grantRole(keccak256("GUARDIAN"), guardian);
     }
 
     function _firstDeposit(CommonAggregator aggregator, uint256 initialDeposit) private returns (uint256) {
