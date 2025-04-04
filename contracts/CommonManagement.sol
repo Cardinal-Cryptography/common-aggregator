@@ -117,7 +117,11 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         )
     {
         ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.ensureVaultIsPresent(vault);
+
+        $.aggregator.tryExitVault(vault);
+        if (!$.aggregator.paused()) {
+            $.aggregator.pauseUserInteractions();
+        }
         $.pendingVaultForceRemovals++;
 
         emit VaultForceRemovalSubmitted(address(vault), block.timestamp + FORCE_REMOVE_VAULT_TIMELOCK);

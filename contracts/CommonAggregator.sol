@@ -370,6 +370,17 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         updateHoldingsState();
     }
 
+    /// Tries to redeem as many shares as possible from the given vault.
+    /// Reverts only if the vault is not present on the list.
+    function tryExitVault(IERC4626 vault) external onlyManagement {
+        ensureVaultIsPresent(vault);
+
+        // Try redeeming as much shares of the removed vault as possible
+        try vault.maxRedeem(address(this)) returns (uint256 redeemableShares) {
+            try vault.redeem(redeemableShares, address(this), address(this)) {} catch {}
+        } catch {}
+    }
+
     /// @notice Removes vault from the list by the given index in the vaults array, without any checks.
     /// Updates the storage and removes the vault from mappings.
     function _removeVault(uint256 index) internal {
