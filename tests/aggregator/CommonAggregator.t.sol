@@ -222,14 +222,14 @@ contract CommonAggregatorTest is Test {
 
     function testProtocolFee() public {
         vm.prank(owner);
-        commonAggregator.setProtocolFee(100); // 1%
+        commonManagement.setProtocolFee(100); // 1%
 
         vm.prank(owner);
         vm.expectRevert();
-        commonAggregator.setProtocolFeeReceiver(address(0));
+        commonManagement.setProtocolFeeReceiver(address(0));
 
         vm.prank(owner);
-        commonAggregator.setProtocolFeeReceiver(owner);
+        commonManagement.setProtocolFeeReceiver(owner);
 
         uint256 aliceInitialBalance = 100_000;
         uint256 airdropped = 10_000;
@@ -251,7 +251,7 @@ contract CommonAggregatorTest is Test {
         // Protocol fee increases, but until new gain is reported, nothing changes.
         vm.warp(STARTING_TIMESTAMP + 10 days);
         vm.prank(owner);
-        commonAggregator.setProtocolFee(200);
+        commonManagement.setProtocolFee(200);
         commonAggregator.updateHoldingsState();
 
         vm.warp(STARTING_TIMESTAMP + 25 days);

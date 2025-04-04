@@ -38,60 +38,60 @@ contract PausingTest is Test {
 
     function testOwnerCanPauseUnpauseGlobal() public {
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
         vm.prank(owner);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
     }
 
     function testManagerCanPauseUnpauseGlobal() public {
         vm.prank(manager);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
         vm.prank(manager);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
     }
 
     function testGuardianCanPauseUnpauseGlobal() public {
         vm.prank(guardian);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
         vm.prank(guardian);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
     }
 
     function testRegularUserCantPauseUnpauseGlobal() public {
         vm.prank(alice);
         vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
 
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         // actually pause, so that unpausing is a correct action
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         vm.prank(alice);
         vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
     }
 
     function testUnpausingFailsWhenNotPaused() public {
         vm.prank(owner);
         vm.expectRevert(PausableUpgradeable.ExpectedPause.selector);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
     }
 
     function testPausingFailsWhenPaused() public {
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
     }
 
     function testMaxDepositIsZeroWhenPaused() public {
         assertGt(aggregator.maxDeposit(alice), 0);
 
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         assertEq(aggregator.maxDeposit(alice), 0);
     }
@@ -100,7 +100,7 @@ contract PausingTest is Test {
         assertGt(aggregator.maxMint(alice), 0);
 
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         assertEq(aggregator.maxMint(alice), 0);
     }
@@ -115,7 +115,7 @@ contract PausingTest is Test {
         assertEq(aggregator.maxWithdraw(alice), 1000);
 
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         assertEq(aggregator.maxWithdraw(alice), 0);
     }
@@ -131,7 +131,7 @@ contract PausingTest is Test {
         assertEq(aggregator.maxRedeem(alice), shares);
 
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         assertEq(aggregator.maxRedeem(alice), 0);
     }
@@ -147,7 +147,7 @@ contract PausingTest is Test {
         assertEq(aggregator.maxEmergencyRedeem(alice), shares);
 
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         assertEq(aggregator.maxEmergencyRedeem(alice), shares);
     }
@@ -163,7 +163,7 @@ contract PausingTest is Test {
 
         // pause
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         // deposit fails when paused
         vm.prank(alice);
@@ -172,7 +172,7 @@ contract PausingTest is Test {
 
         // unpause
         vm.prank(owner);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
 
         // deposit succeeds again
         vm.prank(alice);
@@ -191,7 +191,7 @@ contract PausingTest is Test {
 
         // pause
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         // mint fails when paused
         vm.prank(alice);
@@ -200,7 +200,7 @@ contract PausingTest is Test {
 
         // unpause
         vm.prank(owner);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
 
         // mint succeeds again
         vm.prank(alice);
@@ -220,7 +220,7 @@ contract PausingTest is Test {
 
         // pause
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         // withdraw fails when paused
         vm.prank(alice);
@@ -229,7 +229,7 @@ contract PausingTest is Test {
 
         // unpause
         vm.prank(owner);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
 
         // withdraw succeeds again
         vm.prank(alice);
@@ -249,7 +249,7 @@ contract PausingTest is Test {
 
         // pause
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         // redeem fails when paused
         vm.prank(alice);
@@ -258,7 +258,7 @@ contract PausingTest is Test {
 
         // unpause
         vm.prank(owner);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
 
         // redeem succeeds again
         vm.prank(alice);
@@ -278,7 +278,7 @@ contract PausingTest is Test {
 
         // pause
         vm.prank(owner);
-        aggregator.pauseUserInteractions();
+        management.pauseUserInteractions();
 
         // emergency redeem still works when paused
         vm.prank(alice);
@@ -295,21 +295,21 @@ contract PausingTest is Test {
 
         vm.prank(guardian);
         vm.expectRevert(abi.encodeWithSelector(ICommonManagement.PendingVaultForceRemovals.selector, 2));
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
 
         vm.prank(guardian);
         management.cancelForceRemoveVault(vault0);
 
         vm.prank(guardian);
         vm.expectRevert(abi.encodeWithSelector(ICommonManagement.PendingVaultForceRemovals.selector, 1));
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
 
         vm.warp(30 days);
         vm.prank(owner);
-        aggregator.forceRemoveVault(vault1);
+        management.forceRemoveVault(vault1);
 
         vm.prank(guardian);
-        aggregator.unpauseUserInteractions();
+        management.unpauseUserInteractions();
 
         assertEq(aggregator.paused(), false);
     }
