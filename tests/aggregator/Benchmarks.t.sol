@@ -67,7 +67,7 @@ contract CommonAggregatorTest is Test {
 
         advanceTimeWithGain();
         commonAggregator.deposit(amountToDeposit, alice);
-        
+
         advanceTimeWithGain();
         sharesToMint = commonAggregator.previewDeposit(BASE_AMOUNT);
         commonAggregator.mint(sharesToMint, alice);
@@ -87,7 +87,6 @@ contract CommonAggregatorTest is Test {
         uint256 sharesToWithdraw = commonAggregator.previewWithdraw(BASE_AMOUNT);
         commonAggregator.redeem(sharesToWithdraw, alice, alice);
         vm.stopPrank();
-
 
         // Update holdings state
         for (uint256 i = 0; i < 5; i++) {
