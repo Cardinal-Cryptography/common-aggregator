@@ -212,7 +212,7 @@ contract CommonAggregatorTest is Test {
         vm.warp(STARTING_TIMESTAMP + 20 days);
 
         vm.prank(owner);
-        commonAggregator.addVault(IERC4626(address(freshVault)));
+        commonManagement.addVault(IERC4626(address(freshVault)));
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(freshVault)));
         commonManagement.transferRewardsForSale(address(freshVault));
