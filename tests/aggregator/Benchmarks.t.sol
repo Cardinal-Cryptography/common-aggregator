@@ -13,6 +13,7 @@ contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
     uint256 constant VAULT_COUNT = 5;
     uint256 constant BASE_AMOUNT = 1_000_000;
+    uint256 constant DROP_AMOUNT = 1_000;
 
     CommonAggregator commonAggregator;
     address owner = address(0x123);
@@ -45,8 +46,11 @@ contract CommonAggregatorTest is Test {
         asset.mint(alice, amountToDeposit + BASE_AMOUNT);
         asset.approve(address(commonAggregator), type(uint256).max);
 
+        advanceTimeWithGain();
         commonAggregator.deposit(amountToDeposit, alice);
-        uint256 sharesToMint = commonAggregator.convertToShares(BASE_AMOUNT);
+
+        advanceTimeWithGain();
+        uint256 sharesToMint = commonAggregator.previewDeposit(BASE_AMOUNT);
         commonAggregator.mint(sharesToMint, alice);
         vm.stopPrank();
 
@@ -61,25 +65,40 @@ contract CommonAggregatorTest is Test {
         asset.mint(alice, amountToDeposit + BASE_AMOUNT);
         asset.approve(address(commonAggregator), type(uint256).max);
 
+        advanceTimeWithGain();
         commonAggregator.deposit(amountToDeposit, alice);
-        sharesToMint = commonAggregator.convertToShares(BASE_AMOUNT);
+        
+        advanceTimeWithGain();
+        sharesToMint = commonAggregator.previewDeposit(BASE_AMOUNT);
         commonAggregator.mint(sharesToMint, alice);
         vm.stopPrank();
 
         // Pulling funds
+        advanceTimeWithGain();
         vm.prank(owner);
         commonAggregator.pullFunds(BASE_AMOUNT, vaults[2]);
 
         // Withdrawals
         vm.startPrank(alice);
-        uint256 sharesToWithdraw = commonAggregator.convertToShares(BASE_AMOUNT);
+        advanceTimeWithGain();
         commonAggregator.withdraw(BASE_AMOUNT, alice, alice);
+
+        advanceTimeWithGain();
+        uint256 sharesToWithdraw = commonAggregator.previewWithdraw(BASE_AMOUNT);
         commonAggregator.redeem(sharesToWithdraw, alice, alice);
         vm.stopPrank();
 
+
+        // Update holdings state
+        for (uint256 i = 0; i < 5; i++) {
+            advanceTimeWithGain();
+            commonAggregator.updateHoldingsState();
+        }
+    }
+
+    function advanceTimeWithGain() internal {
         // Drop some funds to have a meaningful report
-        asset.mint(address(commonAggregator), BASE_AMOUNT);
-        vm.prank(owner);
-        commonAggregator.updateHoldingsState();
+        asset.mint(address(commonAggregator), DROP_AMOUNT);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
     }
 }
