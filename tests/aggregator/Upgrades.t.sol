@@ -40,7 +40,6 @@ contract ERC4626MockUUPS is ERC4626Upgradeable {}
 contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
 
-    ERC1967Proxy proxy;
     CommonAggregator commonAggregator;
     CommonManagement commonManagement;
     ERC20Mock asset = new ERC20Mock();
@@ -58,8 +57,6 @@ contract CommonAggregatorTest is Test {
         CommonManagement managementImplementation = new CommonManagement();
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
-
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
 
         ERC1967Proxy aggregatorProxy = new ERC1967Proxy(address(aggregatorImplementation), "");
         ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
@@ -91,23 +88,23 @@ contract CommonAggregatorTest is Test {
         vm.warp(STARTING_TIMESTAMP + 30 days);
 
         vm.prank(owner);
-        commonAggregator.upgradeToAndCall(newImplementation, "");
+        commonManagement.upgradeAggregator(newImplementation, "");
 
-        CommonAggregatorUpgraded upgraded = CommonAggregatorUpgraded(address(proxy));
+        CommonAggregatorUpgraded upgraded = CommonAggregatorUpgraded(address(commonAggregator));
 
         assertEq(upgraded.maxWithdraw(owner), 1000);
         assertEq(upgraded.newMethod(), 42);
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ContractIsNoLongerPauseable.selector));
-        upgraded.pauseUserInteractions();
+        commonManagement.pauseUserInteractions();
     }
 
     function testUpgradeWithCustomInitializer() public {
         address newImplementation = address(new CommonAggregatorUpgraded());
 
         vm.prank(owner);
-        commonAggregator.pauseUserInteractions();
+        commonManagement.pauseUserInteractions();
         vm.prank(owner);
         commonManagement.submitUpgradeAggregator(newImplementation);
 
@@ -119,7 +116,7 @@ contract CommonAggregatorTest is Test {
         bytes memory unpauseData = abi.encodeWithSelector(CommonAggregator.unpauseUserInteractions.selector);
 
         vm.prank(owner);
-        commonAggregator.upgradeToAndCall(newImplementation, unpauseData);
+        commonManagement.upgradeAggregator(newImplementation, unpauseData);
 
         assertEq(commonAggregator.paused(), false);
         assertEq(CommonAggregatorUpgraded(address(commonAggregator)).newMethod(), 42);
@@ -139,11 +136,11 @@ contract CommonAggregatorTest is Test {
 
         vm.prank(owner);
         vm.expectRevert();
-        commonAggregator.upgradeToAndCall(nonContract, "");
+        commonManagement.upgradeAggregator(nonContract, "");
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ERC1967Utils.ERC1967InvalidImplementation.selector, nonUUPSImpl));
-        commonAggregator.upgradeToAndCall(nonUUPSImpl, "");
+        commonManagement.upgradeAggregator(nonUUPSImpl, "");
     }
 
     function testTimelock() public {
@@ -161,7 +158,7 @@ contract CommonAggregatorTest is Test {
                 STARTING_TIMESTAMP + 14 days
             )
         );
-        commonAggregator.upgradeToAndCall(newImplementation, "");
+        commonManagement.upgradeAggregator(newImplementation, "");
     }
 
     function testRolesUpgrading() public {
@@ -190,22 +187,22 @@ contract CommonAggregatorTest is Test {
 
         vm.prank(alice);
         expectAutorizationRevert(alice, keccak256("OWNER"));
-        commonAggregator.upgradeToAndCall(newImplementation, "");
+        commonManagement.upgradeAggregator(newImplementation, "");
 
         vm.prank(rebalancer);
         expectAutorizationRevert(rebalancer, keccak256("OWNER"));
-        commonAggregator.upgradeToAndCall(newImplementation, "");
+        commonManagement.upgradeAggregator(newImplementation, "");
 
         vm.prank(guardian);
         expectAutorizationRevert(guardian, keccak256("OWNER"));
-        commonAggregator.upgradeToAndCall(newImplementation, "");
+        commonManagement.upgradeAggregator(newImplementation, "");
 
         vm.prank(manager);
         expectAutorizationRevert(manager, keccak256("OWNER"));
-        commonAggregator.upgradeToAndCall(newImplementation, "");
+        commonManagement.upgradeAggregator(newImplementation, "");
 
         vm.prank(owner);
-        commonAggregator.upgradeToAndCall(newImplementation, "");
+        commonManagement.upgradeAggregator(newImplementation, "");
     }
 
     function testRolesCancelling() public {
@@ -243,7 +240,7 @@ contract CommonAggregatorTest is Test {
                     keccak256(abi.encode(CommonManagement.TimelockTypes.AGGREGATOR_UPGRADE, impl[i]))
                 )
             );
-            commonAggregator.upgradeToAndCall(impl[i], "");
+            commonManagement.upgradeAggregator(impl[i], "");
         }
     }
 
