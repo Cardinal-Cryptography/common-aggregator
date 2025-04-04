@@ -221,6 +221,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
             !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
+
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.ensureTokenSafeToTransfer(rewardToken);
 
@@ -246,6 +247,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
             !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
+
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.ensureTokenSafeToTransfer(rewardToken);
         $.rewardTrader[rewardToken] = traderAddress;
@@ -255,6 +257,11 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     /// @inheritdoc ICommonManagement
     function transferRewardsForSale(address rewardToken) external {
+        require(
+            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
+            InvalidRewardToken(rewardToken)
+        );
+
         ManagementStorage storage $ = _getManagementStorage();
         require($.rewardTrader[rewardToken] != address(0), NoTraderSetForToken(rewardToken));
         address receiver = $.rewardTrader[rewardToken];
