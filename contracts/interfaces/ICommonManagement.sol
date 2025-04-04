@@ -155,6 +155,19 @@ interface ICommonManagement {
     /// @notice Transfers all `token`s held in the aggregator to `rewardTrader[token]`
     function transferRewardsForSale(address token) external;
 
+    // ----- Pausing -----
+
+    /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
+    /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
+    /// to exit the aggregator.
+    function pauseUserInteractions() external;
+
+    /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
+    /// the manager or the owner. To be used after mitigating a potential emergency.
+    function unpauseUserInteractions() external;
+
+    error PendingVaultForceRemovals(uint256 count);
+
     // ----- Access control -----
 
     error CallerNotRebalancerOrWithHigherRole();

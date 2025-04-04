@@ -264,21 +264,19 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
     /// to exit the aggregator.
-    function pauseUserInteractions() public onlyGuardianOrHigherRole {
+    function pauseUserInteractions() external onlyGuardianOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.pauseUserInteractions();
     }
 
     /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used after mitigating a potential emergency.
-    function unpauseUserInteractions() public onlyGuardianOrHigherRole {
+    function unpauseUserInteractions() external onlyGuardianOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         uint256 pendingVaultForceRemovals = $.pendingVaultForceRemovals;
         require(pendingVaultForceRemovals == 0, PendingVaultForceRemovals(pendingVaultForceRemovals));
         $.aggregator.unpauseUserInteractions();
     }
-
-    error PendingVaultForceRemovals(uint256 count);
 
     // ----- Management upgrades -----
 
