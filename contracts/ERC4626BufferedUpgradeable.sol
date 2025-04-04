@@ -80,14 +80,13 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         uint256 oldTotalAssets = $.assetsCached;
 
-        (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint) = _holdingsUpdate();
+        (uint256 newTotalAssets, uint256 sharesToBurn, uint256 sharesToMint) = _holdingsUpdate();
 
         $.currentBufferEnd = $.currentBufferEnd.max(block.timestamp);
 
         // It's possible that we will have `sharesToBurn > 0 && sharesToMint > 0`.
         // We still want to perform both mint and burn, since fee is calculated based on minted shares.
         // If only the difference would be minted/burned then, with steady inflow of rewards, vault would take almost no fees.
-        uint256 sharesToBurn = releasedShares + lostShares;
         if (sharesToBurn > 0) {
             // Burn fees from the buffer
             _burn(address(this), sharesToBurn);
@@ -113,28 +112,29 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// @notice Preview the holdings state update, without actually updating it.
     /// Returns `totalAssets` and `totalSupply` that there would be after the update.
     function _previewUpdateHoldingsState() internal view returns (uint256, uint256) {
-        (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint) = _holdingsUpdate();
-        return (newTotalAssets, super.totalSupply() - releasedShares - lostShares + sharesToMint);
+        (uint256 newTotalAssets, uint256 sharesToBurn, uint256 sharesToMint) = _holdingsUpdate();
+        return (newTotalAssets, super.totalSupply() - sharesToBurn + sharesToMint);
     }
 
     function _holdingsUpdate()
         internal
         view
-        returns (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint)
+        returns (uint256 newTotalAssets, uint256 sharesToBurn, uint256 sharesToMint)
     {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         newTotalAssets = _totalAssetsNotCached();
         uint256 oldTotalShares = super.totalSupply();
 
-        releasedShares = _releasedShares();
+        uint256 releasedShares = _releasedShares();
         uint256 newBufferedShares = $.bufferedShares - releasedShares;
 
         if ($.assetsCached <= newTotalAssets) {
             sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares - releasedShares);
         } else {
-            lostShares =
+            sharesToBurn =
                 _sharesToBurnOnLoss($.assetsCached, newTotalAssets, oldTotalShares - releasedShares, newBufferedShares);
         }
+        sharesToBurn += releasedShares;
     }
 
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
