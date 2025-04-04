@@ -100,6 +100,11 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     }
 
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
+        require(
+            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
+            PendingVaultForceRemoval(vault)
+        );
+
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.removeVault(vault);
 
