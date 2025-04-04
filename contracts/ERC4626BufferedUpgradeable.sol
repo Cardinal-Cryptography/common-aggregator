@@ -84,33 +84,28 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
         $.currentBufferEnd = $.currentBufferEnd.max(block.timestamp);
 
-        // It's possible that we will have `sharesToBurn > 0 && sharesToMint > 0`.
-        // We still want to perform both mint and burn, since fee is calculated based on minted shares.
-        // If only the difference would be minted/burned then, with steady inflow of rewards, vault would take almost no fees.
+        // Account for released shares and any potential losses in the further calculations
+        $.bufferedShares -= sharesToBurn; // (#1)
 
-        uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
-        uint256 sharesToMintMinusFee = sharesToMint - fee;
+        // Apply fee and compute new buffer end timestamp, if there was any gain
+        // Note that `sharesToMint > 0` means there are no losses
+        if (sharesToMint > 0) {
+            uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
+            _mint($.protocolFeeReceiver, fee);
+            sharesToMint -= fee;
 
-        if (sharesToBurn > 0) {
-            // Cancel out sharesToBurn and sharesToMintMinusFee to save gas.
-            if (sharesToBurn > sharesToMintMinusFee) {
-                _burn(address(this), sharesToBurn - sharesToMintMinusFee);
-            }
-            $.bufferedShares = $.bufferedShares - sharesToBurn;
+            // compute new buffer end timestamp
+            uint256 newUnlockEnd = block.timestamp + _defaultBufferingDuration();
+            $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint);
+
+            $.bufferedShares = checkedAdd($.bufferedShares, sharesToMint, 1); // (#2)
         }
 
-        // This branch has to be computed after the burn, as we're subtracting
-        // the released shares in time from `bufferedShares`, and the updated value has to be used there.
-        if (sharesToMint > 0) {
-            // Cancel out sharesToBurn and sharesToMintMinusFee to save gas.
-            if (sharesToMintMinusFee > sharesToBurn) {
-                _mint(address(this), sharesToMintMinusFee - sharesToBurn);
-            }
-            _mint($.protocolFeeReceiver, fee);
-
-            uint256 newUnlockEnd = block.timestamp + _defaultBufferingDuration();
-            $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMintMinusFee);
-            $.bufferedShares = checkedAdd($.bufferedShares, sharesToMintMinusFee, 1);
+        // Mint or burn buffer shares ( to reflect #1 and #2)
+        if (sharesToMint > sharesToBurn) {
+            _mint(address(this), sharesToMint - sharesToBurn);
+        } else {
+            _burn(address(this), sharesToBurn - sharesToMint);
         }
 
         $.lastUpdate = block.timestamp;
@@ -134,16 +129,15 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         newTotalAssets = _totalAssetsNotCached();
         uint256 oldTotalShares = super.totalSupply();
 
-        uint256 releasedShares = _releasedShares();
-        uint256 newBufferedShares = $.bufferedShares - releasedShares;
+        sharesToBurn = _releasedShares();
+        uint256 newBufferedShares = $.bufferedShares - sharesToBurn;
 
         if ($.assetsCached <= newTotalAssets) {
-            sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares - releasedShares);
+            sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares - sharesToBurn);
         } else {
-            sharesToBurn =
-                _sharesToBurnOnLoss($.assetsCached, newTotalAssets, oldTotalShares - releasedShares, newBufferedShares);
+            sharesToBurn +=
+                _sharesToBurnOnLoss($.assetsCached, newTotalAssets, oldTotalShares - sharesToBurn, newBufferedShares);
         }
-        sharesToBurn += releasedShares;
     }
 
     /// @dev Number of shares that should be burned to account for rewards to be released by the buffer.
