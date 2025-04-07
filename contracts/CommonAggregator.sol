@@ -15,6 +15,7 @@ import {
     ERC4626BufferedUpgradeable
 } from "./ERC4626BufferedUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {saturatingAdd} from "./Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import {ERC4626BufferedUpgradeable} from "./ERC4626BufferedUpgradeable.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
@@ -145,7 +146,10 @@ contract CommonAggregator is
         if (paused()) {
             return 0;
         }
-        return super.maxRedeem(owner).min(convertToShares(_availableFunds()));
+        // Avoid overflow
+        uint256 availableConvertedToShares =
+            convertToShares(_availableFunds().min(type(uint256).max / 10 ** _decimalsOffset()));
+        return super.maxRedeem(owner).min(availableConvertedToShares);
     }
 
     function _availableFunds() internal view returns (uint256) {
@@ -157,7 +161,7 @@ contract CommonAggregator is
             // We want to ensure that this requirement is fulfilled, even if one of the
             // aggregated vaults does not respect it and reverts on `maxWithdraw`.
             try $.vaults[i].maxWithdraw(address(this)) returns (uint256 pullableFunds) {
-                availableFunds += pullableFunds;
+                availableFunds = saturatingAdd(availableFunds, pullableFunds);
             } catch {}
         }
 
