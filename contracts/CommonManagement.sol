@@ -64,9 +64,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     // ----- Aggregated vaults management -----
 
-    /// @notice Submits a timelocked proposal to add a new vault to the list.
-    /// @dev There's no limit on the number of pending vaults that can be added, only on the number of fully added vaults.
-    /// Manager or Guardian should cancel mistaken and stale submissions.
+    /// @inheritdoc ICommonManagement
     function submitAddVault(IERC4626 vault)
         external
         override
@@ -156,6 +154,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.forceRemoveVault(vault);
         $.pendingVaultForceRemovals--;
+
         emit VaultForceRemoved(address(vault));
     }
     // ----- Rebalancing -----
@@ -164,6 +163,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.pushFunds(assets, vault);
+
         emit AssetsRebalanced(address($.aggregator), address(vault), assets);
     }
 
@@ -171,6 +171,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     function pullFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.pullFunds(assets, vault);
+
         emit AssetsRebalanced(address(vault), address($.aggregator), assets);
     }
 
@@ -178,6 +179,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyRebalancerOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         uint256 assets = $.aggregator.pullFundsByShares(shares, vault);
+
         emit AssetsRebalanced(address(vault), address($.aggregator), assets);
     }
 
@@ -278,16 +280,13 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     // ----- Pausing user interactions -----
 
-    /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
-    /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
-    /// to exit the aggregator.
+    /// @inheritdoc ICommonManagement
     function pauseUserInteractions() external onlyGuardianOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.pauseUserInteractions();
     }
 
-    /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
-    /// the manager or the owner. To be used after mitigating a potential emergency.
+    /// @inheritdoc ICommonManagement
     function unpauseUserInteractions() external onlyGuardianOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         uint256 pendingVaultForceRemovals = $.pendingVaultForceRemovals;

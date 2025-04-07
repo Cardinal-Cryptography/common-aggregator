@@ -57,19 +57,18 @@ interface ICommonManagement {
 
     function removeVault(IERC4626 vault) external;
 
-    /// @notice Submits timelocked force removal action for `vault`.
-    /// Pauses user actions (deposit, mint, withdraw, redeem), allowing only for the emergency redeem, if
-    /// the aggregator is not already paused.
-    /// After `unlockTimestamp` passes, the `forceRemoveVault` can be called.
+    /// @notice Submits timelocked force removal action for `vault`. Triggers a pause on the aggregator
+    /// allowing users only to emergency redeem. After `unlockTimestamp` passes, `forceRemoveVault`
+    /// can be called.
     /// @dev Tries to redeem as many `vault`'s shares as possible.
     function submitForceRemoveVault(IERC4626 vault) external;
 
     /// @notice Cancels timelocked force removal action for `vault`.
-    /// Doesn't unpause protocol by itself.
+    /// Doesn't trigger unpause on the aggregator by itself.
     function cancelForceRemoveVault(IERC4626 vault) external;
 
-    /// @notice Force-removes `vault` from the aggregator, lossing all the assets allocated to it.
-    /// Doesn't unpause protocol by itself.
+    /// @notice Force-removes `vault` from the aggregator, loosing all the assets allocated to it.
+    /// Doesn't trigger unpause on the aggregator by itself.
     function forceRemoveVault(IERC4626 vault) external;
 
     error PendingVaultForceRemoval(IERC4626 vault);
@@ -79,50 +78,31 @@ interface ICommonManagement {
 
     event AssetsRebalanced(address indexed from, address indexed to, uint256 amount);
 
-    /// @notice Deposits `assets` from aggregator's own balance into `vault`.
-    /// Vault must be present on the vault list. Allocation limits are checked.
+    /// @notice Allows the `REBALANCER` or higher role holder to trigger `pushFunds` on the aggregator.
     function pushFunds(uint256 assets, IERC4626 vault) external;
 
-    /// @notice Withdraws `assets` from `vault` into aggregator's own balance.
-    /// Vault must be present on the vault list.
-    /// @dev Doesn't check the allocation limits, as even if they are still
-    /// exceeded, the total excess will be lowered.
+    /// @notice Allows the `REBALANCER` or higher role holder to trigger `pullFunds` on the aggregator.
     function pullFunds(uint256 assets, IERC4626 vault) external;
 
-    /// @notice Redeems `shares` from `vault`, returning assets into
-    /// aggregator's own balance. Vault must be present on the vault list.
-    /// @dev Similarly to `pullFunds`, doesn't check the allocation limits.
+    /// @notice Allows the `REBALANCER` or higher role holder to triggers `pullFundsByShares` on the aggregator.
     function pullFundsByShares(uint256 shares, IERC4626 vault) external;
 
     // ----- Allocation Limits -----
 
     event AllocationLimitSet(address indexed vault, uint256 newLimitBps);
 
-    /// @notice Sets allocation limit of `vault` to `newLimitBps`.
-    /// The limit is expressed in bps, and is applied on the assets.
-    /// It's a no-op if `newLimitBps` is the same as the current limit.
-    /// Reverts if `newLimitBps` is higher MAX_BPS, or if `vault` is not present
-    /// on the vault list.
+    /// @notice Allows the `OWNER` role holder to trigger `setLimit` on the aggregator.
     function setLimit(IERC4626 vault, uint256 newLimitBps) external;
-
-    error VaultNotOnTheList(IERC4626 vault);
-    error IncorrectMaxAllocationLimit();
 
     // ----- Fee management -----
 
     event ProtocolFeeChanged(uint256 oldProtocolFee, uint256 newProtocolFee);
-
     event ProtocolFeeReceiverChanged(address indexed oldPorotocolFeeReceiver, address indexed newPorotocolFeeReceiver);
 
-    /// @notice Sets bps-wise protocol fee.
-    /// The protocol fee is applied on the profit made, with each holdings state update.
-    /// It's a no-op if `_protocolFeeBps` is the same as the current `protocolFeeBps`.
+    /// @notice Allows the `OWNER` role holder to trigger `setProtocolFee` on the aggregator.
     function setProtocolFee(uint256 _protocolFeeBps) external;
 
-    error SelfProtocolFeeReceiver();
-
-    /// @notice Sets the protocol fee receiver.
-    /// It's a no-op if `protocolFeeReceiver` is the same as the current `protocolFeeReceiver`.
+    /// @notice Allows the `OWNER` role holder to trigger `setProtocolFeeReceiver` on the aggregator.
     function setProtocolFeeReceiver(address protocolFeeReceiver) external;
 
     // ----- Non-asset rewards trading -----
@@ -137,12 +117,12 @@ interface ICommonManagement {
     error InvalidRewardToken(address token);
     error NoTraderSetForToken(address token);
 
-    /// @notice Proposes execution of `setRewardTrader` with given parameters.
-    /// Caller must hold the `OWNER` role.
+    /// @notice Proposes execution of `setRewardTrader` with given parameters. Ensures that the reward
+    /// token is not a vault pending to be added. Caller must hold the `OWNER` role.
     function submitSetRewardTrader(address rewardToken, address traderAddress) external;
 
-    /// @notice Allows transfering `rewardToken`s from aggregator to `traderAddress`
-    /// using `transferRewardsForSale` method.
+    /// @notice Allows transfering `rewardToken`s from aggregator to `traderAddress` using the
+    /// `transferRewardsForSale` method. Ensures that the reward token is not a vault pending to be added.
     /// Can only be called after timelock initiated in `submitSetRewardTrader` has elapsed.
     function setRewardTrader(address rewardToken, address traderAddress) external;
 
@@ -150,18 +130,16 @@ interface ICommonManagement {
     /// Caller must hold `GUARDIAN`, `MANAGER` or `OWNER` role.
     function cancelSetRewardTrader(address rewardToken, address traderAddress) external;
 
-    /// @notice Transfers all `token`s held in the aggregator to `rewardTrader[token]`
+    /// @notice Triggers `transferRewardsForSale` on the aggregator. Ensures that the reward
+    /// token is not a vault pending to be added.
     function transferRewardsForSale(address token) external;
 
     // ----- Pausing -----
 
-    /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
-    /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
-    /// to exit the aggregator.
+    /// @notice Allows the `GUARDIAN` or a higher role holder to trigger `pauseUserInteractions` on the aggregator.
     function pauseUserInteractions() external;
 
-    /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
-    /// the manager or the owner. To be used after mitigating a potential emergency.
+    /// @notice Allows the `GUARDIAN` or a higher role holder to trigger `unpauseUserInteractions` on the aggregator.
     function unpauseUserInteractions() external;
 
     error PendingVaultForceRemovals(uint256 count);
