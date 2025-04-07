@@ -67,7 +67,7 @@ interface ICommonManagement {
     /// Doesn't trigger unpause on the aggregator by itself.
     function cancelForceRemoveVault(IERC4626 vault) external;
 
-    /// @notice Force-removes `vault` from the aggregator, loosing all the assets allocated to it.
+    /// @notice Force-removes `vault` from the aggregator, losing all the assets allocated to it.
     /// Doesn't trigger unpause on the aggregator by itself.
     function forceRemoveVault(IERC4626 vault) external;
 
