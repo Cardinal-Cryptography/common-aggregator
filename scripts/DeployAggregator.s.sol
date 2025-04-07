@@ -29,7 +29,7 @@ contract DeployAggregatorScript is Script {
         CommonManagement management = CommonManagement(managementProxy);
         CommonAggregator aggregator = CommonAggregator(aggregatorProxy);
 
-        aggregator.initialize(management, asset, vaults);
+        aggregator.initialize(address(management), asset, vaults);
         management.initialize(owner, aggregator);
 
         console.log("Deployed CommonManagement contract to:", managementProxy);

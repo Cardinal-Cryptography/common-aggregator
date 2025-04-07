@@ -16,6 +16,6 @@ function setUpAggregator(address owner, ERC20Mock asset, IERC4626[] memory vault
     ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
     aggregator = CommonAggregator(address(aggregatorProxy));
     management = CommonManagement(address(managementProxy));
-    aggregator.initialize(management, asset, vaults);
+    aggregator.initialize(address(management), asset, vaults);
     management.initialize(owner, aggregator);
 }

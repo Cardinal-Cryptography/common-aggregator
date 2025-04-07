@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
-import {ICommonManagement} from "./interfaces/ICommonManagement.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {
@@ -29,7 +28,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     struct AggregatorStorage {
         IERC4626[] vaults; // Both for iterating and a fallback queue.
         mapping(address vault => uint256 limit) allocationLimitBps;
-        ICommonManagement management;
+        address management;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
@@ -52,10 +51,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         return $.allocationLimitBps[address(vault)];
     }
 
-    function initialize(ICommonManagement management, IERC20Metadata asset, IERC4626[] memory vaults)
-        public
-        initializer
-    {
+    function initialize(address management, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
         __UUPSUpgradeable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
         __ERC4626Buffered_init(asset);

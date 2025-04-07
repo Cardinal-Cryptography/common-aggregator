@@ -109,7 +109,7 @@ contract CommonAggregatorTest is Test {
         managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
         aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
         CommonManagement(managementProxy).initialize(owner, CommonAggregator(aggregatorProxy));
-        CommonAggregator(aggregatorProxy).initialize(ICommonManagement(managementProxy), asset, vaults);
+        CommonAggregator(aggregatorProxy).initialize(address(managementProxy), asset, vaults);
 
         Options memory options;
         Upgrades.validateUpgrade("UpgradesOpenZeppelin.t.sol:CommonAggregatorCorrectUpgrade", options);
@@ -120,7 +120,7 @@ contract CommonAggregatorTest is Test {
         managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
         aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
         CommonManagement(managementProxy).initialize(owner, CommonAggregator(aggregatorProxy));
-        CommonAggregator(aggregatorProxy).initialize(ICommonManagement(managementProxy), asset, vaults);
+        CommonAggregator(aggregatorProxy).initialize(address(managementProxy), asset, vaults);
 
         vm.expectRevert();
         this.validateUpgrade("UpgradesOpenZeppelin.t.sol:CommonAggregatorUpgradeMissingNamespaceStorage");
@@ -131,7 +131,7 @@ contract CommonAggregatorTest is Test {
         managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
         aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
         CommonManagement(managementProxy).initialize(owner, CommonAggregator(aggregatorProxy));
-        CommonAggregator(aggregatorProxy).initialize(ICommonManagement(managementProxy), asset, vaults);
+        CommonAggregator(aggregatorProxy).initialize(address(managementProxy), asset, vaults);
 
         vm.expectRevert();
         this.validateUpgrade("UpgradesOpenZeppelin.t.sol:CommonAggregatorUpgradeMissingStorageFields");
