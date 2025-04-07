@@ -23,7 +23,8 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     uint256 public constant SET_TRADER_TIMELOCK = 5 days;
     uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
     uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 14 days;
-    uint256 public constant CONTRACT_UPGRADE_TIMELOCK = 14 days;
+    uint256 public constant AGGREGATOR_UPGRADE_TIMELOCK = 14 days;
+    uint256 public constant MANAGEMENT_UPGRADE_TIMELOCK = 14 days;
 
     enum TimelockTypes {
         SET_TRADER,
@@ -33,7 +34,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         MANAGEMENT_UPGRADE
     }
 
-    /// @custom:storage-location erc7201:common.storage.aggregator
+    /// @custom:storage-location erc7201:common.storage.management
     struct ManagementStorage {
         mapping(address rewardToken => address traderAddress) rewardTrader;
         uint256 pendingVaultForceRemovals;
@@ -315,10 +316,10 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         onlyRole(OWNER)
         registersTimelockedAction(
             keccak256(abi.encode(TimelockTypes.MANAGEMENT_UPGRADE, newImplementation)),
-            CONTRACT_UPGRADE_TIMELOCK
+            MANAGEMENT_UPGRADE_TIMELOCK
         )
     {
-        emit ManagementUpgradeSubmitted(newImplementation, block.timestamp + CONTRACT_UPGRADE_TIMELOCK);
+        emit ManagementUpgradeSubmitted(newImplementation, block.timestamp + MANAGEMENT_UPGRADE_TIMELOCK);
     }
 
     function cancelUpgradeManagement(address newImplementation)
@@ -336,10 +337,10 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         onlyRole(OWNER)
         registersTimelockedAction(
             keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE, newImplementation)),
-            CONTRACT_UPGRADE_TIMELOCK
+            AGGREGATOR_UPGRADE_TIMELOCK
         )
     {
-        emit AggregatorUpgradeSubmitted(newImplementation, block.timestamp + CONTRACT_UPGRADE_TIMELOCK);
+        emit AggregatorUpgradeSubmitted(newImplementation, block.timestamp + AGGREGATOR_UPGRADE_TIMELOCK);
     }
 
     function cancelUpgradeAggregator(address newImplementation)

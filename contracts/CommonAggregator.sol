@@ -433,7 +433,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         if (oldLimit == newLimitBps) return;
 
         $.allocationLimitBps[address(vault)] = newLimitBps;
-        emit AllocationLimitSet(address(vault), newLimitBps);
     }
 
     // ----- Fee management -----
@@ -450,7 +449,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         if (oldProtocolFee == protocolFeeBps) return;
 
         super.setProtocolFee(protocolFeeBps);
-        emit ProtocolFeeChanged(oldProtocolFee, protocolFeeBps);
     }
 
     /// @inheritdoc ICommonAggregator
@@ -465,7 +463,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;
 
         super.setProtocolFeeReceiver(protocolFeeReceiver);
-        emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 
     function _isVaultOnTheList(IERC4626 vault) internal view returns (bool onTheList) {

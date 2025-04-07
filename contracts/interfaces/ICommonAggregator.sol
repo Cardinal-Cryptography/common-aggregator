@@ -53,8 +53,6 @@ interface ICommonAggregator is IERC4626Buffered {
 
     // ----- Allocation Limits -----
 
-    event AllocationLimitSet(address indexed vault, uint256 newLimitBps);
-
     /// @notice Sets allocation limit of `vault` to `newLimitBps`.
     /// The limit is expressed in bps, and is applied on the assets.
     /// It's a no-op if `newLimitBps` is the same as the current limit.
@@ -66,10 +64,6 @@ interface ICommonAggregator is IERC4626Buffered {
     error IncorrectMaxAllocationLimit();
 
     // ----- Fee management -----
-
-    event ProtocolFeeChanged(uint256 oldProtocolFee, uint256 newProtocolFee);
-
-    event ProtocolFeeReceiverChanged(address indexed oldPorotocolFeeReceiver, address indexed newPorotocolFeeReceiver);
 
     error ProtocolFeeTooHigh();
 

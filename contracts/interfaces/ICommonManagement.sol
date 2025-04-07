@@ -114,8 +114,6 @@ interface ICommonManagement {
 
     event ProtocolFeeReceiverChanged(address indexed oldPorotocolFeeReceiver, address indexed newPorotocolFeeReceiver);
 
-    error ProtocolFeeTooHigh();
-
     /// @notice Sets bps-wise protocol fee.
     /// The protocol fee is applied on the profit made, with each holdings state update.
     /// It's a no-op if `_protocolFeeBps` is the same as the current `protocolFeeBps`.
