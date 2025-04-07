@@ -14,6 +14,7 @@ import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {MAX_BPS} from "contracts/Math.sol";
+import {setUpAggregator} from "tests/utils.sol";
 
 contract VaultManagementTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
@@ -665,26 +666,12 @@ contract VaultManagementTest is Test {
         vaults[1] = new ERC4626Mock(address(asset));
         vaults[2] = new ERC4626Mock(address(asset));
 
-        CommonAggregator aggregatorImplementation = new CommonAggregator();
-        CommonManagement managementImplementation = new CommonManagement();
-        ERC1967Proxy aggregatorProxy = new ERC1967Proxy(address(aggregatorImplementation), "");
-        ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
-        aggregator = CommonAggregator(address(aggregatorProxy));
-        management = CommonManagement(address(managementProxy));
-        aggregator.initialize(management, asset, vaults);
-        management.initialize(owner, aggregator);
+        (aggregator, management) = setUpAggregator(owner, asset, vaults);
         _grantRoles(management);
     }
 
     function _noVaultAggregator() private returns (CommonAggregator aggregator, CommonManagement management) {
-        CommonAggregator aggregatorImplementation = new CommonAggregator();
-        CommonManagement managementImplementation = new CommonManagement();
-        ERC1967Proxy aggregatorProxy = new ERC1967Proxy(address(aggregatorImplementation), "");
-        ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
-        aggregator = CommonAggregator(address(aggregatorProxy));
-        management = CommonManagement(address(managementProxy));
-        aggregator.initialize(management, asset, new IERC4626[](0));
-        management.initialize(owner, aggregator);
+        (aggregator, management) = setUpAggregator(owner, asset, new IERC4626[](0));
         _grantRoles(management);
     }
 

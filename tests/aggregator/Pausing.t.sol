@@ -9,6 +9,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
+import {setUpAggregator} from "tests/utils.sol";
 
 contract PausingTest is Test {
     address owner = address(0x123);
@@ -21,18 +22,11 @@ contract PausingTest is Test {
     CommonManagement management;
 
     function setUp() public {
-        CommonAggregator aggregatorImplementation = new CommonAggregator();
-        CommonManagement managementImplementation = new CommonManagement();
         IERC4626[] memory vaults = new IERC4626[](2);
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
-        ERC1967Proxy aggregatorProxy = new ERC1967Proxy(address(aggregatorImplementation), "");
-        ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
-        aggregator = CommonAggregator(address(aggregatorProxy));
-        management = CommonManagement(address(managementProxy));
-        aggregator.initialize(management, asset, vaults);
-        management.initialize(owner, aggregator);
+        (aggregator, management) = setUpAggregator(owner, asset, vaults);
         _grantRoles();
     }
 

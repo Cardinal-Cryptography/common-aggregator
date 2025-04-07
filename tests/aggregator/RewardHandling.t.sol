@@ -11,6 +11,7 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
+import {setUpAggregator} from "tests/utils.sol";
 
 contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
@@ -32,17 +33,10 @@ contract CommonAggregatorTest is Test {
 
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
-        CommonAggregator aggregatorImplementation = new CommonAggregator();
-        CommonManagement managementImplementation = new CommonManagement();
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
-        ERC1967Proxy aggregatorProxy = new ERC1967Proxy(address(aggregatorImplementation), "");
-        ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
-        commonAggregator = CommonAggregator(address(aggregatorProxy));
-        commonManagement = CommonManagement(address(managementProxy));
-        commonAggregator.initialize(commonManagement, asset, vaults);
-        commonManagement.initialize(owner, commonAggregator);
+        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
         vm.prank(owner);
         commonManagement.grantRole(keccak256("REBALANCER"), rebalancer);
         vm.prank(owner);
