@@ -94,7 +94,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         return 4;
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626BufferedUpgradeable
     /// @notice Returns the maximum deposit amount of the given address at the current time.
     function maxDeposit(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
@@ -103,7 +103,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         return super.maxDeposit(owner);
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626BufferedUpgradeable
     /// @notice Returns the maximum mint amount of the given address at the current time.
     function maxMint(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
@@ -112,7 +112,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         return super.maxMint(owner);
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626BufferedUpgradeable
     /// @notice Returns the maximum withdraw amount of the given address at the current time.
     function maxWithdraw(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
@@ -121,7 +121,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         return super.maxWithdraw(owner).min(_availableFunds());
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626BufferedUpgradeable
     /// @notice Returns the maximum redeem amount of the given address at the current time.
     function maxRedeem(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
@@ -149,7 +149,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         return availableFunds;
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626BufferedUpgradeable
     function deposit(uint256 assets, address receiver)
         public
         virtual
@@ -160,9 +160,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         return super.deposit(assets, receiver);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev If caller and receiver is `protocolFeeReceiver`, the balance of the `protocolFeeReceiver`
-    /// might change by more than `shares`, as there might be some pending protocol fees to be collected.
+    /// @inheritdoc ERC4626BufferedUpgradeable
     function mint(uint256 shares, address receiver)
         public
         virtual
@@ -173,7 +171,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         return super.mint(shares, receiver);
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626BufferedUpgradeable
     function withdraw(uint256 assets, address receiver, address owner)
         public
         virtual
@@ -184,9 +182,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         return super.withdraw(assets, receiver, owner);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev If `owner` is `protocolFeeReceiver`, the `maxRedeem` might underestimate if there are pending protocol fees.
-    /// Call the `updateHoldingsState()` before calling this function to ensure that the `maxRedeem` is exact.
+    /// @inheritdoc ERC4626BufferedUpgradeable
     function redeem(uint256 shares, address receiver, address owner)
         public
         virtual
@@ -288,8 +284,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
             revert InsufficientAssetsForWithdrawal(assetsToPull);
         }
     }
-
-    // TODO: make sure deposits / withdrawals from protocolReceiver are handled correctly
 
     // ----- Emergency redeem -----
 
