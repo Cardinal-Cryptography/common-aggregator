@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
+import {saturatingAdd} from "./Math.sol";
+
 /// @title An abstract contract which manages timelocked actions.
 /// @notice A timelocked action can be registered to be executed after the timelock passes. A registered action
 /// can be cancelled anytime.
@@ -53,7 +55,7 @@ abstract contract CommonTimelocks {
         if ($.registeredTimelocks[actionHash] != NOT_REGISTERED) {
             revert ActionAlreadyRegistered(actionHash);
         }
-        $.registeredTimelocks[actionHash] = _saturatingAdd(block.timestamp, delay);
+        $.registeredTimelocks[actionHash] = saturatingAdd(block.timestamp, delay);
     }
 
     /// @dev Removes a timelock entry for the given action if it exists and the timelock has passed.
@@ -82,15 +84,6 @@ abstract contract CommonTimelocks {
     function _getTimelocksStorage() private pure returns (TimelocksStorage storage $) {
         assembly {
             $.slot := TIMELOCKS_STORAGE_LOCATION
-        }
-    }
-
-    /// @dev Utility function for addition which returns the maximal uint256 value if the result would overflow.
-    function _saturatingAdd(uint256 a, uint256 b) private pure returns (uint256 result) {
-        if (type(uint256).max - a < b) {
-            result = type(uint256).max;
-        } else {
-            result = a + b;
         }
     }
 }
