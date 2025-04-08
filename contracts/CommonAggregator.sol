@@ -296,6 +296,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         external
         returns (uint256 assets, uint256[] memory vaultShares)
     {
+        updateHoldingsState();
         uint256 maxShares = maxEmergencyRedeem(owner);
         if (shares > maxShares) {
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
@@ -303,25 +304,29 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         if (msg.sender != owner) {
             _spendAllowance(owner, msg.sender, shares);
         }
-        updateHoldingsState();
 
         uint256 totalShares = totalSupply();
         _burn(owner, shares);
 
         assets = shares.mulDiv(IERC20(asset()).balanceOf(address(this)), totalShares);
-        IERC20(asset()).safeTransfer(account, assets);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
+        IERC4626[] memory vaults = new IERC4626[]($.vaults.length);
         vaultShares = new uint256[]($.vaults.length);
         uint256 valueInAssets = assets;
         for (uint256 i = 0; i < $.vaults.length; i++) {
-            vaultShares[i] = shares.mulDiv($.vaults[i].balanceOf(address(this)), totalShares);
-            valueInAssets += $.vaults[i].convertToAssets(vaultShares[i]);
-            $.vaults[i].safeTransfer(account, vaultShares[i]);
+            vaults[i] = $.vaults[i];
+            vaultShares[i] = shares.mulDiv(vaults[i].balanceOf(address(this)), totalShares);
+            valueInAssets += vaults[i].convertToAssets(vaultShares[i]);
         }
-
         _decreaseAssets(valueInAssets);
 
+        // Even if reentrancy happens, this is a valid state - `_totalAssetsNotCached()` will return
+        // more shares than the cached value, so it's as if `account` donated vault's shares to the aggregator.
+        IERC20(asset()).safeTransfer(account, assets);
+        for (uint256 i = 0; i < vaults.length; i++) {
+            vaults[i].safeTransfer(account, vaultShares[i]);
+        }
         emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultShares);
     }
 
