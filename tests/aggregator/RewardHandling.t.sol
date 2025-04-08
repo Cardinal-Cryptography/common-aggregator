@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ICommonAggregator} from "contracts/interfaces/ICommonAggregator.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -11,18 +11,20 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
+import {setUpAggregator} from "tests/utils.sol";
 
 contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
 
     CommonAggregator commonAggregator;
+    CommonManagement commonManagement;
     address owner = address(0x123);
     address rebalancer = address(0x321);
     address guardian = address(0x135);
     address manager = address(0x531);
 
     ERC20Mock asset = new ERC20Mock();
-    ERC4626Mock[] vaults = new ERC4626Mock[](2);
+    IERC4626[] vaults = new IERC4626[](2);
 
     ERC20Mock reward = new ERC20Mock();
     address trader = address(0x888);
@@ -31,20 +33,16 @@ contract CommonAggregatorTest is Test {
 
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
-        CommonAggregator implementation = new CommonAggregator();
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
-
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
-        commonAggregator = CommonAggregator(address(proxy));
+        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
         vm.prank(owner);
-        commonAggregator.grantRole(keccak256("REBALANCER"), rebalancer);
+        commonManagement.grantRole(keccak256("REBALANCER"), rebalancer);
         vm.prank(owner);
-        commonAggregator.grantRole(keccak256("GUARDIAN"), guardian);
+        commonManagement.grantRole(keccak256("GUARDIAN"), guardian);
         vm.prank(owner);
-        commonAggregator.grantRole(keccak256("MANAGER"), manager);
+        commonManagement.grantRole(keccak256("MANAGER"), manager);
     }
 
     function testHappyPath() public {
@@ -55,45 +53,45 @@ contract CommonAggregatorTest is Test {
         assertEq(reward.balanceOf(trader), 0);
 
         vm.prank(owner);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
 
         vm.warp(STARTING_TIMESTAMP + 8 days);
 
         vm.prank(manager);
-        commonAggregator.setRewardTrader(address(reward), trader);
+        commonManagement.setRewardTrader(address(reward), trader);
 
         vm.prank(alice);
-        commonAggregator.transferRewardsForSale(address(reward));
+        commonManagement.transferRewardsForSale(address(reward));
 
         assertEq(reward.balanceOf(trader), 1000);
     }
 
     function testTimelock() public {
         vm.prank(owner);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
 
         vm.warp(STARTING_TIMESTAMP + 2 days);
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonTimelocks.ActionTimelocked.selector,
-                keccak256(abi.encode(CommonAggregator.TimelockTypes.SET_TRADER, address(reward), trader)),
+                keccak256(abi.encode(CommonManagement.TimelockTypes.SET_TRADER, address(reward), trader)),
                 STARTING_TIMESTAMP + 5 days
             )
         );
         vm.prank(owner);
-        commonAggregator.setRewardTrader(address(reward), trader);
+        commonManagement.setRewardTrader(address(reward), trader);
 
         vm.warp(STARTING_TIMESTAMP + 6 days);
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonTimelocks.ActionNotRegistered.selector,
-                keccak256(abi.encode(CommonAggregator.TimelockTypes.SET_TRADER, address(reward), owner))
+                keccak256(abi.encode(CommonManagement.TimelockTypes.SET_TRADER, address(reward), owner))
             )
         );
         vm.prank(owner);
-        commonAggregator.setRewardTrader(address(reward), owner);
+        commonManagement.setRewardTrader(address(reward), owner);
     }
 
     function testTransferWithoutTraderSet() public {
@@ -101,73 +99,73 @@ contract CommonAggregatorTest is Test {
         vm.prank(alice);
         reward.transfer(address(commonAggregator), 1000);
 
-        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.NoTraderSetForToken.selector, address(reward)));
+        vm.expectRevert(abi.encodeWithSelector(ICommonManagement.NoTraderSetForToken.selector, address(reward)));
         vm.prank(owner);
-        commonAggregator.transferRewardsForSale(address(reward));
+        commonManagement.transferRewardsForSale(address(reward));
     }
 
     function testPermissions() public {
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(rebalancer);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(guardian);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
 
-        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.CallerNotManagerNorOwner.selector));
+        vm.expectRevert(abi.encodeWithSelector(ICommonManagement.CallerNotManagerNorOwner.selector));
         vm.prank(alice);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
 
         vm.prank(owner);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
 
-        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
+        vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
         vm.prank(alice);
-        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+        commonManagement.cancelSetRewardTrader(address(reward), trader);
 
-        vm.expectRevert(ICommonAggregator.CallerNotGuardianOrWithHigherRole.selector);
+        vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
         vm.prank(rebalancer);
-        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+        commonManagement.cancelSetRewardTrader(address(reward), trader);
 
         vm.prank(guardian);
-        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+        commonManagement.cancelSetRewardTrader(address(reward), trader);
 
         vm.prank(owner);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
         vm.prank(manager);
-        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+        commonManagement.cancelSetRewardTrader(address(reward), trader);
 
         vm.prank(owner);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
         vm.prank(owner);
-        commonAggregator.cancelSetRewardTrader(address(reward), trader);
+        commonManagement.cancelSetRewardTrader(address(reward), trader);
 
         vm.prank(manager);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
 
         vm.warp(STARTING_TIMESTAMP + 6 days);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(alice);
-        commonAggregator.setRewardTrader(address(reward), trader);
+        commonManagement.setRewardTrader(address(reward), trader);
 
-        vm.expectRevert(ICommonAggregator.CallerNotManagerNorOwner.selector);
+        vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(guardian);
-        commonAggregator.setRewardTrader(address(reward), trader);
+        commonManagement.setRewardTrader(address(reward), trader);
 
         // Manager can set trader
         vm.prank(manager);
-        commonAggregator.setRewardTrader(address(reward), trader);
+        commonManagement.setRewardTrader(address(reward), trader);
 
         vm.prank(owner);
-        commonAggregator.submitSetRewardTrader(address(reward), trader);
+        commonManagement.submitSetRewardTrader(address(reward), trader);
 
         vm.warp(STARTING_TIMESTAMP + 12 days);
 
         // Owner can set trader
         vm.prank(owner);
-        commonAggregator.setRewardTrader(address(reward), trader);
+        commonManagement.setRewardTrader(address(reward), trader);
     }
 
     function testWrongTokens() public {
@@ -175,16 +173,16 @@ contract CommonAggregatorTest is Test {
             abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(commonAggregator))
         );
         vm.prank(owner);
-        commonAggregator.submitSetRewardTrader(address(commonAggregator), trader);
+        commonManagement.submitSetRewardTrader(address(commonAggregator), trader);
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(asset)));
         vm.prank(owner);
-        commonAggregator.submitSetRewardTrader(address(asset), trader);
+        commonManagement.submitSetRewardTrader(address(asset), trader);
 
         for (uint256 i = 0; i < vaults.length; ++i) {
             vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(vaults[i])));
             vm.prank(owner);
-            commonAggregator.submitSetRewardTrader(address(vaults[i]), trader);
+            commonManagement.submitSetRewardTrader(address(vaults[i]), trader);
         }
     }
 
@@ -192,25 +190,25 @@ contract CommonAggregatorTest is Test {
         ERC4626Mock freshVault = new ERC4626Mock(address(asset));
 
         vm.prank(owner);
-        commonAggregator.submitSetRewardTrader(address(freshVault), trader);
+        commonManagement.submitSetRewardTrader(address(freshVault), trader);
 
         vm.warp(STARTING_TIMESTAMP + 6 days);
 
         vm.prank(owner);
-        commonAggregator.setRewardTrader(address(freshVault), trader);
+        commonManagement.setRewardTrader(address(freshVault), trader);
 
         vm.prank(owner);
-        commonAggregator.submitAddVault(IERC4626(address(freshVault)));
+        commonManagement.submitAddVault(IERC4626(address(freshVault)));
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(freshVault)));
-        commonAggregator.transferRewardsForSale(address(freshVault));
+        commonManagement.transferRewardsForSale(address(freshVault));
 
         vm.warp(STARTING_TIMESTAMP + 20 days);
 
         vm.prank(owner);
-        commonAggregator.addVault(IERC4626(address(freshVault)));
+        commonManagement.addVault(IERC4626(address(freshVault)));
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(freshVault)));
-        commonAggregator.transferRewardsForSale(address(freshVault));
+        commonManagement.transferRewardsForSale(address(freshVault));
     }
 }

@@ -3,10 +3,18 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {mulDivWithRemainder, weightedAvg} from "../contracts/Math.sol";
+import {mulDivWithRemainder, weightedAvg, saturatingAdd} from "../contracts/Math.sol";
 
 contract MathTest is Test {
     using Math for uint256;
+
+    function test_saturatingAdd() public pure {
+        assertEq(saturatingAdd(1, 2), 3);
+        assertEq(saturatingAdd(1, type(uint256).max), type(uint256).max);
+        assertEq(saturatingAdd(0, type(uint256).max), type(uint256).max);
+        assertEq(saturatingAdd(5, type(uint256).max - 6), type(uint256).max - 1);
+        assertEq(saturatingAdd(type(uint256).max, type(uint256).max), type(uint256).max);
+    }
 
     function testFuzz_mulDivWithRemainder(uint256 a, uint256 b, uint256 c) public pure {
         c = bound(c, 1, (1 << 128));
