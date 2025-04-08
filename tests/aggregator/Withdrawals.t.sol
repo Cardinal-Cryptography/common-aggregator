@@ -126,7 +126,7 @@ contract CommonAggregatorTest is Test {
         // surplus = surplus - deficit = 45
         assertEq(_vaultsAllocation(vaults[2]), 50 - 7);
 
-        // deficit < inital_surplus so 1 comes from idle
+        // deficit < surplus so 1 comes from idle
         assertEq(asset.balanceOf(address(commonAggregator)), 5 - 1);
     }
 
@@ -154,7 +154,7 @@ contract CommonAggregatorTest is Test {
         // surplus = surplus - deficit = 24
         assertEq(_vaultsAllocation(vaults[2]), 50 - 7);
 
-        // deficit > inital_surplus so idle does not change
+        // deficit > surplus so idle does not change
         assertEq(asset.balanceOf(address(commonAggregator)), 1);
     }
 
