@@ -3,14 +3,13 @@ pragma solidity ^0.8.28;
 
 import {CommonAggregator} from "./CommonAggregator.sol";
 import {ICommonManagement} from "./interfaces/ICommonManagement.sol";
-import {CommonTimelocks} from "./CommonTimelocks.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20, IERC4626, IERC20Metadata, SafeERC20, ERC20Upgradeable} from "./ERC4626BufferedUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {MAX_BPS} from "./Math.sol";
+import {MAX_BPS, saturatingAdd} from "./Math.sol";
 
-contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable, AccessControlUpgradeable {
+contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUpgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC4626;
@@ -36,6 +35,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     /// @custom:storage-location erc7201:common.storage.management
     struct ManagementStorage {
+        mapping(bytes32 actionHash => uint256 lockedUntil) registeredTimelocks;
         mapping(address rewardToken => address traderAddress) rewardTrader;
         uint256 pendingVaultForceRemovals;
         CommonAggregator aggregator;
@@ -359,5 +359,67 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
             revert CallerNotManagerNorOwner();
         }
         _;
+    }
+
+    // ----- Timelocks -----
+
+    error ActionAlreadyRegistered(bytes32 actionHash);
+    error ActionNotRegistered(bytes32 actionHash);
+    error ActionTimelocked(bytes32 actionHash, uint256 lockedUntil);
+
+    /// @dev Use this modifier for functions which submit a timelocked action proposal.
+    modifier registersTimelockedAction(bytes32 actionHash, uint256 delay) {
+        _register(actionHash, delay);
+        _;
+    }
+
+    /// @dev Use this modifier for functions which execute a previously submitted action whose timelock
+    /// period has passed.
+    modifier executesUnlockedAction(bytes32 actionHash) {
+        _execute(actionHash);
+        _;
+    }
+
+    /// @dev Use this modifier to cancel a previously submitted action, so that it can't be executed.
+    modifier cancelsAction(bytes32 actionHash) {
+        _cancel(actionHash);
+        _;
+    }
+
+    function _isTimelockedActionRegistered(bytes32 actionHash) private view returns (bool) {
+        return _getManagementStorage().registeredTimelocks[actionHash] != 0;
+    }
+
+    /// @dev Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
+    /// is greater than zero. A zero `delay` means that the action is locked only for the current timestamp.
+    function _register(bytes32 actionHash, uint256 delay) private {
+        ManagementStorage storage $ = _getManagementStorage();
+        if ($.registeredTimelocks[actionHash] != 0) {
+            revert ActionAlreadyRegistered(actionHash);
+        }
+        $.registeredTimelocks[actionHash] = saturatingAdd(block.timestamp, delay);
+    }
+
+    /// @dev Removes a timelock entry for the given action if it exists and the timelock has passed.
+    function _execute(bytes32 actionHash) private {
+        ManagementStorage storage $ = _getManagementStorage();
+        uint256 lockedUntil = $.registeredTimelocks[actionHash];
+        if (lockedUntil == 0) {
+            revert ActionNotRegistered(actionHash);
+        }
+        if (lockedUntil >= block.timestamp) {
+            revert ActionTimelocked(actionHash, lockedUntil);
+        }
+        delete $.registeredTimelocks[actionHash];
+    }
+
+    /// @dev Removes a timelock entry for the given action if it exists. Cancellation works both during
+    /// and after the timelock period.
+    function _cancel(bytes32 actionHash) private {
+        ManagementStorage storage $ = _getManagementStorage();
+        if ($.registeredTimelocks[actionHash] == 0) {
+            revert ActionNotRegistered(actionHash);
+        }
+        delete $.registeredTimelocks[actionHash];
     }
 }
