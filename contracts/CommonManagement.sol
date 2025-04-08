@@ -74,7 +74,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.ensureVaultCanBeAdded(vault);
 
-        emit VaultAdditionSubmitted(address(vault), block.timestamp + ADD_VAULT_TIMELOCK);
+        emit VaultAdditionSubmitted(address(vault), saturatingAdd(block.timestamp, ADD_VAULT_TIMELOCK));
     }
 
     function cancelAddVault(IERC4626 vault)
@@ -97,12 +97,12 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
     }
 
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
+        ManagementStorage storage $ = _getManagementStorage();
         require(
-            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
+            $.registeredTimelocks[keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))] == 0,
             PendingVaultForceRemoval(vault)
         );
 
-        ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.removeVault(vault);
     }
 
@@ -124,7 +124,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
         }
         $.pendingVaultForceRemovals++;
 
-        emit VaultForceRemovalSubmitted(address(vault), block.timestamp + FORCE_REMOVE_VAULT_TIMELOCK);
+        emit VaultForceRemovalSubmitted(address(vault), saturatingAdd(block.timestamp, FORCE_REMOVE_VAULT_TIMELOCK));
     }
 
     /// @inheritdoc ICommonManagement
@@ -205,15 +205,15 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
             SET_TRADER_TIMELOCK
         )
     {
+        ManagementStorage storage $ = _getManagementStorage();
         require(
-            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
+            $.registeredTimelocks[keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))] == 0,
             InvalidRewardToken(rewardToken)
         );
 
-        ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.ensureTokenSafeToTransfer(rewardToken);
 
-        emit SetRewardsTraderSubmitted(rewardToken, traderAddress, block.timestamp + SET_TRADER_TIMELOCK);
+        emit SetRewardsTraderSubmitted(rewardToken, traderAddress, saturatingAdd(block.timestamp, SET_TRADER_TIMELOCK));
     }
 
     /// @inheritdoc ICommonManagement
@@ -231,12 +231,12 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
         onlyManagerOrOwner
         executesUnlockedAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
     {
+        ManagementStorage storage $ = _getManagementStorage();
         require(
-            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
+            $.registeredTimelocks[keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))] == 0,
             InvalidRewardToken(rewardToken)
         );
 
-        ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.ensureTokenSafeToTransfer(rewardToken);
         $.rewardTrader[rewardToken] = traderAddress;
 
@@ -245,12 +245,12 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
 
     /// @inheritdoc ICommonManagement
     function transferRewardsForSale(address rewardToken) external {
+        ManagementStorage storage $ = _getManagementStorage();
         require(
-            !_isTimelockedActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
+            $.registeredTimelocks[keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))] == 0,
             InvalidRewardToken(rewardToken)
         );
 
-        ManagementStorage storage $ = _getManagementStorage();
         require($.rewardTrader[rewardToken] != address(0), NoTraderSetForToken(rewardToken));
         address receiver = $.rewardTrader[rewardToken];
         $.aggregator.transferRewardsForSale(rewardToken, receiver);
@@ -296,7 +296,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
             MANAGEMENT_UPGRADE_TIMELOCK
         )
     {
-        emit ManagementUpgradeSubmitted(newImplementation, block.timestamp + MANAGEMENT_UPGRADE_TIMELOCK);
+        emit ManagementUpgradeSubmitted(newImplementation, saturatingAdd(block.timestamp, MANAGEMENT_UPGRADE_TIMELOCK));
     }
 
     function cancelUpgradeManagement(address newImplementation)
@@ -317,7 +317,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
             AGGREGATOR_UPGRADE_TIMELOCK
         )
     {
-        emit AggregatorUpgradeSubmitted(newImplementation, block.timestamp + AGGREGATOR_UPGRADE_TIMELOCK);
+        emit AggregatorUpgradeSubmitted(newImplementation, saturatingAdd(block.timestamp, AGGREGATOR_UPGRADE_TIMELOCK));
     }
 
     function cancelUpgradeAggregator(address newImplementation)
@@ -384,10 +384,6 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
     modifier cancelsAction(bytes32 actionHash) {
         _cancel(actionHash);
         _;
-    }
-
-    function _isTimelockedActionRegistered(bytes32 actionHash) private view returns (bool) {
-        return _getManagementStorage().registeredTimelocks[actionHash] != 0;
     }
 
     /// @dev Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
