@@ -353,6 +353,84 @@ contract ERC4626BufferedUpgradeableTest is Test {
         assertEq(bufferedVault.balanceOf(alice), 50);
     }
 
+    function testMaxRedeemProtocolFeeReceiverWithHoldingsStateUpdate() public {
+        bufferedVault.setProtocolFee(MAX_BPS / 10);
+        bufferedVault.setProtocolFeeReceiver(alice);
+
+        uint256 initialDeposit = 10 ** 6;
+
+        _depositToVault(initialDeposit);
+        uint256 initialShares = bufferedVault.totalSupply();
+
+        assertEq(bufferedVault.maxRedeem(alice), initialShares, "maxRedeem #0");
+        assertEq(bufferedVault.maxWithdraw(alice), initialDeposit, "maxWithdraw #0");
+
+        _dropToVault(initialDeposit);
+        bufferedVault.updateHoldingsState();
+
+        assertEq(bufferedVault.maxRedeem(alice), initialShares * 11 / 10, "maxRedeem #1");
+        assertEq(bufferedVault.maxWithdraw(alice), initialDeposit * 11 / 10, "maxWithdraw #1");
+
+        vm.warp(STARTING_TIMESTAMP + 10 days);
+        assertEq(bufferedVault.maxRedeem(alice), initialShares * 11 / 10, "maxRedeem #2");
+        assertEq(bufferedVault.totalSupply(), initialShares * 11 / 10 + initialShares * 9 / 20, "totalSupply #2");
+        assertEq(
+            bufferedVault.maxWithdraw(alice),
+            bufferedVault.convertToAssets(bufferedVault.maxRedeem(alice)),
+            "maxWithdraw #2"
+        );
+
+        uint256 expectedAssetsWithdrawn = bufferedVault.maxWithdraw(alice);
+        uint256 maxRedeem = bufferedVault.maxRedeem(alice);
+
+        vm.prank(alice);
+        uint256 callResult = bufferedVault.redeem(maxRedeem, alice, alice);
+
+        assertEq(bufferedVault.balanceOf(alice), 0, "alice shares");
+        assertEq(callResult, expectedAssetsWithdrawn, "call result");
+        assertEq(asset.balanceOf(alice), expectedAssetsWithdrawn, "alice assets");
+    }
+
+    function testMaxRedeemUnderestimatesForProtocolFeeReceiver() public {
+        bufferedVault.setProtocolFee(MAX_BPS / 10);
+        bufferedVault.setProtocolFeeReceiver(alice);
+
+        uint256 initialDeposit = 10 ** 6;
+
+        _depositToVault(initialDeposit);
+        uint256 initialShares = bufferedVault.totalSupply();
+
+        _dropToVault(initialDeposit);
+
+        uint256 sharesBefore = bufferedVault.balanceOf(alice);
+
+        assertEq(bufferedVault.maxRedeem(alice), sharesBefore);
+        vm.prank(alice);
+        uint256 assetsWithdrawn = bufferedVault.redeem(sharesBefore * 11 / 10, alice, alice);
+
+        assertEq(assetsWithdrawn, initialDeposit * 11 / 10);
+        assertEq(asset.balanceOf(alice), initialDeposit * 11 / 10);
+    }
+
+    function testMintProtocolFeeReceiver() public {
+        bufferedVault.setProtocolFee(MAX_BPS / 10);
+        bufferedVault.setProtocolFeeReceiver(alice);
+
+        asset.mint(alice, 10 ** 6);
+        vm.prank(alice);
+        asset.approve(address(bufferedVault), 10 ** 6);
+
+        uint256 initialDeposit = 10 ** 6;
+
+        _dropToVault(10 ** 6);
+
+        uint256 offset = (bufferedVault.decimals() / asset.decimals());
+
+        vm.prank(alice);
+        bufferedVault.mint(10 ** 6 * offset, alice);
+        assertEq(bufferedVault.balanceOf(alice), 10 ** 6 * offset * 11 / 10);
+    }
+
     uint256 constant UPDATE_NUM = 10;
 
     function testFuzz_BufferEndIsNeverLowerThanLastUpdate(

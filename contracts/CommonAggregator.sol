@@ -176,6 +176,8 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc IERC4626
+    /// @dev If caller and receiver is `protocolFeeReceiver`, the balance of the `protocolFeeReceiver`
+    /// might change by more than `shares`, as there might be some pending protocol fees to be collected.
     function mint(uint256 shares, address receiver)
         public
         virtual
@@ -198,6 +200,8 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc IERC4626
+    /// @dev If `owner` is `protocolFeeReceiver`, the `maxRedeem` might underestimate if there are pending protocol fees.
+    /// Call the `updateHoldingsState()` before calling this function to ensure that the `maxRedeem` is exact.
     function redeem(uint256 shares, address receiver, address owner)
         public
         virtual
