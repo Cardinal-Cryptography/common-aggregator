@@ -288,7 +288,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     }
 
     /// @inheritdoc IERC4626
-    /// @dev Doesn't update holdings state, so the result will be underestimated if there are pending gains. 
+    /// @dev Doesn't update holdings state, so the result will be underestimated if there are pending gains.
     function maxWithdraw(address owner) public view virtual returns (uint256) {
         return convertToAssets(balanceOf(owner));
     }
