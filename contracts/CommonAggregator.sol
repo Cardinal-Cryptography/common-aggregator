@@ -12,7 +12,7 @@ import {
     ERC20Upgradeable,
     ERC4626BufferedUpgradeable
 } from "./ERC4626BufferedUpgradeable.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math, SafeCast} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {saturatingAdd} from "./Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import {ERC4626BufferedUpgradeable} from "./ERC4626BufferedUpgradeable.sol";
@@ -222,43 +222,20 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     function pullFundsProportional(uint256 assetsRequired) external onlyAggregator {
         require(totalAssets() != 0, NotEnoughFunds());
 
-        IERC20 asset = IERC20(asset());
-        uint256 idle = asset.balanceOf(address(this));
-        uint256 amountIdle = assetsRequired.mulDiv(idle, totalAssets());
-
+        uint256 idle = IERC20(asset()).balanceOf(address(this));
         AggregatorStorage storage $ = _getAggregatorStorage();
-        uint256[] memory amountsVaults = new uint256[]($.vaults.length);
+        uint256 surplus = mulmod(assetsRequired, idle, totalAssets());
 
-        uint256 totalGathered = amountIdle;
         for (uint256 i = 0; i < $.vaults.length; ++i) {
-            amountsVaults[i] = assetsRequired.mulDiv(_aggregatedVaultAssets($.vaults[i]), totalAssets());
-            totalGathered += amountsVaults[i];
-        }
-
-        if (totalGathered < assetsRequired) {
-            uint256 missing = assetsRequired - totalGathered;
-            uint256 additionalIdleContribution = missing.min(idle - amountIdle);
-            missing -= additionalIdleContribution;
-            amountIdle += additionalIdleContribution;
-
-            for (uint256 i = 0; i < $.vaults.length && missing > 0; ++i) {
-                uint256 vaultMaxWithdraw = $.vaults[i].maxWithdraw(address(this));
-                require(
-                    amountsVaults[i] <= vaultMaxWithdraw,
-                    AggregatedVaultWithdrawalLimitExceeded(address($.vaults[i]), vaultMaxWithdraw, amountsVaults[i])
-                );
-                uint256 additionalVaultContribution = missing.min(vaultMaxWithdraw - amountsVaults[i]);
-                missing -= additionalVaultContribution;
-                amountsVaults[i] += additionalVaultContribution;
+            uint256 vaultAssets = _aggregatedVaultAssets($.vaults[i]);
+            uint256 deficit = mulmod(assetsRequired, vaultAssets, totalAssets());
+            uint256 pullAmount =
+                assetsRequired.mulDiv(vaultAssets, totalAssets()) + SafeCast.toUint(surplus < deficit);
+            if (surplus < deficit) {
+                surplus += totalAssets();
             }
-
-            require(missing == 0, NotEnoughFunds());
-        }
-
-        for (uint256 i = 0; i < $.vaults.length; ++i) {
-            uint256 shares = $.vaults[i].convertToShares(amountsVaults[i]);
-            $.vaults[i].approve(address($.vaults[i]), shares);
-            $.vaults[i].withdraw(amountsVaults[i], address(this), address(this));
+            surplus -= deficit;
+            $.vaults[i].withdraw(pullAmount, address(this), address(this));
         }
     }
 
