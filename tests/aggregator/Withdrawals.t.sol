@@ -106,32 +106,56 @@ contract CommonAggregatorTest is Test {
         _prepareDistribution([uint256(10), 20, 50], 5);
 
         _bobWithdraw(12);
-
         assertEq(asset.balanceOf(bob), 12);
 
+        // total assets: 10 + 20 + 50 + 5 = 85
+        // idle: 5 * 12 / 85 = 0, surplus = 70
+
+        // 10 * 12 / 85 = 1, deficit = 35
+        // surplus > deficit so we round down
+        // surplus = surplus - deficit = 35
         assertEq(_vaultsAllocation(vaults[0]), 10 - 1);
-        // 2 instead of 3 because of OZ rounding
-        assertEq(_vaultsAllocation(vaults[1]), 20 - 2);
+
+        // 20 * 12 / 85 = 2, deficit = 70
+        // surplus < deficit so we round up
+        // surplus = surplus + 85 - deficit = 50
+        assertEq(_vaultsAllocation(vaults[1]), 20 - 2 - 1);
+
+        // 50 * 12 / 85 = 7, deficit = 5
+        // surplus > deficit so we round down
+        // surplus = surplus - deficit = 45
         assertEq(_vaultsAllocation(vaults[2]), 50 - 7);
-        // Two should come from idle to fix rounding errors
-        assertEq(asset.balanceOf(address(commonAggregator)), 5 - 2);
+
+        // deficit < inital_surplus so 1 comes from idle
+        assertEq(asset.balanceOf(address(commonAggregator)), 5 - 1);
     }
 
     function testWithdrawRoundingErrors2() public {
         _prepareDistribution([uint256(10), 20, 50], 1);
 
         _bobWithdraw(12);
-
         assertEq(asset.balanceOf(bob), 12);
 
-        // One additional asset from the first vault as there isn't enough in idle
-        // to cover for all rounding errors.
-        assertEq(_vaultsAllocation(vaults[0]), 10 - 2);
-        // 2 instead of 3 because of OZ rounding
-        assertEq(_vaultsAllocation(vaults[1]), 20 - 2);
+        // total assets: 10 + 20 + 50 + 1 = 81
+        // idle: 12 * 1 / 81 = 0, surplus = 12
+
+        // 10 * 12 / 81 = 1, deficit = 39
+        // surplus < deficit so we round up
+        // surplus = surplus + 81 - deficit = 54
+        assertEq(_vaultsAllocation(vaults[0]), 10 - 1 - 1);
+
+        // 20 * 12 / 81 = 2, deficit = 78
+        // surplus < deficit so we round up
+        // surplus = surplus + 81 - deficit = 57
+        assertEq(_vaultsAllocation(vaults[1]), 20 - 2 - 1);
+
+        // 50 * 12 / 81 = 7, deficit = 33
+        // surplus > deficit so we round down
+        // surplus = surplus - deficit = 24
         assertEq(_vaultsAllocation(vaults[2]), 50 - 7);
-        // One should come from idle to fix rounding errors (partially)
-        assertEq(asset.balanceOf(address(commonAggregator)), 1 - 1);
+
+        // deficit > inital_surplus so idle does not change
+        assertEq(asset.balanceOf(address(commonAggregator)), 1);
     }
 
     function testZeroAssets() public {
