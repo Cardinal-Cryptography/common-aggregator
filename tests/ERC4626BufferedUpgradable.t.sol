@@ -13,9 +13,9 @@ import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
     uint8 private decimalsOffset;
 
-    function initialize(uint8 decimalsOffset_, IERC20 _asset) public initializer {
+    function initialize(uint8 _decimalsOffset, IERC20 _asset) public initializer {
         __ERC4626Buffered_init(_asset);
-        decimalsOffset = decimalsOffset_;
+        decimalsOffset = _decimalsOffset;
     }
 
     function currentBufferEnd() external view returns (uint256) {
