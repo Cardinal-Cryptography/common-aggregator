@@ -306,7 +306,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
         }
 
-        uint256 shares = convertToShares(assets);
+        uint256 shares =
+            assets.mulDiv(super.totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, Math.Rounding.Floor);
         _deposit(_msgSender(), receiver, assets, shares);
 
         return shares;
@@ -360,7 +361,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
         }
 
-        uint256 assets = convertToAssets(shares);
+        uint256 assets =
+            shares.mulDiv(totalAssets() + 1, super.totalSupply() + 10 ** _decimalsOffset(), Math.Rounding.Floor);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
