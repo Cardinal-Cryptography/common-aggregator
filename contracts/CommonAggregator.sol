@@ -240,7 +240,8 @@ contract CommonAggregator is
         AggregatorStorage storage $ = _getAggregatorStorage();
 
         for (uint256 i = 0; i < $.vaults.length; ++i) {
-            uint256 pullAmount = assetsRequired.mulDiv(_aggregatedVaultAssets($.vaults[i]), totalAssets(), Math.Rounding.Ceil);
+            uint256 pullAmount =
+                assetsRequired.mulDiv(_aggregatedVaultAssets($.vaults[i]), totalAssets(), Math.Rounding.Ceil);
             $.vaults[i].withdraw(pullAmount, address(this), address(this));
         }
     }
