@@ -229,8 +229,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         for (uint256 i = 0; i < $.vaults.length; ++i) {
             uint256 vaultAssets = _aggregatedVaultAssets($.vaults[i]);
             uint256 deficit = mulmod(assetsRequired, vaultAssets, totalAssets());
-            uint256 pullAmount =
-                assetsRequired.mulDiv(vaultAssets, totalAssets()) + SafeCast.toUint(surplus < deficit);
+            uint256 pullAmount = assetsRequired.mulDiv(vaultAssets, totalAssets()) + SafeCast.toUint(surplus < deficit);
             if (surplus < deficit) {
                 surplus += totalAssets();
             }
