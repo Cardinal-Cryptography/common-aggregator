@@ -313,18 +313,17 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         AggregatorStorage storage $ = _getAggregatorStorage();
         IERC4626[] memory vaults = new IERC4626[]($.vaults.length);
         vaultShares = new uint256[]($.vaults.length);
-        uint256 valueInAssets = assets;
         for (uint256 i = 0; i < $.vaults.length; i++) {
             vaults[i] = $.vaults[i];
             vaultShares[i] = shares.mulDiv(vaults[i].balanceOf(address(this)), totalShares);
-            valueInAssets += vaults[i].convertToAssets(vaultShares[i]);
         }
-        _decreaseAssets(valueInAssets);
 
-        // Even if reentrancy happens, this is a valid state - `_totalAssetsNotCached()` will return
-        // more shares than the cached value, so it's as if `account` donated vault's shares to the aggregator.
+        _decreaseAssets(assets);
         IERC20(asset()).safeTransfer(account, assets);
+
+        // Even if reentrancy happens, this is a valid state
         for (uint256 i = 0; i < vaults.length; i++) {
+            _decreaseAssets(vaults[i].convertToAssets(vaultShares[i]));
             vaults[i].safeTransfer(account, vaultShares[i]);
         }
         emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultShares);
