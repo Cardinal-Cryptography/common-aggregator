@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
+import {ICommonManagement} from "../contracts/interfaces/ICommonManagement.sol";
 import {Script} from "forge-std/Script.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "forge-std/console.sol";
@@ -9,13 +10,13 @@ import "forge-std/console.sol";
 /// via SubmitUpgradeAggregatorScript.s.sol before running this script, and the time lock should pass.
 contract FinalizeUpgradeAggregatorScript is Script {
     function run() public {
-        address commonAggregator = vm.envAddress("COMMON_AGGREGATOR");
+        address commonManagement = vm.envAddress("COMMON_MANAGEMENT");
         address newImplementation = vm.envAddress("NEW_IMPLEMENTATION");
         bytes memory callData = "";
 
         vm.startBroadcast();
 
-        UUPSUpgradeable(commonAggregator).upgradeToAndCall(newImplementation, callData);
+        ICommonManagement(commonManagement).upgradeAggregator(newImplementation, callData);
 
         console.log("Upgrade finalized successfully");
 

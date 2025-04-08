@@ -80,29 +80,32 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         uint256 oldTotalAssets = $.assetsCached;
 
-        (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint) = _holdingsUpdate();
+        (uint256 newTotalAssets, uint256 sharesToBurn, uint256 sharesToMint) = _holdingsUpdate();
 
         $.currentBufferEnd = $.currentBufferEnd.max(block.timestamp);
 
-        // It's possible that we will have `sharesToBurn > 0 && sharesToMint > 0`.
-        // We still want to perform both mint and burn, since fee is calculated based on minted shares.
-        // If only the difference would be minted/burned then, with steady inflow of rewards, vault would take almost no fees.
-        uint256 sharesToBurn = releasedShares + lostShares;
-        if (sharesToBurn > 0) {
-            // Burn fees from the buffer
-            _burn(address(this), sharesToBurn);
-            $.bufferedShares = $.bufferedShares - sharesToBurn;
-        }
+        // Account for released shares and any potential losses in the further calculations
+        $.bufferedShares -= sharesToBurn; // (#1)
 
+        // Apply fee and compute new buffer end timestamp, if there was any gain
+        // Note that `sharesToMint > 0` means there are no losses
         if (sharesToMint > 0) {
             uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
-
-            _mint(address(this), sharesToMint - fee);
             _mint($.protocolFeeReceiver, fee);
+            sharesToMint -= fee;
 
+            // compute new buffer end timestamp
             uint256 newUnlockEnd = block.timestamp + _defaultBufferingDuration();
-            $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint - fee);
-            $.bufferedShares = checkedAdd($.bufferedShares, sharesToMint - fee, 1);
+            $.currentBufferEnd = weightedAvg($.currentBufferEnd, $.bufferedShares, newUnlockEnd, sharesToMint);
+
+            $.bufferedShares = checkedAdd($.bufferedShares, sharesToMint, 1); // (#2)
+        }
+
+        // Mint or burn buffer shares ( to reflect #1 and #2)
+        if (sharesToMint > sharesToBurn) {
+            _mint(address(this), sharesToMint - sharesToBurn);
+        } else {
+            _burn(address(this), sharesToBurn - sharesToMint);
         }
 
         $.lastUpdate = block.timestamp;
@@ -113,27 +116,27 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// @notice Preview the holdings state update, without actually updating it.
     /// Returns `totalAssets` and `totalSupply` that there would be after the update.
     function _previewUpdateHoldingsState() internal view returns (uint256, uint256) {
-        (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint) = _holdingsUpdate();
-        return (newTotalAssets, super.totalSupply() - releasedShares - lostShares + sharesToMint);
+        (uint256 newTotalAssets, uint256 sharesToBurn, uint256 sharesToMint) = _holdingsUpdate();
+        return (newTotalAssets, super.totalSupply() - sharesToBurn + sharesToMint);
     }
 
     function _holdingsUpdate()
         internal
         view
-        returns (uint256 newTotalAssets, uint256 releasedShares, uint256 lostShares, uint256 sharesToMint)
+        returns (uint256 newTotalAssets, uint256 sharesToBurn, uint256 sharesToMint)
     {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         newTotalAssets = _totalAssetsNotCached();
         uint256 oldTotalShares = super.totalSupply();
 
-        releasedShares = _releasedShares();
-        uint256 newBufferedShares = $.bufferedShares - releasedShares;
+        sharesToBurn = _releasedShares();
+        uint256 newBufferedShares = $.bufferedShares - sharesToBurn;
 
         if ($.assetsCached <= newTotalAssets) {
-            sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares - releasedShares);
+            sharesToMint = _sharesToMintOnGain($.assetsCached, newTotalAssets, oldTotalShares - sharesToBurn);
         } else {
-            lostShares =
-                _sharesToBurnOnLoss($.assetsCached, newTotalAssets, oldTotalShares - releasedShares, newBufferedShares);
+            sharesToBurn +=
+                _sharesToBurnOnLoss($.assetsCached, newTotalAssets, oldTotalShares - sharesToBurn, newBufferedShares);
         }
     }
 
@@ -303,7 +306,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
         }
 
-        uint256 shares = previewDeposit(assets);
+        uint256 shares =
+            assets.mulDiv(super.totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, Math.Rounding.Floor);
         _deposit(_msgSender(), receiver, assets, shares);
 
         return shares;
@@ -317,7 +321,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             revert ERC4626ExceededMaxMint(receiver, shares, maxShares);
         }
 
-        uint256 assets = previewMint(shares);
+        uint256 assets =
+            shares.mulDiv(totalAssets() + 1, super.totalSupply() + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
         _deposit(_msgSender(), receiver, assets, shares);
 
         return assets;
@@ -336,7 +341,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
         }
 
-        uint256 shares = previewWithdraw(assets);
+        uint256 shares =
+            assets.mulDiv(super.totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, Math.Rounding.Ceil);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return shares;
@@ -355,7 +361,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
         }
 
-        uint256 assets = previewRedeem(shares);
+        uint256 assets =
+            shares.mulDiv(totalAssets() + 1, super.totalSupply() + 10 ** _decimalsOffset(), Math.Rounding.Floor);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
