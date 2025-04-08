@@ -74,6 +74,21 @@ contract CommonAggregatorTest is Test {
         assertEq(commonAggregator.maxRedeem(alice), commonAggregator.convertToShares(90));
     }
 
+    function testMaxWithdrawAndRedeemDontRevert() public {
+        _prepareDistribution([uint256(1 << 230), uint256(1 << 230), 0], 0);
+
+        uint256 aliceInitialShares = commonAggregator.balanceOf(alice);
+
+        uint256 initialAssets = commonAggregator.totalAssets();
+        asset.mint(address(commonAggregator.getVaults()[0]), 1 << 254);
+        asset.mint(address(commonAggregator.getVaults()[2]), 1 << 255);
+
+        // Not yet updated
+        assertEq(commonAggregator.totalAssets(), 2 * (1 << 230));
+        assertEq(commonAggregator.maxWithdraw(alice), 2 * (1 << 230));
+        assertEq(commonAggregator.maxRedeem(alice), aliceInitialShares);
+    }
+
     function testSimpleWithdraw() public {
         _prepareDistribution([uint256(10), 20, 30], 5);
 

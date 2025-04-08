@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Script} from "forge-std/Script.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonManagement} from "contracts/CommonManagement.sol";
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 import "forge-std/console.sol";
 
@@ -13,7 +13,7 @@ import "forge-std/console.sol";
 contract SubmitUpgradeAggregatorScript is Script {
     function run() public {
         string memory contractName = vm.envString("UPGRADED_CONTRACT_NAME");
-        CommonAggregator commonAggregator = CommonAggregator(vm.envAddress("COMMON_AGGREGATOR"));
+        CommonManagement commonManagement = CommonManagement(vm.envAddress("COMMON_MANAGEMENT"));
 
         Options memory options;
         Upgrades.validateUpgrade(contractName, options);
@@ -25,7 +25,7 @@ contract SubmitUpgradeAggregatorScript is Script {
         address implementation = Upgrades.deployImplementation(contractName, options);
         console.log("Deployed implementation contract to:", implementation);
 
-        commonAggregator.submitUpgrade(implementation);
+        commonManagement.submitUpgradeAggregator(implementation);
 
         console.log("Update submitted successfully");
 

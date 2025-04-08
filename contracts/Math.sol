@@ -20,6 +20,17 @@ function checkedSub(uint256 a, uint256 b, uint256 id) pure returns (uint256 resu
     if (!success) revert SubtractionOverflow(id);
 }
 
+/// @notice Returns a+b, or type(uint256).max if it would overflow. The function never reverts.
+function saturatingAdd(uint256 a, uint256 b) pure returns (uint256 result) {
+    unchecked {
+        if (type(uint256).max - a < b) {
+            result = type(uint256).max;
+        } else {
+            result = a + b;
+        }
+    }
+}
+
 /// @notice Returns weighted average of v1 and v2, rounded down.
 /// Reverts if w1+w2 is zero, overflows uint256, or if the result overflows uint256.
 function weightedAvg(uint256 v1, uint256 w1, uint256 v2, uint256 w2) pure returns (uint256 result) {
