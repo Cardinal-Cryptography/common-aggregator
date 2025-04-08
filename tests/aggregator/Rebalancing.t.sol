@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ICommonAggregator} from "contracts/interfaces/ICommonAggregator.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -11,11 +11,13 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {MAX_BPS} from "contracts/Math.sol";
+import {setUpAggregator} from "tests/utils.sol";
 
 contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
 
     CommonAggregator commonAggregator;
+    CommonManagement commonManagement;
     address owner = address(0x123);
     address rebalancer = address(0x321);
 
@@ -26,16 +28,15 @@ contract CommonAggregatorTest is Test {
 
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
-        CommonAggregator implementation = new CommonAggregator();
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
+        IERC4626[] memory ierc4626Vaults = new IERC4626[](2);
+        ierc4626Vaults[0] = vaults[0];
+        ierc4626Vaults[1] = vaults[1];
 
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
-
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
-        commonAggregator = CommonAggregator(address(proxy));
+        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, ierc4626Vaults);
         vm.prank(owner);
-        commonAggregator.grantRole(keccak256("REBALANCER"), rebalancer);
+        commonManagement.grantRole(keccak256("REBALANCER"), rebalancer);
     }
 
     function testPushFunds() public {
@@ -48,7 +49,7 @@ contract CommonAggregatorTest is Test {
         commonAggregator.deposit(amount, alice);
 
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(amount, vaults[0]);
+        commonManagement.pushFunds(amount, vaults[0]);
         assertEq(asset.balanceOf(address(vaults[0])), amount);
     }
 
@@ -63,16 +64,16 @@ contract CommonAggregatorTest is Test {
         vm.prank(alice);
         commonAggregator.deposit(amount, alice);
         vm.prank(owner);
-        commonAggregator.setLimit(vaults[0], MAX_BPS / 2);
+        commonManagement.setLimit(vaults[0], MAX_BPS / 2);
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.AllocationLimitExceeded.selector, vaults[0]));
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(maxToPush + 1, vaults[0]);
+        commonManagement.pushFunds(maxToPush + 1, vaults[0]);
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(maxToPush, vaults[0]);
+        commonManagement.pushFunds(maxToPush, vaults[0]);
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.AllocationLimitExceeded.selector, vaults[0]));
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(1, vaults[0]);
+        commonManagement.pushFunds(1, vaults[0]);
         assertEq(asset.balanceOf(address(vaults[0])), maxToPush);
     }
 
@@ -85,12 +86,12 @@ contract CommonAggregatorTest is Test {
         commonAggregator.deposit(amount, alice);
 
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(50, vaults[0]);
+        commonManagement.pushFunds(50, vaults[0]);
         vm.prank(owner);
-        commonAggregator.setLimit(vaults[0], 0);
+        commonManagement.setLimit(vaults[0], 0);
 
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(50, vaults[1]);
+        commonManagement.pushFunds(50, vaults[1]);
     }
 
     function testPullFunds() public {
@@ -100,9 +101,9 @@ contract CommonAggregatorTest is Test {
         vaults[0].mint(address(commonAggregator), shares);
 
         vm.prank(owner);
-        commonAggregator.setLimit(vaults[0], 0);
+        commonManagement.setLimit(vaults[0], 0);
         vm.prank(rebalancer);
-        commonAggregator.pullFunds(60, vaults[0]);
+        commonManagement.pullFunds(60, vaults[0]);
         assertEq(asset.balanceOf(address(commonAggregator)), 60);
         assertEq(asset.balanceOf(address(vaults[0])), 50);
     }
@@ -114,29 +115,29 @@ contract CommonAggregatorTest is Test {
         vaults[0].mint(address(commonAggregator), shares);
 
         vm.prank(owner);
-        commonAggregator.setLimit(vaults[0], 0);
+        commonManagement.setLimit(vaults[0], 0);
         vm.prank(rebalancer);
-        commonAggregator.pullFundsByShares(shares / 2, vaults[0]);
+        commonManagement.pullFundsByShares(shares / 2, vaults[0]);
         assertEq(asset.balanceOf(address(commonAggregator)), 549);
         assertEq(asset.balanceOf(address(vaults[0])), 551);
     }
 
     function testZeroFunds() public {
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(0, vaults[0]);
+        commonManagement.pushFunds(0, vaults[0]);
         vm.prank(rebalancer);
-        commonAggregator.pullFunds(0, vaults[0]);
+        commonManagement.pullFunds(0, vaults[0]);
         vm.prank(rebalancer);
-        commonAggregator.pullFundsByShares(0, vaults[0]);
+        commonManagement.pullFundsByShares(0, vaults[0]);
         vm.expectRevert();
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(1, vaults[0]);
+        commonManagement.pushFunds(1, vaults[0]);
         vm.expectRevert();
         vm.prank(rebalancer);
-        commonAggregator.pullFunds(1, vaults[0]);
+        commonManagement.pullFunds(1, vaults[0]);
         vm.expectRevert();
         vm.prank(rebalancer);
-        commonAggregator.pullFundsByShares(1, vaults[0]);
+        commonManagement.pullFundsByShares(1, vaults[0]);
 
         uint256 amount = 100;
         asset.mint(alice, amount);
@@ -146,27 +147,27 @@ contract CommonAggregatorTest is Test {
         commonAggregator.deposit(amount, alice);
 
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(0, vaults[0]);
+        commonManagement.pushFunds(0, vaults[0]);
         vm.prank(rebalancer);
-        commonAggregator.pullFunds(0, vaults[0]);
+        commonManagement.pullFunds(0, vaults[0]);
         vm.prank(rebalancer);
-        commonAggregator.pullFundsByShares(0, vaults[0]);
+        commonManagement.pullFundsByShares(0, vaults[0]);
         vm.expectRevert();
         vm.prank(rebalancer);
-        commonAggregator.pullFunds(1, vaults[0]);
+        commonManagement.pullFunds(1, vaults[0]);
         vm.expectRevert();
         vm.prank(rebalancer);
-        commonAggregator.pullFundsByShares(1, vaults[0]);
+        commonManagement.pullFundsByShares(1, vaults[0]);
 
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(amount, vaults[0]);
+        commonManagement.pushFunds(amount, vaults[0]);
 
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(0, vaults[0]);
+        commonManagement.pushFunds(0, vaults[0]);
         vm.prank(rebalancer);
-        commonAggregator.pullFunds(0, vaults[0]);
+        commonManagement.pullFunds(0, vaults[0]);
         vm.prank(rebalancer);
-        commonAggregator.pullFundsByShares(0, vaults[0]);
+        commonManagement.pullFundsByShares(0, vaults[0]);
     }
 
     function testVaultPresentOnTheListCheck() public {
@@ -177,7 +178,7 @@ contract CommonAggregatorTest is Test {
         vm.prank(alice);
         commonAggregator.deposit(amount, alice);
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(amount - 1, vaults[0]);
+        commonManagement.pushFunds(amount - 1, vaults[0]);
 
         IERC4626[] memory notAddedAddresses = new IERC4626[](4);
         notAddedAddresses[0] = IERC4626(commonAggregator);
@@ -190,19 +191,19 @@ contract CommonAggregatorTest is Test {
 
             vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
             vm.prank(rebalancer);
-            commonAggregator.pushFunds(1, a);
+            commonManagement.pushFunds(1, a);
 
             vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
             vm.prank(rebalancer);
-            commonAggregator.pullFunds(1, a);
+            commonManagement.pullFunds(1, a);
 
             vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
             vm.prank(rebalancer);
-            commonAggregator.pullFundsByShares(1, a);
+            commonManagement.pullFundsByShares(1, a);
 
             vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
             vm.prank(owner);
-            commonAggregator.setLimit(a, 0);
+            commonManagement.setLimit(a, 0);
         }
     }
 
@@ -216,9 +217,9 @@ contract CommonAggregatorTest is Test {
 
         // Initial allocation
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(600, vaults[0]);
+        commonManagement.pushFunds(600, vaults[0]);
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(300, vaults[1]);
+        commonManagement.pushFunds(300, vaults[1]);
         assertEq(commonAggregator.totalAssets(), 1000);
 
         asset.burn(address(vaults[0]), 100);
@@ -231,9 +232,9 @@ contract CommonAggregatorTest is Test {
         assertEq(commonAggregator.totalAssets(), 959, "pre rebalance totalAssets");
 
         vm.prank(rebalancer);
-        commonAggregator.pullFunds(500, vaults[0]);
+        commonManagement.pullFunds(500, vaults[0]);
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(500, vaults[1]);
+        commonManagement.pushFunds(500, vaults[1]);
 
         assertEq(commonAggregator.totalAssets(), 959, "post rebalance totalAssets");
         assertEq(asset.balanceOf(address(commonAggregator)), 100);
@@ -244,7 +245,7 @@ contract CommonAggregatorTest is Test {
     function testRolesPushPullFunds() public {
         address manager = address(0x111);
         vm.prank(owner);
-        commonAggregator.grantRole(keccak256("MANAGER"), manager);
+        commonManagement.grantRole(keccak256("MANAGER"), manager);
 
         uint256 amount = 100;
         asset.mint(alice, amount);
@@ -253,37 +254,37 @@ contract CommonAggregatorTest is Test {
         vm.prank(alice);
         commonAggregator.deposit(amount, alice);
         vm.prank(rebalancer);
-        commonAggregator.pushFunds(amount / 2, vaults[0]);
+        commonManagement.pushFunds(amount / 2, vaults[0]);
 
         vm.prank(manager);
-        commonAggregator.pushFunds(1, vaults[0]);
+        commonManagement.pushFunds(1, vaults[0]);
         vm.prank(owner);
-        commonAggregator.pushFunds(1, vaults[0]);
-        vm.expectRevert(ICommonAggregator.CallerNotRebalancerOrWithHigherRole.selector);
+        commonManagement.pushFunds(1, vaults[0]);
+        vm.expectRevert(ICommonManagement.CallerNotRebalancerOrWithHigherRole.selector);
         vm.prank(alice);
-        commonAggregator.pushFunds(1, vaults[0]);
+        commonManagement.pushFunds(1, vaults[0]);
 
         vm.prank(manager);
-        commonAggregator.pullFunds(1, vaults[0]);
+        commonManagement.pullFunds(1, vaults[0]);
         vm.prank(owner);
-        commonAggregator.pullFunds(1, vaults[0]);
-        vm.expectRevert(ICommonAggregator.CallerNotRebalancerOrWithHigherRole.selector);
+        commonManagement.pullFunds(1, vaults[0]);
+        vm.expectRevert(ICommonManagement.CallerNotRebalancerOrWithHigherRole.selector);
         vm.prank(alice);
-        commonAggregator.pullFunds(1, vaults[0]);
+        commonManagement.pullFunds(1, vaults[0]);
 
         vm.prank(manager);
-        commonAggregator.pullFundsByShares(1, vaults[0]);
+        commonManagement.pullFundsByShares(1, vaults[0]);
         vm.prank(owner);
-        commonAggregator.pullFundsByShares(1, vaults[0]);
-        vm.expectRevert(ICommonAggregator.CallerNotRebalancerOrWithHigherRole.selector);
+        commonManagement.pullFundsByShares(1, vaults[0]);
+        vm.expectRevert(ICommonManagement.CallerNotRebalancerOrWithHigherRole.selector);
         vm.prank(alice);
-        commonAggregator.pullFundsByShares(1, vaults[0]);
+        commonManagement.pullFundsByShares(1, vaults[0]);
     }
 
     function testRolesSetLimit() public {
         address manager = address(0x111);
         vm.prank(owner);
-        commonAggregator.grantRole(keccak256("MANAGER"), manager);
+        commonManagement.grantRole(keccak256("MANAGER"), manager);
         bytes4 errorSelector = IAccessControl.AccessControlUnauthorizedAccount.selector;
 
         address[] memory notAllowed = new address[](3);
@@ -295,17 +296,17 @@ contract CommonAggregatorTest is Test {
             address a = notAllowed[i];
             vm.expectRevert(abi.encodeWithSelector(errorSelector, a, keccak256("OWNER")));
             vm.prank(a);
-            commonAggregator.setLimit(vaults[0], 0);
+            commonManagement.setLimit(vaults[0], 0);
 
             vm.expectRevert(abi.encodeWithSelector(errorSelector, a, keccak256("OWNER")));
             vm.prank(a);
-            commonAggregator.setLimit(vaults[0], MAX_BPS);
+            commonManagement.setLimit(vaults[0], MAX_BPS);
         }
     }
 
     function testSetLimitMaxLimit() public {
         vm.expectRevert(ICommonAggregator.IncorrectMaxAllocationLimit.selector);
         vm.prank(owner);
-        commonAggregator.setLimit(vaults[0], MAX_BPS + 1);
+        commonManagement.setLimit(vaults[0], MAX_BPS + 1);
     }
 }
