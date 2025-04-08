@@ -43,13 +43,12 @@ interface ICommonManagement {
 
     event VaultAdditionSubmitted(address indexed vault, uint256 unlockTimestamp);
     event VaultAdditionCancelled(address indexed vault);
-    event VaultAdded(address indexed vault);
-
-    event VaultRemoved(address indexed vault);
 
     event VaultForceRemovalSubmitted(address indexed vault, uint256 unlockTimestamp);
     event VaultForceRemovalCancelled(address indexed vault);
-    event VaultForceRemoved(address indexed vault);
+
+    error PendingVaultForceRemoval(IERC4626 vault);
+    error VaultAdditionAlreadyPending(IERC4626 vault);
 
     function submitAddVault(IERC4626 vault) external;
     function cancelAddVault(IERC4626 vault) external;
@@ -71,12 +70,7 @@ interface ICommonManagement {
     /// Doesn't trigger unpause on the aggregator by itself.
     function forceRemoveVault(IERC4626 vault) external;
 
-    error PendingVaultForceRemoval(IERC4626 vault);
-    error VaultAdditionAlreadyPending(IERC4626 vault);
-
     // ----- Rebalancing -----
-
-    event AssetsRebalanced(address indexed from, address indexed to, uint256 amount);
 
     /// @notice Allows the `REBALANCER` or higher role holder to trigger `pushFunds` on the aggregator.
     function pushFunds(uint256 assets, IERC4626 vault) external;
@@ -89,15 +83,10 @@ interface ICommonManagement {
 
     // ----- Allocation Limits -----
 
-    event AllocationLimitSet(address indexed vault, uint256 newLimitBps);
-
     /// @notice Allows the `OWNER` role holder to trigger `setLimit` on the aggregator.
     function setLimit(IERC4626 vault, uint256 newLimitBps) external;
 
     // ----- Fee management -----
-
-    event ProtocolFeeChanged(uint256 oldProtocolFee, uint256 newProtocolFee);
-    event ProtocolFeeReceiverChanged(address indexed oldPorotocolFeeReceiver, address indexed newPorotocolFeeReceiver);
 
     /// @notice Allows the `OWNER` role holder to trigger `setProtocolFee` on the aggregator.
     function setProtocolFee(uint256 _protocolFeeBps) external;
@@ -112,7 +101,6 @@ interface ICommonManagement {
     );
     event SetRewardsTraderCancelled(address indexed rewardToken, address indexed traderAddress);
     event RewardsTraderSet(address indexed rewardToken, address indexed traderAddress);
-    event RewardsTransferred(address indexed rewardToken, uint256 amount, address indexed receiver);
 
     error InvalidRewardToken(address token);
     error NoTraderSetForToken(address token);
@@ -136,13 +124,13 @@ interface ICommonManagement {
 
     // ----- Pausing -----
 
+    error PendingVaultForceRemovals(uint256 count);
+
     /// @notice Allows the `GUARDIAN` or a higher role holder to trigger `pauseUserInteractions` on the aggregator.
     function pauseUserInteractions() external;
 
     /// @notice Allows the `GUARDIAN` or a higher role holder to trigger `unpauseUserInteractions` on the aggregator.
     function unpauseUserInteractions() external;
-
-    error PendingVaultForceRemovals(uint256 count);
 
     // ----- Access control -----
 

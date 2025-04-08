@@ -51,8 +51,8 @@ contract VaultManagementTest is Test {
 
         vm.warp(vm.getBlockTimestamp() + 7 days + 5 hours);
 
-        vm.expectEmit(true, true, true, true, address(management), 1);
-        emit ICommonManagement.VaultAdded(address(vault));
+        vm.expectEmit(true, true, true, true, address(aggregator), 1);
+        emit ICommonAggregator.VaultAdded(address(vault));
         vm.prank(manager);
         management.addVault(vault);
 
@@ -205,8 +205,8 @@ contract VaultManagementTest is Test {
         IERC4626[] memory initialVaults = aggregator.getVaults();
 
         vm.prank(manager);
-        vm.expectEmit(true, true, true, true, address(management), 1);
-        emit ICommonManagement.VaultRemoved(address(initialVaults[1]));
+        vm.expectEmit(true, true, true, true, address(aggregator), 1);
+        emit ICommonAggregator.VaultRemoved(address(initialVaults[1]));
         management.removeVault(initialVaults[1]);
 
         assertEq(aggregator.getVaults().length, 2);
@@ -315,8 +315,8 @@ contract VaultManagementTest is Test {
         vm.warp(STARTING_TIMESTAMP + 30 days);
 
         vm.prank(manager);
-        vm.expectEmit(true, true, true, true, address(management), 1);
-        emit ICommonManagement.VaultForceRemoved(address(toRemove));
+        vm.expectEmit(true, true, true, true, address(aggregator), 1);
+        emit ICommonAggregator.VaultForceRemoved(address(toRemove));
         management.forceRemoveVault(toRemove);
 
         assertEq(aggregator.getVaults().length, 2);

@@ -94,8 +94,6 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.addVault(vault);
-
-        emit VaultAdded(address(vault));
     }
 
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
@@ -106,8 +104,6 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.removeVault(vault);
-
-        emit VaultRemoved(address(vault));
     }
 
     /// @inheritdoc ICommonManagement
@@ -154,8 +150,6 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.forceRemoveVault(vault);
         $.pendingVaultForceRemovals--;
-
-        emit VaultForceRemoved(address(vault));
     }
     // ----- Rebalancing -----
 
@@ -163,24 +157,18 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.pushFunds(assets, vault);
-
-        emit AssetsRebalanced(address($.aggregator), address(vault), assets);
     }
 
     /// @inheritdoc ICommonManagement
     function pullFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.pullFunds(assets, vault);
-
-        emit AssetsRebalanced(address(vault), address($.aggregator), assets);
     }
 
     /// @inheritdoc ICommonManagement
     function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyRebalancerOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
-        uint256 assets = $.aggregator.pullFundsByShares(shares, vault);
-
-        emit AssetsRebalanced(address(vault), address($.aggregator), assets);
+        $.aggregator.pullFundsByShares(shares, vault);
     }
 
     // ----- Allocation Limits -----
@@ -190,8 +178,6 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyRole(OWNER) {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.setLimit(vault, newLimitBps);
-
-        emit AllocationLimitSet(address(vault), newLimitBps);
     }
 
     // ----- Fee management -----
@@ -199,19 +185,13 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     /// @inheritdoc ICommonManagement
     function setProtocolFee(uint256 protocolFeeBps) public override(ICommonManagement) onlyRole(OWNER) {
         ManagementStorage storage $ = _getManagementStorage();
-        uint256 oldProtocolFee = $.aggregator.getProtocolFee();
         $.aggregator.setProtocolFee(protocolFeeBps);
-
-        emit ProtocolFeeChanged(oldProtocolFee, protocolFeeBps);
     }
 
     /// @inheritdoc ICommonManagement
     function setProtocolFeeReceiver(address protocolFeeReceiver) public override(ICommonManagement) onlyRole(OWNER) {
         ManagementStorage storage $ = _getManagementStorage();
-        address oldProtocolFeeReceiver = $.aggregator.getProtocolFeeReceiver();
         $.aggregator.setProtocolFeeReceiver(protocolFeeReceiver);
-
-        emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 
     // ----- Non-asset rewards trading -----
@@ -273,9 +253,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         ManagementStorage storage $ = _getManagementStorage();
         require($.rewardTrader[rewardToken] != address(0), NoTraderSetForToken(rewardToken));
         address receiver = $.rewardTrader[rewardToken];
-        uint256 amount = $.aggregator.transferRewardsForSale(rewardToken, receiver);
-
-        emit RewardsTransferred(rewardToken, amount, receiver);
+        $.aggregator.transferRewardsForSale(rewardToken, receiver);
     }
 
     // ----- Pausing user interactions -----

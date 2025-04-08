@@ -16,6 +16,10 @@ interface ICommonAggregator is IERC4626Buffered {
 
     // ----- Vault management -----
 
+    event VaultAdded(address indexed vault);
+    event VaultRemoved(address indexed vault);
+    event VaultForceRemoved(address indexed vault);
+
     function addVault(IERC4626 vault) external;
     function removeVault(IERC4626 vault) external;
     function forceRemoveVault(IERC4626 vault) external;
@@ -34,6 +38,8 @@ interface ICommonAggregator is IERC4626Buffered {
 
     // ----- Rebalancing -----
 
+    event AssetsRebalanced(address indexed from, address indexed to, uint256 amount);
+
     /// @notice Deposits `assets` from aggregator's own balance into `vault`.
     /// Vault must be present on the vault list. Allocation limits are checked.
     function pushFunds(uint256 assets, IERC4626 vault) external;
@@ -47,7 +53,7 @@ interface ICommonAggregator is IERC4626Buffered {
     /// @notice Redeems `shares` from `vault`, returning assets into
     /// aggregator's own balance. Vault must be present on the vault list.
     /// @dev Similarly to `pullFunds`, doesn't check the allocation limits.
-    function pullFundsByShares(uint256 shares, IERC4626 vault) external returns (uint256 assets);
+    function pullFundsByShares(uint256 shares, IERC4626 vault) external;
 
     error AllocationLimitExceeded(IERC4626 vault);
 
@@ -58,12 +64,18 @@ interface ICommonAggregator is IERC4626Buffered {
     /// It's a no-op if `newLimitBps` is the same as the current limit.
     /// Reverts if `newLimitBps` is higher MAX_BPS, or if `vault` is not present
     /// on the vault list.
-    function setLimit(IERC4626 vault, uint256 newLimitBps) external;
+
+    event AllocationLimitSet(address indexed vault, uint256 newLimitBps);
 
     error VaultNotOnTheList(IERC4626 vault);
     error IncorrectMaxAllocationLimit();
 
+    function setLimit(IERC4626 vault, uint256 newLimitBps) external;
+
     // ----- Fee management -----
+
+    event ProtocolFeeChanged(uint256 oldProtocolFee, uint256 newProtocolFee);
+    event ProtocolFeeReceiverChanged(address indexed oldPorotocolFeeReceiver, address indexed newPorotocolFeeReceiver);
 
     error ProtocolFeeTooHigh();
 
@@ -80,10 +92,12 @@ interface ICommonAggregator is IERC4626Buffered {
 
     // ----- Non-asset rewards trading -----
 
+    event RewardsTransferred(address indexed rewardToken, uint256 amount, address indexed receiver);
+
     error InvalidRewardToken(address token);
 
     /// @notice Transfers all `rewardToken`s held in the aggregator to `rewardTrader`
-    function transferRewardsForSale(address rewardToken, address rewardTrader) external returns (uint256 amount);
+    function transferRewardsForSale(address rewardToken, address rewardTrader) external;
 
     // ----- Emergency redeem -----
 

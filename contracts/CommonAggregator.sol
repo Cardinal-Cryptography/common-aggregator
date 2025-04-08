@@ -347,6 +347,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.vaults.push(vault);
         updateHoldingsState();
+
+        emit VaultAdded(address(vault));
     }
 
     function removeVault(IERC4626 vault) external override onlyManagement {
@@ -355,6 +357,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         // No need to updateHoldingsState, as we're not operating on assets.
         vault.redeem(vault.balanceOf(address(this)), address(this), address(this));
         _removeVault(index);
+
+        emit VaultRemoved(address(vault));
     }
 
     /// @inheritdoc ICommonAggregator
@@ -364,6 +368,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
 
         // Some assets were lost, so we have to update the holdings state.
         updateHoldingsState();
+
+        emit VaultForceRemoved(address(vault));
     }
 
     /// Tries to redeem as many shares as possible from the given vault.
@@ -401,18 +407,24 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         IERC20(asset()).approve(address(vault), assets);
         vault.deposit(assets, address(this));
         _checkLimit(IERC4626(vault));
+
+        emit AssetsRebalanced(address(this), address(vault), assets);
     }
 
     /// @inheritdoc ICommonAggregator
     function pullFunds(uint256 assets, IERC4626 vault) external onlyManagement {
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
         IERC4626(vault).withdraw(assets, address(this), address(this));
+
+        emit AssetsRebalanced(address(vault), address(this), assets);
     }
 
     /// @inheritdoc ICommonAggregator
-    function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyManagement returns (uint256 assets) {
+    function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyManagement {
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
-        assets = vault.redeem(shares, address(this), address(this));
+        uint256 assets = vault.redeem(shares, address(this), address(this));
+
+        emit AssetsRebalanced(address(vault), address(this), assets);
     }
 
     // ----- Allocation Limits -----
@@ -429,6 +441,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         if (oldLimit == newLimitBps) return;
 
         $.allocationLimitBps[address(vault)] = newLimitBps;
+
+        emit AllocationLimitSet(address(vault), newLimitBps);
     }
 
     // ----- Fee management -----
@@ -445,6 +459,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         if (oldProtocolFee == protocolFeeBps) return;
 
         super.setProtocolFee(protocolFeeBps);
+
+        emit ProtocolFeeChanged(oldProtocolFee, protocolFeeBps);
     }
 
     /// @inheritdoc ICommonAggregator
@@ -459,6 +475,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;
 
         super.setProtocolFeeReceiver(protocolFeeReceiver);
+
+        emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 
     function _isVaultOnTheList(IERC4626 vault) internal view returns (bool onTheList) {
@@ -490,15 +508,13 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     // ----- Non-asset rewards trading -----
 
     /// @inheritdoc ICommonAggregator
-    function transferRewardsForSale(address rewardToken, address rewardTrader)
-        external
-        onlyManagement
-        returns (uint256 amount)
-    {
+    function transferRewardsForSale(address rewardToken, address rewardTrader) external onlyManagement {
         ensureTokenSafeToTransfer(rewardToken);
         IERC20 transferrableToken = IERC20(rewardToken);
-        amount = transferrableToken.balanceOf(address(this));
+        uint256 amount = transferrableToken.balanceOf(address(this));
         SafeERC20.safeTransfer(transferrableToken, rewardTrader, amount);
+
+        emit RewardsTransferred(rewardToken, amount, rewardTrader);
     }
 
     // ----- Pausing user interactions -----
@@ -532,7 +548,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
 
     modifier onlyManagement() {
         AggregatorStorage storage $ = _getAggregatorStorage();
-        require(msg.sender == address($.management), CallerNotManagement());
+        require(msg.sender == $.management, CallerNotManagement());
         _;
     }
 }
