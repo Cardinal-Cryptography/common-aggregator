@@ -10,7 +10,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
-import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
 import {setUpAggregator} from "tests/utils.sol";
 
 contract CommonAggregatorTest is Test {
@@ -74,7 +73,7 @@ contract CommonAggregatorTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                CommonTimelocks.ActionTimelocked.selector,
+                CommonManagement.ActionTimelocked.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.SET_TRADER, address(reward), trader)),
                 STARTING_TIMESTAMP + 5 days
             )
@@ -86,7 +85,7 @@ contract CommonAggregatorTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                CommonTimelocks.ActionNotRegistered.selector,
+                CommonManagement.ActionNotRegistered.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.SET_TRADER, address(reward), owner))
             )
         );
