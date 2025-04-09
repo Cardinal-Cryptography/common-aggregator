@@ -7,7 +7,6 @@ import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.so
 import {ERC1967Proxy, ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
-import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
 import {UUPSUpgradeable, Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
@@ -67,7 +66,6 @@ contract CommonAggregatorUpgradeMissingNamespaceStorage is UUPSUpgradeable {
 
 /// @custom:oz-upgrades-from contracts/CommonAggregator.sol:CommonAggregator
 contract CommonAggregatorUpgradeMissingStorageFields is
-    CommonTimelocks,
     UUPSUpgradeable,
     AccessControlUpgradeable,
     ERC4626BufferedUpgradeable,
