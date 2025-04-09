@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {
     IERC20,
     IERC4626,
@@ -17,7 +18,8 @@ import {saturatingAdd} from "./Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import {ERC4626BufferedUpgradeable} from "./ERC4626BufferedUpgradeable.sol";
 
-contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626BufferedUpgradeable, PausableUpgradeable {
+
+contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626BufferedUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC4626;
@@ -56,6 +58,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         __UUPSUpgradeable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
         __ERC4626Buffered_init(asset);
+        __ReentrancyGuard_init();
         __Pausable_init();
 
         AggregatorStorage storage $ = _getAggregatorStorage();
@@ -155,6 +158,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         virtual
         override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
+        nonReentrant
         returns (uint256)
     {
         return super.deposit(assets, receiver);
@@ -166,6 +170,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         virtual
         override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
+        nonReentrant
         returns (uint256)
     {
         return super.mint(shares, receiver);
@@ -177,6 +182,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         virtual
         override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
+        nonReentrant
         returns (uint256)
     {
         return super.withdraw(assets, receiver, owner);
@@ -188,6 +194,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         virtual
         override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
+        nonReentrant
         returns (uint256)
     {
         return super.redeem(shares, receiver, owner);
@@ -294,9 +301,10 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     /// @inheritdoc ICommonAggregator
     function emergencyRedeem(uint256 shares, address account, address owner)
         external
+        nonReentrant
         returns (uint256 assets, uint256[] memory vaultShares)
     {
-        updateHoldingsState();
+        _updateHoldingsState();
         uint256 maxShares = maxEmergencyRedeem(owner);
         if (shares > maxShares) {
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
@@ -321,7 +329,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         _decreaseAssets(assets);
         IERC20(asset()).safeTransfer(account, assets);
 
-        // Even if reentrancy happens, this is a valid state
         for (uint256 i = 0; i < vaults.length; i++) {
             _decreaseAssets(vaults[i].convertToAssets(vaultShares[i]));
             vaults[i].safeTransfer(account, vaultShares[i]);
@@ -330,6 +337,11 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     }
 
     // ----- Reporting -----
+
+    /// @notice Updates the holdings state of the aggregator.
+    function updateHoldingsState() external nonReentrant {
+        _updateHoldingsState();
+    }
 
     function _totalAssetsNotCached() internal view override returns (uint256) {
         AggregatorStorage storage $ = _getAggregatorStorage();
@@ -348,16 +360,16 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
 
     // ----- Aggregated vaults management -----
 
-    function addVault(IERC4626 vault) external override onlyManagement {
+    function addVault(IERC4626 vault) external override onlyManagement nonReentrant {
         ensureVaultCanBeAdded(vault);
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.vaults.push(vault);
-        updateHoldingsState();
+        _updateHoldingsState();
 
         emit VaultAdded(address(vault));
     }
 
-    function removeVault(IERC4626 vault) external override onlyManagement {
+    function removeVault(IERC4626 vault) external override onlyManagement nonReentrant {
         uint256 index = ensureVaultIsPresent(vault);
 
         // No need to updateHoldingsState, as we're not operating on assets.
@@ -368,19 +380,19 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     }
 
     /// @inheritdoc ICommonAggregator
-    function forceRemoveVault(IERC4626 vault) external override onlyManagement {
+    function forceRemoveVault(IERC4626 vault) external override onlyManagement nonReentrant {
         uint256 index = ensureVaultIsPresent(vault);
         _removeVault(index);
 
         // Some assets were lost, so we have to update the holdings state.
-        updateHoldingsState();
+        _updateHoldingsState();
 
         emit VaultForceRemoved(address(vault));
     }
 
     /// Tries to redeem as many shares as possible from the given vault.
     /// Reverts only if the vault is not present on the list.
-    function tryExitVault(IERC4626 vault) external onlyManagement {
+    function tryExitVault(IERC4626 vault) external onlyManagement nonReentrant {
         ensureVaultIsPresent(vault);
 
         // Try redeeming as much shares of the removed vault as possible
@@ -407,8 +419,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     // ----- Rebalancing -----
 
     /// @inheritdoc ICommonAggregator
-    function pushFunds(uint256 assets, IERC4626 vault) external onlyManagement whenNotPaused {
-        updateHoldingsState();
+    function pushFunds(uint256 assets, IERC4626 vault) external onlyManagement whenNotPaused nonReentrant {
+        _updateHoldingsState();
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
         IERC20(asset()).approve(address(vault), assets);
         vault.deposit(assets, address(this));
@@ -418,7 +430,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     }
 
     /// @inheritdoc ICommonAggregator
-    function pullFunds(uint256 assets, IERC4626 vault) external onlyManagement {
+    function pullFunds(uint256 assets, IERC4626 vault) external onlyManagement nonReentrant {
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
         IERC4626(vault).withdraw(assets, address(this), address(this));
 
@@ -426,7 +438,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     }
 
     /// @inheritdoc ICommonAggregator
-    function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyManagement {
+    function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyManagement nonReentrant {
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
         uint256 assets = vault.redeem(shares, address(this), address(this));
 
@@ -437,7 +449,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
 
     /// @inheritdoc ICommonAggregator
     /// @notice Doesn't rebalance the assets, after the action limits may be exceeded.
-    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyManagement {
+    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyManagement nonReentrant{
         require(newLimitBps <= MAX_BPS, IncorrectMaxAllocationLimit());
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
 
@@ -458,6 +470,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         public
         override(ERC4626BufferedUpgradeable, ICommonAggregator)
         onlyManagement
+        nonReentrant
     {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
 
@@ -474,6 +487,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         public
         override(ERC4626BufferedUpgradeable, ICommonAggregator)
         onlyManagement
+        nonReentrant
     {
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
 
@@ -514,7 +528,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     // ----- Non-asset rewards trading -----
 
     /// @inheritdoc ICommonAggregator
-    function transferRewardsForSale(address rewardToken, address rewardTrader) external onlyManagement {
+    function transferRewardsForSale(address rewardToken, address rewardTrader) external onlyManagement nonReentrant {
         ensureTokenSafeToTransfer(rewardToken);
         IERC20 transferrableToken = IERC20(rewardToken);
         uint256 amount = transferrableToken.balanceOf(address(this));
@@ -528,13 +542,13 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
     /// to exit the aggregator.
-    function pauseUserInteractions() public onlyManagement {
+    function pauseUserInteractions() public onlyManagement nonReentrant {
         _pause();
     }
 
     /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used after mitigating a potential emergency.
-    function unpauseUserInteractions() public onlyManagement {
+    function unpauseUserInteractions() public onlyManagement nonReentrant {
         _unpause();
     }
 
