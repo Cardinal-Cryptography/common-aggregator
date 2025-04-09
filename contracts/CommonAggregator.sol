@@ -289,22 +289,22 @@ contract CommonAggregator is
         assets = shares.mulDiv(IERC20(asset()).balanceOf(address(this)), totalShares);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
-        IERC4626[] memory vaults = new IERC4626[]($.vaults.length);
         vaultShares = new uint256[]($.vaults.length);
+        uint256 valueInAssets = assets;
+
         for (uint256 i = 0; i < $.vaults.length; i++) {
-            vaults[i] = $.vaults[i];
-            vaultShares[i] = shares.mulDiv(vaults[i].balanceOf(address(this)), totalShares);
+            IERC4626 vault = $.vaults[i];
+            vaultShares[i] = shares.mulDiv(vault.balanceOf(address(this)), totalShares);
+            valueInAssets += vault.convertToAssets(vaultShares[i]);
+            // Reentracy could happen, so reentrant lock is needed.
+            // This should also include locking adding and removing vaults.
+            vault.safeTransfer(account, vaultShares[i]);
         }
 
-        _decreaseAssets(assets);
+        _decreaseAssets(valueInAssets);
+
         IERC20(asset()).safeTransfer(account, assets);
 
-        // We've burnt all shares, but not all vaults' shares are transferred yet.
-        // Because of that the reentrancy guard is needed.
-        for (uint256 i = 0; i < vaults.length; i++) {
-            _decreaseAssets(vaults[i].convertToAssets(vaultShares[i]));
-            vaults[i].safeTransfer(account, vaultShares[i]);
-        }
         emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultShares);
     }
 
@@ -512,7 +512,7 @@ contract CommonAggregator is
     // ----- Pausing user interactions -----
 
     /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
-    /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
+    /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyRedeem
     /// to exit the aggregator.
     function pauseUserInteractions() public onlyManagement {
         _pause();
