@@ -416,8 +416,8 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         if ($.registeredTimelocks[actionHash].lockedUntil != 0) {
             revert ActionAlreadyRegistered(actionHash);
         }
-        $.registeredTimelocks[actionHash].lockedUntil = saturatingAdd(block.timestamp, delay);
-        $.registeredTimelocks[actionHash].actionData = actionData;
+        $.registeredTimelocks[actionHash] =
+            TimelockData({lockedUntil: saturatingAdd(block.timestamp, delay), actionData: actionData});
     }
 
     /// @dev Removes a timelock entry for the given action if it exists and the timelock has passed.
