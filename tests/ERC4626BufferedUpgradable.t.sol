@@ -402,7 +402,6 @@ contract ERC4626BufferedUpgradeableTest is Test {
         uint256 initialDeposit = 10 ** 6;
 
         _depositToVault(initialDeposit);
-        uint256 initialShares = bufferedVault.totalSupply();
 
         _dropToVault(initialDeposit);
 
@@ -423,8 +422,6 @@ contract ERC4626BufferedUpgradeableTest is Test {
         asset.mint(alice, 10 ** 6);
         vm.prank(alice);
         asset.approve(address(bufferedVault), 10 ** 6);
-
-        uint256 initialDeposit = 10 ** 6;
 
         _dropToVault(10 ** 6);
 

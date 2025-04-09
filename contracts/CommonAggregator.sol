@@ -18,8 +18,13 @@ import {saturatingAdd} from "./Math.sol";
 import {MAX_BPS} from "./Math.sol";
 import {ERC4626BufferedUpgradeable} from "./ERC4626BufferedUpgradeable.sol";
 
-
-contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626BufferedUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract CommonAggregator is
+    ICommonAggregator,
+    UUPSUpgradeable,
+    ERC4626BufferedUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
+{
     using Math for uint256;
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC4626;
@@ -155,7 +160,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     /// @inheritdoc ERC4626BufferedUpgradeable
     function deposit(uint256 assets, address receiver)
         public
-        virtual
         override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
         nonReentrant
@@ -167,7 +171,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     /// @inheritdoc ERC4626BufferedUpgradeable
     function mint(uint256 shares, address receiver)
         public
-        virtual
         override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
         nonReentrant
@@ -179,7 +182,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     /// @inheritdoc ERC4626BufferedUpgradeable
     function withdraw(uint256 assets, address receiver, address owner)
         public
-        virtual
         override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
         nonReentrant
@@ -191,7 +193,6 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     /// @inheritdoc ERC4626BufferedUpgradeable
     function redeem(uint256 shares, address receiver, address owner)
         public
-        virtual
         override(ERC4626BufferedUpgradeable, IERC4626)
         whenNotPaused
         nonReentrant
@@ -329,6 +330,8 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
         _decreaseAssets(assets);
         IERC20(asset()).safeTransfer(account, assets);
 
+        // We've burnt all shares, but not all vaults' shares are transferred yet.
+        // Because of that the reentrancy guard is needed.
         for (uint256 i = 0; i < vaults.length; i++) {
             _decreaseAssets(vaults[i].convertToAssets(vaultShares[i]));
             vaults[i].safeTransfer(account, vaultShares[i]);
@@ -449,7 +452,7 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
 
     /// @inheritdoc ICommonAggregator
     /// @notice Doesn't rebalance the assets, after the action limits may be exceeded.
-    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyManagement nonReentrant{
+    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyManagement nonReentrant {
         require(newLimitBps <= MAX_BPS, IncorrectMaxAllocationLimit());
         require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
 
@@ -542,13 +545,13 @@ contract CommonAggregator is ICommonAggregator, UUPSUpgradeable, ERC4626Buffered
     /// @notice Pauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used in case of an emergency. Users can still use emergencyWithdraw
     /// to exit the aggregator.
-    function pauseUserInteractions() public onlyManagement nonReentrant {
+    function pauseUserInteractions() public onlyManagement {
         _pause();
     }
 
     /// @notice Unpauses user interactions including deposit, mint, withdraw, and redeem. Callable by the guardian,
     /// the manager or the owner. To be used after mitigating a potential emergency.
-    function unpauseUserInteractions() public onlyManagement nonReentrant {
+    function unpauseUserInteractions() public onlyManagement {
         _unpause();
     }
 
