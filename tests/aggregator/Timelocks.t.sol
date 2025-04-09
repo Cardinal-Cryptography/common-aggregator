@@ -58,6 +58,18 @@ contract TimelocksTest is Test {
         management.cancel(actionHash);
     }
 
+    function testExecuteWithBadActionDataFails() public {
+        vm.warp(1000);
+        bytes32 actionHash = bytes32(0);
+        management.register(actionHash, nonemptyActionData, 200);
+
+        vm.warp(1201);
+        vm.expectRevert(
+            abi.encodeWithSelector(CommonManagement.IncorrectActionData.selector, actionHash, emptyActionData)
+        );
+        management.execute(actionHash, emptyActionData);
+    }
+
     // More complex scenario
 
     function testManyActions() public {
@@ -121,20 +133,6 @@ contract TimelocksTest is Test {
         bytes32 actionHash = bytes32(0);
         vm.expectRevert(abi.encodeWithSelector(CommonManagement.ActionNotRegistered.selector, actionHash));
         management.cancel(actionHash);
-    }
-
-    // Non-matching action data
-
-    function testExecuteBadActionDataFails() public {
-        vm.warp(1000);
-        bytes32 actionHash = bytes32(0);
-        management.register(actionHash, nonemptyActionData, 200);
-
-        vm.warp(1201);
-        vm.expectRevert(
-            abi.encodeWithSelector(CommonManagement.IncorrectActionData.selector, actionHash, emptyActionData)
-        );
-        management.execute(actionHash, emptyActionData);
     }
 
     // When there are multiple identical operations, only the first one should succeed
