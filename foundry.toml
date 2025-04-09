@@ -6,6 +6,7 @@ out = "artifacts"
 libs = ["node_modules"]
 gas_reports = ["CommonAggregator"]
 optimizer = true
+optimizer-runs = 1_000_000
 via-ir = true
 
 remappings = [
