@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
 import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
-import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -73,7 +72,7 @@ contract VaultManagementTest is Test {
 
         bytes32 actionHash = keccak256(abi.encode(CommonManagement.TimelockTypes.ADD_VAULT, vault));
         vm.expectRevert(
-            abi.encodeWithSelector(CommonTimelocks.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 7 days)
+            abi.encodeWithSelector(CommonManagement.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 7 days)
         );
         vm.prank(manager);
         management.addVault(vault);
@@ -97,7 +96,7 @@ contract VaultManagementTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                CommonTimelocks.ActionAlreadyRegistered.selector,
+                CommonManagement.ActionAlreadyRegistered.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.ADD_VAULT, vault))
             )
         );
@@ -331,7 +330,7 @@ contract VaultManagementTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                CommonTimelocks.ActionNotRegistered.selector,
+                CommonManagement.ActionNotRegistered.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
             )
         );
@@ -346,7 +345,7 @@ contract VaultManagementTest is Test {
 
         bytes32 actionHash = keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove));
         vm.expectRevert(
-            abi.encodeWithSelector(CommonTimelocks.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 14 days)
+            abi.encodeWithSelector(CommonManagement.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 14 days)
         );
         vm.prank(manager);
         management.forceRemoveVault(toRemove);
@@ -363,7 +362,7 @@ contract VaultManagementTest is Test {
         vm.prank(manager);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CommonTimelocks.ActionAlreadyRegistered.selector,
+                CommonManagement.ActionAlreadyRegistered.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
             )
         );
@@ -387,7 +386,7 @@ contract VaultManagementTest is Test {
         // Cancelling too early fails
         vm.expectRevert(
             abi.encodeWithSelector(
-                CommonTimelocks.ActionNotRegistered.selector,
+                CommonManagement.ActionNotRegistered.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
             )
         );
@@ -406,7 +405,7 @@ contract VaultManagementTest is Test {
         // Cancelling for the second time fails
         vm.expectRevert(
             abi.encodeWithSelector(
-                CommonTimelocks.ActionNotRegistered.selector,
+                CommonManagement.ActionNotRegistered.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove))
             )
         );
@@ -416,7 +415,7 @@ contract VaultManagementTest is Test {
         // Force removal doesn't work after cancelling
         vm.warp(STARTING_TIMESTAMP + 30 days);
         bytes32 actionHash = keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove));
-        vm.expectRevert(abi.encodeWithSelector(CommonTimelocks.ActionNotRegistered.selector, actionHash));
+        vm.expectRevert(abi.encodeWithSelector(CommonManagement.ActionNotRegistered.selector, actionHash));
         vm.prank(manager);
         management.forceRemoveVault(toRemove);
     }

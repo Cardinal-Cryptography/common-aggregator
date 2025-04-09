@@ -7,7 +7,6 @@ import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.so
 import {ERC1967Proxy, ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
-import {CommonTimelocks} from "contracts/CommonTimelocks.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {setUpAggregator} from "tests/utils.sol";
 
@@ -146,7 +145,7 @@ contract CommonAggregatorTest is Test {
         vm.prank(owner);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CommonTimelocks.ActionTimelocked.selector,
+                CommonManagement.ActionTimelocked.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.AGGREGATOR_UPGRADE, newImplementation)),
                 STARTING_TIMESTAMP + 14 days
             )
@@ -229,7 +228,7 @@ contract CommonAggregatorTest is Test {
             vm.prank(owner);
             vm.expectRevert(
                 abi.encodeWithSelector(
-                    CommonTimelocks.ActionNotRegistered.selector,
+                    CommonManagement.ActionNotRegistered.selector,
                     keccak256(abi.encode(CommonManagement.TimelockTypes.AGGREGATOR_UPGRADE, impl[i]))
                 )
             );
