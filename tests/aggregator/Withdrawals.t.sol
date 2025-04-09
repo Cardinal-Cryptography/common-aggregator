@@ -79,7 +79,6 @@ contract CommonAggregatorTest is Test {
 
         uint256 aliceInitialShares = commonAggregator.balanceOf(alice);
 
-        uint256 initialAssets = commonAggregator.totalAssets();
         asset.mint(address(commonAggregator.getVaults()[0]), 1 << 254);
         asset.mint(address(commonAggregator.getVaults()[2]), 1 << 255);
 
