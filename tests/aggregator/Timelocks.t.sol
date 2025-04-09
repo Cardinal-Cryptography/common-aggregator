@@ -97,7 +97,7 @@ contract TimelocksTest is Test {
         management.cancel(actionHash2); // immediate cancellation succeeds
         vm.expectRevert(abi.encodeWithSelector(CommonManagement.ActionNotRegistered.selector, actionHash2));
         management.execute(actionHash2, emptyActionData); // action got erased
-        management.register(actionHash2, emptyActionData, 10); // ends in 2140
+        management.register(actionHash2, emptyActionData, 20); // ends in 2150
 
         vm.warp(2150);
         // After the timelock passes, wrong `actionData` is the reason of the revert.
