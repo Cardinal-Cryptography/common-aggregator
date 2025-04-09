@@ -30,7 +30,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
 
     struct TimelockData {
         uint256 lockedUntil;
-        bytes32 actionData;
+        bytes32 actionData; // Used to enforce parameter consistency between action submission and execution.
     }
 
     /// @custom:storage-location erc7201:common.storage.management
