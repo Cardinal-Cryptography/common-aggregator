@@ -33,11 +33,10 @@ contract CommonAggregatorTest is Test {
     }
 
     function testRoleGranting() public {
-        //assertTrue(commonManagement.hasRole(commonManagement.DEFAULT_ADMIN_ROLE(), owner));
-        //assertTrue(commonManagement.hasRole(commonManagement.OWNER(), owner));
+        assertEq(commonManagement.owner(), owner);
 
         address otherAccount = address(0x456);
-        //assertFalse(commonManagement.hasRole(commonManagement.OWNER(), otherAccount));
+        assertNotEq(commonManagement.owner(), otherAccount);
         assertFalse(commonManagement.hasRole(ICommonManagement.Roles.Manager, otherAccount));
 
         vm.prank(owner);
