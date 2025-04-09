@@ -106,32 +106,32 @@ contract CommonAggregatorTest is Test {
         _prepareDistribution([uint256(10), 20, 50], 5);
 
         _bobWithdraw(12);
-
         assertEq(asset.balanceOf(bob), 12);
 
-        assertEq(_vaultsAllocation(vaults[0]), 10 - 1);
-        // 2 instead of 3 because of OZ rounding
-        assertEq(_vaultsAllocation(vaults[1]), 20 - 2);
-        assertEq(_vaultsAllocation(vaults[2]), 50 - 7);
-        // Two should come from idle to fix rounding errors
-        assertEq(asset.balanceOf(address(commonAggregator)), 5 - 2);
+        // 12 * 10 % 85 > 0 so we round up
+        assertEq(_vaultsAllocation(vaults[0]), 10 - 1 - 1);
+        // 12 * 20 % 85 > 0 so we round up
+        assertEq(_vaultsAllocation(vaults[1]), 20 - 2 - 1);
+        // 12 * 50 % 85 > 0 so we round up
+        assertEq(_vaultsAllocation(vaults[2]), 50 - 7 - 1);
+        // due to rounding up, we end up with extra 1 in idle
+        assertEq(asset.balanceOf(address(commonAggregator)), 5 + 1);
     }
 
     function testWithdrawRoundingErrors2() public {
         _prepareDistribution([uint256(10), 20, 50], 1);
 
         _bobWithdraw(12);
-
         assertEq(asset.balanceOf(bob), 12);
 
-        // One additional asset from the first vault as there isn't enough in idle
-        // to cover for all rounding errors.
-        assertEq(_vaultsAllocation(vaults[0]), 10 - 2);
-        // 2 instead of 3 because of OZ rounding
-        assertEq(_vaultsAllocation(vaults[1]), 20 - 2);
-        assertEq(_vaultsAllocation(vaults[2]), 50 - 7);
-        // One should come from idle to fix rounding errors (partially)
-        assertEq(asset.balanceOf(address(commonAggregator)), 1 - 1);
+        // 12 * 10 % 81 > 0 so we round up
+        assertEq(_vaultsAllocation(vaults[0]), 10 - 1 - 1);
+        // 12 * 20 % 81 > 0 so we round up
+        assertEq(_vaultsAllocation(vaults[1]), 20 - 2 - 1);
+        // 12 * 50 % 81 > 0 so we round up
+        assertEq(_vaultsAllocation(vaults[2]), 50 - 7 - 1);
+        // due to rounding up, we end up with extra 1 in idle
+        assertEq(asset.balanceOf(address(commonAggregator)), 1 + 1);
     }
 
     function testZeroAssets() public {
