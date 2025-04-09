@@ -134,6 +134,15 @@ interface ICommonManagement {
 
     // ----- Access control -----
 
+    enum Roles {
+        Manager,
+        Rebalancer,
+        Guardian
+    }
+
+    event RoleGranted(Roles role, address indexed account);
+    event RoleRevoked(Roles role, address indexed account);
+
     error CallerNotRebalancerOrWithHigherRole();
     error CallerNotManagerNorOwner();
     error CallerNotGuardianOrWithHigherRole();

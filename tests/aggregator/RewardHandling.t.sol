@@ -37,11 +37,11 @@ contract CommonAggregatorTest is Test {
 
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
         vm.prank(owner);
-        commonManagement.grantRole(keccak256("REBALANCER"), rebalancer);
+        commonManagement.grantRole(ICommonManagement.Roles.Rebalancer, rebalancer);
         vm.prank(owner);
-        commonManagement.grantRole(keccak256("GUARDIAN"), guardian);
+        commonManagement.grantRole(ICommonManagement.Roles.Guardian, guardian);
         vm.prank(owner);
-        commonManagement.grantRole(keccak256("MANAGER"), manager);
+        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
     }
 
     function testHappyPath() public {
