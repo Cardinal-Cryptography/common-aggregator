@@ -99,7 +99,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
         ManagementStorage storage $ = _getManagementStorage();
         require(
-            $.registeredTimelocks[keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))] == 0,
+            !_isActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
             PendingVaultForceRemoval(vault)
         );
 
@@ -207,7 +207,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
     {
         ManagementStorage storage $ = _getManagementStorage();
         require(
-            $.registeredTimelocks[keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))] == 0,
+            !_isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
 
@@ -233,7 +233,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
     {
         ManagementStorage storage $ = _getManagementStorage();
         require(
-            $.registeredTimelocks[keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))] == 0,
+            !_isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
 
@@ -247,7 +247,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
     function transferRewardsForSale(address rewardToken) external {
         ManagementStorage storage $ = _getManagementStorage();
         require(
-            $.registeredTimelocks[keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))] == 0,
+            !_isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
 
@@ -417,5 +417,9 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, AccessControlUp
             revert ActionNotRegistered(actionHash);
         }
         delete $.registeredTimelocks[actionHash];
+    }
+
+    function _isActionRegistered(bytes32 actionHash) public view returns (bool) {
+        return _getManagementStorage().registeredTimelocks[actionHash] != 0;
     }
 }
