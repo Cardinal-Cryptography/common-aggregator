@@ -5,20 +5,15 @@ import {CommonAggregator} from "./CommonAggregator.sol";
 import {ICommonManagement} from "./interfaces/ICommonManagement.sol";
 import {CommonTimelocks} from "./CommonTimelocks.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {IERC20, IERC4626, IERC20Metadata, SafeERC20, ERC20Upgradeable} from "./ERC4626BufferedUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MAX_BPS} from "./Math.sol";
 
-contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable, AccessControlUpgradeable {
+contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable, Ownable2StepUpgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC4626;
-
-    bytes32 public constant OWNER = keccak256("OWNER");
-    bytes32 public constant MANAGER = keccak256("MANAGER");
-    bytes32 public constant REBALANCER = keccak256("REBALANCER");
-    bytes32 public constant GUARDIAN = keccak256("GUARDIAN");
 
     uint256 public constant SET_TRADER_TIMELOCK = 5 days;
     uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
@@ -34,9 +29,16 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         MANAGEMENT_UPGRADE
     }
 
+    enum Roles {
+        Manager,
+        Rebalancer,
+        Guardian
+    }
+
     /// @custom:storage-location erc7201:common.storage.management
     struct ManagementStorage {
         mapping(address rewardToken => address traderAddress) rewardTrader;
+        mapping(Roles => mapping(address => bool)) roles;
         uint256 pendingVaultForceRemovals;
         CommonAggregator aggregator;
     }
@@ -53,10 +55,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     function initialize(address owner, CommonAggregator aggregator) public initializer {
         __UUPSUpgradeable_init();
-        __AccessControl_init();
-
-        _grantRole(DEFAULT_ADMIN_ROLE, owner);
-        _grantRole(OWNER, owner);
+        __Ownable_init(owner);
 
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator = aggregator;
@@ -175,7 +174,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     /// @inheritdoc ICommonManagement
     /// @notice Doesn't rebalance the assets, after the action limits may be exceeded.
-    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyRole(OWNER) {
+    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyOwner {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.setLimit(vault, newLimitBps);
     }
@@ -183,13 +182,13 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     // ----- Fee management -----
 
     /// @inheritdoc ICommonManagement
-    function setProtocolFee(uint256 protocolFeeBps) public override(ICommonManagement) onlyRole(OWNER) {
+    function setProtocolFee(uint256 protocolFeeBps) public override(ICommonManagement) onlyOwner {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.setProtocolFee(protocolFeeBps);
     }
 
     /// @inheritdoc ICommonManagement
-    function setProtocolFeeReceiver(address protocolFeeReceiver) public override(ICommonManagement) onlyRole(OWNER) {
+    function setProtocolFeeReceiver(address protocolFeeReceiver) public override(ICommonManagement) onlyOwner {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.setProtocolFeeReceiver(protocolFeeReceiver);
     }
@@ -282,7 +281,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation)
         internal
         override
-        onlyRole(OWNER)
+        onlyOwner
         executesUnlockedAction(keccak256(abi.encode(TimelockTypes.MANAGEMENT_UPGRADE, newImplementation)))
     {
         emit ManagementUpgradeAuthorized(newImplementation);
@@ -290,7 +289,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     function submitUpgradeManagement(address newImplementation)
         external
-        onlyRole(OWNER)
+        onlyOwner
         registersTimelockedAction(
             keccak256(abi.encode(TimelockTypes.MANAGEMENT_UPGRADE, newImplementation)),
             MANAGEMENT_UPGRADE_TIMELOCK
@@ -311,7 +310,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     function submitUpgradeAggregator(address newImplementation)
         external
-        onlyRole(OWNER)
+        onlyOwner
         registersTimelockedAction(
             keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE, newImplementation)),
             AGGREGATOR_UPGRADE_TIMELOCK
@@ -330,7 +329,7 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     function upgradeAggregator(address newImplementation, bytes memory callData)
         external
-        onlyRole(OWNER)
+        onlyOwner
         executesUnlockedAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE, newImplementation)))
     {
         ManagementStorage storage $ = _getManagementStorage();
@@ -340,22 +339,35 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     // ----- Access control -----
 
+    /// @notice We explicitly disable renouncing ownership.
+    function renounceOwnership() public override onlyOwner {}
+
+    function hasRole(Roles role, address account) public view returns (bool) {
+        ManagementStorage storage $ = _getManagementStorage();
+        return $.roles[role][account];
+    }
+
+    function grantRole(Roles role, address account) external onlyOwner {
+        ManagementStorage storage $ = _getManagementStorage();
+        $.roles[role][account] = true;
+    }
+
     modifier onlyRebalancerOrHigherRole() {
-        if (!hasRole(REBALANCER, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
+        if (!hasRole(Roles.Rebalancer, msg.sender) && !hasRole(Roles.Manager, msg.sender) && msg.sender != owner()) {
             revert CallerNotRebalancerOrWithHigherRole();
         }
         _;
     }
 
     modifier onlyGuardianOrHigherRole() {
-        if (!hasRole(GUARDIAN, msg.sender) && !hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
+        if (!hasRole(Roles.Guardian, msg.sender) && !hasRole(Roles.Manager, msg.sender) && msg.sender != owner()) {
             revert CallerNotGuardianOrWithHigherRole();
         }
         _;
     }
 
     modifier onlyManagerOrOwner() {
-        if (!hasRole(MANAGER, msg.sender) && !hasRole(OWNER, msg.sender)) {
+        if (!hasRole(Roles.Manager, msg.sender) && msg.sender != owner()) {
             revert CallerNotManagerNorOwner();
         }
         _;
