@@ -676,10 +676,10 @@ contract VaultManagementTest is Test {
 
     function _grantRoles(CommonManagement management) private {
         vm.prank(owner);
-        management.grantRole(keccak256("MANAGER"), manager);
+        management.grantRole(ICommonManagement.Roles.Manager, manager);
 
         vm.prank(owner);
-        management.grantRole(keccak256("GUARDIAN"), guardian);
+        management.grantRole(ICommonManagement.Roles.Guardian, guardian);
     }
 
     function _firstDeposit(CommonAggregator aggregator, uint256 initialDeposit) private returns (uint256) {

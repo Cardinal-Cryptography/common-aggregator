@@ -8,6 +8,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {MAX_BPS} from "contracts/Math.sol";
@@ -36,7 +37,7 @@ contract CommonAggregatorTest is Test {
 
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, ierc4626Vaults);
         vm.prank(owner);
-        commonManagement.grantRole(keccak256("REBALANCER"), rebalancer);
+        commonManagement.grantRole(ICommonManagement.Roles.Rebalancer, rebalancer);
     }
 
     function testPushFunds() public {
@@ -245,7 +246,7 @@ contract CommonAggregatorTest is Test {
     function testRolesPushPullFunds() public {
         address manager = address(0x111);
         vm.prank(owner);
-        commonManagement.grantRole(keccak256("MANAGER"), manager);
+        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
 
         uint256 amount = 100;
         asset.mint(alice, amount);
@@ -284,8 +285,8 @@ contract CommonAggregatorTest is Test {
     function testRolesSetLimit() public {
         address manager = address(0x111);
         vm.prank(owner);
-        commonManagement.grantRole(keccak256("MANAGER"), manager);
-        bytes4 errorSelector = IAccessControl.AccessControlUnauthorizedAccount.selector;
+        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
+        bytes4 errorSelector = OwnableUpgradeable.OwnableUnauthorizedAccount.selector;
 
         address[] memory notAllowed = new address[](3);
         notAllowed[0] = alice;
@@ -294,11 +295,11 @@ contract CommonAggregatorTest is Test {
 
         for (uint256 i = 0; i < notAllowed.length; i++) {
             address a = notAllowed[i];
-            vm.expectRevert(abi.encodeWithSelector(errorSelector, a, keccak256("OWNER")));
+            vm.expectRevert(abi.encodeWithSelector(errorSelector, a));
             vm.prank(a);
             commonManagement.setLimit(vaults[0], 0);
 
-            vm.expectRevert(abi.encodeWithSelector(errorSelector, a, keccak256("OWNER")));
+            vm.expectRevert(abi.encodeWithSelector(errorSelector, a));
             vm.prank(a);
             commonManagement.setLimit(vaults[0], MAX_BPS);
         }

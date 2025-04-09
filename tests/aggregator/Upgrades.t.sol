@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
 import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy, ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -58,11 +59,11 @@ contract CommonAggregatorTest is Test {
 
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
         vm.prank(owner);
-        commonManagement.grantRole(keccak256("MANAGER"), manager);
+        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
         vm.prank(owner);
-        commonManagement.grantRole(keccak256("REBALANCER"), rebalancer);
+        commonManagement.grantRole(ICommonManagement.Roles.Rebalancer, rebalancer);
         vm.prank(owner);
-        commonManagement.grantRole(keccak256("GUARDIAN"), guardian);
+        commonManagement.grantRole(ICommonManagement.Roles.Guardian, guardian);
     }
 
     function testUpgrade() public {
@@ -157,19 +158,19 @@ contract CommonAggregatorTest is Test {
         address newImplementation = address(new CommonAggregatorUpgraded());
 
         vm.prank(alice);
-        expectAutorizationRevert(alice, keccak256("OWNER"));
+        expectAutorizationRevert(alice);
         commonManagement.submitUpgradeAggregator(newImplementation);
 
         vm.prank(rebalancer);
-        expectAutorizationRevert(rebalancer, keccak256("OWNER"));
+        expectAutorizationRevert(rebalancer);
         commonManagement.submitUpgradeAggregator(newImplementation);
 
         vm.prank(guardian);
-        expectAutorizationRevert(guardian, keccak256("OWNER"));
+        expectAutorizationRevert(guardian);
         commonManagement.submitUpgradeAggregator(newImplementation);
 
         vm.prank(manager);
-        expectAutorizationRevert(manager, keccak256("OWNER"));
+        expectAutorizationRevert(manager);
         commonManagement.submitUpgradeAggregator(newImplementation);
 
         vm.prank(owner);
@@ -178,19 +179,19 @@ contract CommonAggregatorTest is Test {
         vm.warp(STARTING_TIMESTAMP + 30 days);
 
         vm.prank(alice);
-        expectAutorizationRevert(alice, keccak256("OWNER"));
+        expectAutorizationRevert(alice);
         commonManagement.upgradeAggregator(newImplementation, "");
 
         vm.prank(rebalancer);
-        expectAutorizationRevert(rebalancer, keccak256("OWNER"));
+        expectAutorizationRevert(rebalancer);
         commonManagement.upgradeAggregator(newImplementation, "");
 
         vm.prank(guardian);
-        expectAutorizationRevert(guardian, keccak256("OWNER"));
+        expectAutorizationRevert(guardian);
         commonManagement.upgradeAggregator(newImplementation, "");
 
         vm.prank(manager);
-        expectAutorizationRevert(manager, keccak256("OWNER"));
+        expectAutorizationRevert(manager);
         commonManagement.upgradeAggregator(newImplementation, "");
 
         vm.prank(owner);
@@ -236,7 +237,7 @@ contract CommonAggregatorTest is Test {
         }
     }
 
-    function expectAutorizationRevert(address caller, bytes32 role) private {
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, caller, role));
+    function expectAutorizationRevert(address caller) private {
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, caller));
     }
 }
