@@ -310,8 +310,8 @@ contract PausingTest is Test {
 
     function _grantRoles() private {
         vm.prank(owner);
-        management.grantRole(CommonManagement.Roles.Manager, manager);
+        management.grantRole(ICommonManagement.Roles.Manager, manager);
         vm.prank(owner);
-        management.grantRole(CommonManagement.Roles.Guardian, guardian);
+        management.grantRole(ICommonManagement.Roles.Guardian, guardian);
     }
 }

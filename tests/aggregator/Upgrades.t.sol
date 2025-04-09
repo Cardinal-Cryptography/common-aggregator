@@ -60,11 +60,11 @@ contract CommonAggregatorTest is Test {
 
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
         vm.prank(owner);
-        commonManagement.grantRole(CommonManagement.Roles.Manager, manager);
+        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
         vm.prank(owner);
-        commonManagement.grantRole(CommonManagement.Roles.Rebalancer, rebalancer);
+        commonManagement.grantRole(ICommonManagement.Roles.Rebalancer, rebalancer);
         vm.prank(owner);
-        commonManagement.grantRole(CommonManagement.Roles.Guardian, guardian);
+        commonManagement.grantRole(ICommonManagement.Roles.Guardian, guardian);
     }
 
     function testUpgrade() public {

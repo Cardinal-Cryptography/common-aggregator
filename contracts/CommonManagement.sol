@@ -29,12 +29,6 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
         MANAGEMENT_UPGRADE
     }
 
-    enum Roles {
-        Manager,
-        Rebalancer,
-        Guardian
-    }
-
     /// @custom:storage-location erc7201:common.storage.management
     struct ManagementStorage {
         mapping(address rewardToken => address traderAddress) rewardTrader;
@@ -349,7 +343,18 @@ contract CommonManagement is ICommonManagement, CommonTimelocks, UUPSUpgradeable
 
     function grantRole(Roles role, address account) external onlyOwner {
         ManagementStorage storage $ = _getManagementStorage();
-        $.roles[role][account] = true;
+        if (!$.roles[role][account]) {
+            $.roles[role][account] = true;
+            emit RoleGranted(role, account);
+        }
+    }
+
+    function revokeRole(Roles role, address account) external onlyOwner {
+        ManagementStorage storage $ = _getManagementStorage();
+        if ($.roles[role][account]) {
+            $.roles[role][account] = false;
+            emit RoleRevoked(role, account);
+        }
     }
 
     modifier onlyRebalancerOrHigherRole() {

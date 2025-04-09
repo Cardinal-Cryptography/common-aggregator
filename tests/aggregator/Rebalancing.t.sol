@@ -37,7 +37,7 @@ contract CommonAggregatorTest is Test {
 
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, ierc4626Vaults);
         vm.prank(owner);
-        commonManagement.grantRole(CommonManagement.Roles.Rebalancer, rebalancer);
+        commonManagement.grantRole(ICommonManagement.Roles.Rebalancer, rebalancer);
     }
 
     function testPushFunds() public {
@@ -246,7 +246,7 @@ contract CommonAggregatorTest is Test {
     function testRolesPushPullFunds() public {
         address manager = address(0x111);
         vm.prank(owner);
-        commonManagement.grantRole(CommonManagement.Roles.Manager, manager);
+        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
 
         uint256 amount = 100;
         asset.mint(alice, amount);
@@ -285,7 +285,7 @@ contract CommonAggregatorTest is Test {
     function testRolesSetLimit() public {
         address manager = address(0x111);
         vm.prank(owner);
-        commonManagement.grantRole(CommonManagement.Roles.Manager, manager);
+        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
         bytes4 errorSelector = OwnableUpgradeable.OwnableUnauthorizedAccount.selector;
 
         address[] memory notAllowed = new address[](3);
