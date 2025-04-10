@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: UNKNOWN
+// solhint-disable no-console
 pragma solidity ^0.8.28;
 
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 import {CommonManagement} from "contracts/CommonManagement.sol";
+import {console} from "forge-std/console.sol";
 import {Script} from "forge-std/Script.sol";
 
 /// @notice Submit the upgrade of the CommonAggregator contract. Validates the upgrade,
@@ -17,11 +19,16 @@ contract SubmitUpgradeAggregatorScript is Script {
         Options memory options;
         Upgrades.validateUpgrade(contractName, options);
 
+        console.log("Upgrade validation successful");
+
         vm.startBroadcast();
 
         address implementation = Upgrades.deployImplementation(contractName, options);
+        console.log("Deployed implementation contract to:", implementation);
 
         commonManagement.submitUpgradeAggregator(implementation);
+
+        console.log("Update submitted successfully");
 
         vm.stopBroadcast();
     }

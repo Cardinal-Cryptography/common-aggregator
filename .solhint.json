@@ -14,10 +14,10 @@
     "no-empty-blocks": "off",
     "no-inline-assembly": "off",
 
-    "gas-small-strings": "warn",
     "gas-struct-packing": "warn",
     "gas-calldata-parameters": "warn",
     "gas-increment-by-one": "warn",
+    "gas-small-strings": "off",
     "gas-indexed-events": "off",
     "gas-length-in-loops": "off",
     "gas-strict-inequalities": "off"
