@@ -4,12 +4,11 @@ pragma solidity ^0.8.28;
 import {Script} from "forge-std/Script.sol";
 import {CommonAggregator, IERC20Metadata, IERC4626} from "../contracts/CommonAggregator.sol";
 import {CommonManagement} from "../contracts/CommonManagement.sol";
-import {Upgrades} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
+import {CommonFactory} from "../contracts/CommonFactory.sol";
 import "forge-std/console.sol";
 
 /// @notice Deploy the CommonAggregator contract (implementation and upgradeable proxy).
 /// Use when deploying the contract for the first time.
-/// @dev Requires FOUNDRY_PROFILE=full
 contract DeployAggregatorScript is Script {
     function run() public {
         IERC20Metadata asset = IERC20Metadata(vm.envAddress("ASSET_ADDRESS"));
@@ -23,17 +22,12 @@ contract DeployAggregatorScript is Script {
 
         vm.startBroadcast();
 
-        address managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
-        address aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
+        CommonFactory factory = new CommonFactory();
 
-        CommonManagement management = CommonManagement(managementProxy);
-        CommonAggregator aggregator = CommonAggregator(aggregatorProxy);
+        (CommonAggregator aggregator, CommonManagement management) = factory.deployAggregator(owner, asset, vaults);
 
-        aggregator.initialize(address(management), asset, vaults);
-        management.initialize(owner, aggregator);
-
-        console.log("Deployed CommonManagement contract to:", managementProxy);
-        console.log("Deployed CommonAggregator contract to:", aggregatorProxy);
+        console.log("Deployed CommonManagement contract to:", address(management));
+        console.log("Deployed CommonAggregator contract to:", address(aggregator));
 
         vm.stopBroadcast();
     }
