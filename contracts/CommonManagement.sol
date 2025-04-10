@@ -28,9 +28,16 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         MANAGEMENT_UPGRADE
     }
 
+    struct TimelockData {
+        uint256 lockedUntil;
+        bytes32 actionData; // Used to enforce parameter consistency between action submission and execution.
+    }
+
+    bytes32 private constant EMPTY_ACTION_DATA = 0;
+
     /// @custom:storage-location erc7201:common.storage.management
     struct ManagementStorage {
-        mapping(bytes32 actionHash => uint256 lockedUntil) registeredTimelocks;
+        mapping(bytes32 actionHash => TimelockData timelockData) registeredTimelocks;
         mapping(address rewardToken => address traderAddress) rewardTrader;
         mapping(Roles => mapping(address => bool)) roles;
         uint256 pendingVaultForceRemovals;
@@ -62,7 +69,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         external
         override
         onlyManagerOrOwner
-        registersTimelockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), ADD_VAULT_TIMELOCK)
+        registersAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA, ADD_VAULT_TIMELOCK)
     {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.ensureVaultCanBeAdded(vault);
@@ -83,7 +90,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         external
         override
         onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)))
+        executesAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA)
     {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.addVault(vault);
@@ -104,8 +111,9 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         external
         override
         onlyManagerOrOwner
-        registersTimelockedAction(
+        registersAction(
             keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)),
+            EMPTY_ACTION_DATA,
             FORCE_REMOVE_VAULT_TIMELOCK
         )
     {
@@ -138,7 +146,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         external
         override
         onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
+        executesAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)), EMPTY_ACTION_DATA)
     {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.forceRemoveVault(vault);
@@ -193,8 +201,9 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     function submitSetRewardTrader(address rewardToken, address traderAddress)
         external
         onlyManagerOrOwner
-        registersTimelockedAction(
-            keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)),
+        registersAction(
+            keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken)),
+            keccak256(abi.encode(traderAddress)),
             SET_TRADER_TIMELOCK
         )
     {
@@ -213,7 +222,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     function cancelSetRewardTrader(address rewardToken, address traderAddress)
         external
         onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
+        cancelsAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken)))
     {
         emit SetRewardsTraderCancelled(rewardToken, traderAddress);
     }
@@ -222,7 +231,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     function setRewardTrader(address rewardToken, address traderAddress)
         external
         onlyManagerOrOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken, traderAddress)))
+        executesAction(keccak256(abi.encode(TimelockTypes.SET_TRADER, rewardToken)), keccak256(abi.encode(traderAddress)))
     {
         ManagementStorage storage $ = _getManagementStorage();
         require(
@@ -276,7 +285,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         internal
         override
         onlyOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.MANAGEMENT_UPGRADE, newImplementation)))
+        executesAction(keccak256(abi.encode(TimelockTypes.MANAGEMENT_UPGRADE)), keccak256(abi.encode(newImplementation)))
     {
         emit ManagementUpgradeAuthorized(newImplementation);
     }
@@ -284,8 +293,9 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     function submitUpgradeManagement(address newImplementation)
         external
         onlyOwner
-        registersTimelockedAction(
-            keccak256(abi.encode(TimelockTypes.MANAGEMENT_UPGRADE, newImplementation)),
+        registersAction(
+            keccak256(abi.encode(TimelockTypes.MANAGEMENT_UPGRADE)),
+            keccak256(abi.encode(newImplementation)),
             MANAGEMENT_UPGRADE_TIMELOCK
         )
     {
@@ -295,7 +305,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     function cancelUpgradeManagement(address newImplementation)
         external
         onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(TimelockTypes.MANAGEMENT_UPGRADE, newImplementation)))
+        cancelsAction(keccak256(abi.encode(TimelockTypes.MANAGEMENT_UPGRADE)))
     {
         emit ManagementUpgradeCancelled(newImplementation);
     }
@@ -305,8 +315,9 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     function submitUpgradeAggregator(address newImplementation)
         external
         onlyOwner
-        registersTimelockedAction(
-            keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE, newImplementation)),
+        registersAction(
+            keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE)),
+            keccak256(abi.encode(newImplementation)),
             AGGREGATOR_UPGRADE_TIMELOCK
         )
     {
@@ -316,7 +327,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     function cancelUpgradeAggregator(address newImplementation)
         external
         onlyGuardianOrHigherRole
-        cancelsAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE, newImplementation)))
+        cancelsAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE)))
     {
         emit AggregatorUpgradeCancelled(newImplementation);
     }
@@ -324,7 +335,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     function upgradeAggregator(address newImplementation, bytes memory callData)
         external
         onlyOwner
-        executesUnlockedAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE, newImplementation)))
+        executesAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE)), keccak256(abi.encode(newImplementation)))
     {
         ManagementStorage storage $ = _getManagementStorage();
         UUPSUpgradeable($.aggregator).upgradeToAndCall(newImplementation, callData);
@@ -383,17 +394,18 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     error ActionAlreadyRegistered(bytes32 actionHash);
     error ActionNotRegistered(bytes32 actionHash);
     error ActionTimelocked(bytes32 actionHash, uint256 lockedUntil);
+    error IncorrectActionData(bytes32 actionHash, bytes32 actionData);
 
     /// @dev Use this modifier for functions which submit a timelocked action proposal.
-    modifier registersTimelockedAction(bytes32 actionHash, uint256 delay) {
-        _register(actionHash, delay);
+    modifier registersAction(bytes32 actionHash, bytes32 actionData, uint256 delay) {
+        _register(actionHash, actionData, delay);
         _;
     }
 
     /// @dev Use this modifier for functions which execute a previously submitted action whose timelock
     /// period has passed.
-    modifier executesUnlockedAction(bytes32 actionHash) {
-        _execute(actionHash);
+    modifier executesAction(bytes32 actionHash, bytes32 actionData) {
+        _execute(actionHash, actionData);
         _;
     }
 
@@ -405,23 +417,28 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
 
     /// @dev Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
     /// is greater than zero. A zero `delay` means that the action is locked only for the current timestamp.
-    function _register(bytes32 actionHash, uint256 delay) private {
+    function _register(bytes32 actionHash, bytes32 actionData, uint256 delay) private {
         ManagementStorage storage $ = _getManagementStorage();
-        if ($.registeredTimelocks[actionHash] != 0) {
+        if ($.registeredTimelocks[actionHash].lockedUntil != 0) {
             revert ActionAlreadyRegistered(actionHash);
         }
-        $.registeredTimelocks[actionHash] = saturatingAdd(block.timestamp, delay);
+        $.registeredTimelocks[actionHash] =
+            TimelockData({lockedUntil: saturatingAdd(block.timestamp, delay), actionData: actionData});
     }
 
     /// @dev Removes a timelock entry for the given action if it exists and the timelock has passed.
-    function _execute(bytes32 actionHash) private {
+    function _execute(bytes32 actionHash, bytes32 actionData) private {
         ManagementStorage storage $ = _getManagementStorage();
-        uint256 lockedUntil = $.registeredTimelocks[actionHash];
+        uint256 lockedUntil = $.registeredTimelocks[actionHash].lockedUntil;
         if (lockedUntil == 0) {
             revert ActionNotRegistered(actionHash);
         }
         if (lockedUntil >= block.timestamp) {
             revert ActionTimelocked(actionHash, lockedUntil);
+        }
+        bytes32 submittedActionData = $.registeredTimelocks[actionHash].actionData;
+        if (actionData != submittedActionData) {
+            revert IncorrectActionData(actionHash, actionData);
         }
         delete $.registeredTimelocks[actionHash];
     }
@@ -430,13 +447,13 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     /// and after the timelock period.
     function _cancel(bytes32 actionHash) private {
         ManagementStorage storage $ = _getManagementStorage();
-        if ($.registeredTimelocks[actionHash] == 0) {
+        if ($.registeredTimelocks[actionHash].lockedUntil == 0) {
             revert ActionNotRegistered(actionHash);
         }
         delete $.registeredTimelocks[actionHash];
     }
 
     function _isActionRegistered(bytes32 actionHash) public view returns (bool) {
-        return _getManagementStorage().registeredTimelocks[actionHash] != 0;
+        return _getManagementStorage().registeredTimelocks[actionHash].lockedUntil != 0;
     }
 }
