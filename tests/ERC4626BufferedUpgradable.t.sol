@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {ERC4626BufferedUpgradeable, IERC4626Buffered} from "../contracts/ERC4626BufferedUpgradeable.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {MAX_BPS} from "../contracts/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Errors} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Test} from "forge-std/Test.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
+import {ERC4626BufferedUpgradeable, IERC4626Buffered} from "./../contracts/ERC4626BufferedUpgradeable.sol";
+import {MAX_BPS} from "./../contracts/Math.sol";
 
 contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
-    uint8 private decimalsOffset;
+    uint8 internal decimalsOffset;
 
     function initialize(uint8 _decimalsOffset, IERC20 _asset) public initializer {
         __ERC4626Buffered_init(_asset);
@@ -42,17 +42,17 @@ contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
 abstract contract ERC4626BufferedUpgradeableTest is Test {
     using Math for uint256;
 
-    uint256 constant STARTING_TIMESTAMP = 100;
-    uint256 constant STARTING_BALANCE = 10;
+    uint256 internal constant STARTING_TIMESTAMP = 100;
+    uint256 internal constant STARTING_BALANCE = 10;
 
     /// @dev 10**decimalsOffset. Override in immplementation to set the offset.
-    uint256 internal DECIMAL_OFFSET_POWER = 1;
+    uint256 internal immutable DECIMAL_OFFSET_POWER = 1;
 
-    ERC4626BufferedUpgradeableConcrete bufferedVault;
-    ERC20Mock asset = new ERC20Mock();
+    ERC4626BufferedUpgradeableConcrete internal bufferedVault;
+    ERC20Mock internal asset = new ERC20Mock();
 
-    address alice = address(0x456);
-    address bob = address(0x678);
+    address internal alice = address(0x456);
+    address internal bob = address(0x678);
 
     function testAssetsAfterInit() public view {
         assertEq(bufferedVault.asset(), address(asset));
@@ -435,7 +435,7 @@ abstract contract ERC4626BufferedUpgradeableTest is Test {
         assertEq(bufferedVault.balanceOf(alice), 10 ** 6 * DECIMAL_OFFSET_POWER * 11 / 10);
     }
 
-    uint256 constant UPDATE_NUM = 10;
+    uint256 internal constant UPDATE_NUM = 10;
 
     function testFuzz_BufferEndIsNeverLowerThanLastUpdate(
         uint120[UPDATE_NUM] calldata _timeElapsed,
@@ -609,15 +609,18 @@ abstract contract ERC4626BufferedUpgradeableTest is Test {
 }
 
 contract ERC4626BufferedUpgradeableTestNoDecimalOffset is Test, ERC4626BufferedUpgradeableTest {
-    function setUp() public {
-        uint8 decimalsOffset = 0;
+    uint8 private constant DECIMALS_OFFSET = 0;
 
-        DECIMAL_OFFSET_POWER = 10 ** decimalsOffset;
+    constructor() {
+        DECIMAL_OFFSET_POWER = 10 ** DECIMALS_OFFSET;
+    }
+
+    function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
         ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeableConcrete();
 
         bytes memory initializeData =
-            abi.encodeWithSelector(ERC4626BufferedUpgradeableConcrete.initialize.selector, decimalsOffset, asset);
+            abi.encodeWithSelector(ERC4626BufferedUpgradeableConcrete.initialize.selector, DECIMALS_OFFSET, asset);
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
         bufferedVault = ERC4626BufferedUpgradeableConcrete(address(proxy));
@@ -661,14 +664,18 @@ contract ERC4626BufferedUpgradeableTestNoDecimalOffset is Test, ERC4626BufferedU
 }
 
 contract ERC4626BufferedUpgradeableWithDecimalOffset is Test, ERC4626BufferedUpgradeableTest {
+    uint8 private constant DECIMALS_OFFSET = 4;
+
+    constructor() {
+        DECIMAL_OFFSET_POWER = 10 ** DECIMALS_OFFSET;
+    }
+
     function setUp() public {
-        uint8 decimalsOffset = 4;
-        DECIMAL_OFFSET_POWER = 10 ** decimalsOffset;
         vm.warp(STARTING_TIMESTAMP);
         ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeableConcrete();
 
         bytes memory initializeData =
-            abi.encodeWithSelector(ERC4626BufferedUpgradeableConcrete.initialize.selector, decimalsOffset, asset);
+            abi.encodeWithSelector(ERC4626BufferedUpgradeableConcrete.initialize.selector, DECIMALS_OFFSET, asset);
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
         bufferedVault = ERC4626BufferedUpgradeableConcrete(address(proxy));

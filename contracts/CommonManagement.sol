@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {
+    IERC20,
+    IERC4626,
+    Math,
+    SafeERC20
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {CommonAggregator} from "./CommonAggregator.sol";
 import {ICommonManagement} from "./interfaces/ICommonManagement.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {IERC20, IERC4626, IERC20Metadata, SafeERC20, ERC20Upgradeable} from "./ERC4626BufferedUpgradeable.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {MAX_BPS, saturatingAdd} from "./Math.sol";
+import {saturatingAdd} from "./Math.sol";
 
 contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpgradeable {
     using Math for uint256;
@@ -123,7 +127,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         if (!$.aggregator.paused()) {
             $.aggregator.pauseUserInteractions();
         }
-        $.pendingVaultForceRemovals++;
+        ++$.pendingVaultForceRemovals;
 
         emit VaultForceRemovalSubmitted(address(vault), saturatingAdd(block.timestamp, FORCE_REMOVE_VAULT_TIMELOCK));
     }
@@ -136,7 +140,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         cancelsAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
     {
         ManagementStorage storage $ = _getManagementStorage();
-        $.pendingVaultForceRemovals--;
+        --$.pendingVaultForceRemovals;
 
         emit VaultForceRemovalCancelled(address(vault));
     }
@@ -150,7 +154,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.forceRemoveVault(vault);
-        $.pendingVaultForceRemovals--;
+        --$.pendingVaultForceRemovals;
     }
     // ----- Rebalancing -----
 
@@ -332,7 +336,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit AggregatorUpgradeCancelled(newImplementation);
     }
 
-    function upgradeAggregator(address newImplementation, bytes memory callData)
+    function upgradeAggregator(address newImplementation, bytes calldata callData)
         external
         onlyOwner
         executesAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE)), keccak256(abi.encode(newImplementation)))

@@ -2,14 +2,13 @@
 pragma solidity ^0.8.28;
 
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import {IERC4626Buffered} from "./IERC4626Buffered.sol";
 
 interface ICommonManagement {
     // ----- Aggregator Upgrades -----
 
-    event AggregatorUpgradeSubmitted(address newImplementation, uint256 unlockTimestamp);
-    event AggregatorUpgradeCancelled(address newImplementation);
-    event AggregatorUpgraded(address newImplementation);
+    event AggregatorUpgradeSubmitted(address indexed newImplementation, uint256 unlockTimestamp);
+    event AggregatorUpgradeCancelled(address indexed newImplementation);
+    event AggregatorUpgraded(address indexed newImplementation);
 
     /// @notice Submits timelocked upgrade action of the aggregator contract to `newImplementation`.
     /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
@@ -23,9 +22,9 @@ interface ICommonManagement {
 
     // ----- Management Upgrades -----
 
-    event ManagementUpgradeSubmitted(address newImplementation, uint256 unlockTimestamp);
-    event ManagementUpgradeCancelled(address newImplementation);
-    event ManagementUpgradeAuthorized(address newImplementation);
+    event ManagementUpgradeSubmitted(address indexed newImplementation, uint256 unlockTimestamp);
+    event ManagementUpgradeCancelled(address indexed newImplementation);
+    event ManagementUpgradeAuthorized(address indexed newImplementation);
 
     /// @notice Submits timelocked upgrade action of the management contract to `newImplementation`.
     /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
