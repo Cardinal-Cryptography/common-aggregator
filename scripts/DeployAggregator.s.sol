@@ -28,12 +28,12 @@ contract DeployAggregatorScript is Script {
 
         vm.startBroadcast();
 
-        CommonAggregatorDeployer factory = new CommonAggregatorDeployer(owner);
+        CommonAggregatorDeployer factory = new CommonAggregatorDeployer();
         address aggregatorImplementation = address(new CommonAggregator());
         address managementImplementation = address(new CommonManagement());
 
         (address aggregator, address management) =
-            factory.deployAggregator(aggregatorImplementation, managementImplementation, asset, vaults);
+            factory.deployAggregator(aggregatorImplementation, managementImplementation, owner, asset, vaults);
 
         console.log("Deployed CommonManagement contract to:", management);
         console.log("Deployed CommonAggregator contract to:", aggregator);

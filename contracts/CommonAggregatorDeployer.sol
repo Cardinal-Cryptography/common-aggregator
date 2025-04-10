@@ -14,18 +14,25 @@ interface IManagementInitializator {
 }
 
 contract CommonAggregatorDeployer {
-    address public immutable owner;
+    address public immutable deployer;
+    bool public deployed;
 
-    constructor(address _owner) {
-        owner = _owner;
+    constructor() {
+        deployer = msg.sender;
     }
 
     function deployAggregator(
         address aggregatorImplementation,
         address managementImplementation,
+        address owner,
         IERC20Metadata asset,
         IERC4626[] memory vaults
     ) external returns (address aggregator, address management) {
+        assert(msg.sender == deployer);
+        assert(!deployed);
+
+        deployed = true;
+
         ERC1967Proxy aggregatorProxy = new ERC1967Proxy(address(aggregatorImplementation), "");
         ERC1967Proxy managementProxy = new ERC1967Proxy(address(managementImplementation), "");
 
