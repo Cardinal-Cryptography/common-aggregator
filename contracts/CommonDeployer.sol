@@ -13,11 +13,16 @@ interface IManagementInitializator {
     function initialize(address owner, address aggregator) external;
 }
 
-contract CommonFactory {
+contract CommonDeployer {
+    address public immutable owner;
+
+    constructor(address _owner) {
+        owner = _owner;
+    }
+
     function deployAggregator(
         address aggregatorImplementation,
         address managementImplementation,
-        address owner,
         IERC20Metadata asset,
         IERC4626[] memory vaults
     ) external returns (address aggregator, address management) {

@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Script} from "forge-std/Script.sol";
 import {CommonAggregator, IERC20Metadata, IERC4626} from "../contracts/CommonAggregator.sol";
 import {CommonManagement} from "../contracts/CommonManagement.sol";
-import {CommonFactory} from "../contracts/CommonFactory.sol";
+import {CommonDeployer} from "../contracts/CommonDeployer.sol";
 import "forge-std/console.sol";
 
 /// @notice Deploy the CommonAggregator contract (implementation and upgradeable proxy).
@@ -22,12 +22,12 @@ contract DeployAggregatorScript is Script {
 
         vm.startBroadcast();
 
-        CommonFactory factory = new CommonFactory();
+        CommonDeployer factory = new CommonDeployer(owner);
         address aggregatorImplementation = address(new CommonAggregator());
         address managementImplementation = address(new CommonManagement());
 
         (address aggregator, address management) =
-            factory.deployAggregator(aggregatorImplementation, managementImplementation, owner, asset, vaults);
+            factory.deployAggregator(aggregatorImplementation, managementImplementation, asset, vaults);
 
         console.log("Deployed CommonManagement contract to:", management);
         console.log("Deployed CommonAggregator contract to:", aggregator);
