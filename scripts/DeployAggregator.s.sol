@@ -5,10 +5,12 @@ import {Script} from "forge-std/Script.sol";
 import {CommonAggregator, IERC20Metadata, IERC4626} from "../contracts/CommonAggregator.sol";
 import {CommonManagement} from "../contracts/CommonManagement.sol";
 import {CommonDeployer} from "../contracts/CommonDeployer.sol";
+import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 import "forge-std/console.sol";
 
 /// @notice Deploy the CommonAggregator contract (implementation and upgradeable proxy).
 /// Use when deploying the contract for the first time.
+/// @dev Requires FOUNDRY_PROFILE=full
 contract DeployAggregatorScript is Script {
     function run() public {
         IERC20Metadata asset = IERC20Metadata(vm.envAddress("ASSET_ADDRESS"));
@@ -25,6 +27,10 @@ contract DeployAggregatorScript is Script {
         CommonDeployer factory = new CommonDeployer(owner);
         address aggregatorImplementation = address(new CommonAggregator());
         address managementImplementation = address(new CommonManagement());
+
+        Options memory options;
+        Upgrades.validateImplementation("CommonAggregator.sol", options);
+        Upgrades.validateImplementation("CommonManagement.sol", options);
 
         (address aggregator, address management) =
             factory.deployAggregator(aggregatorImplementation, managementImplementation, asset, vaults);
