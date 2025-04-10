@@ -115,21 +115,26 @@ contract CommonAggregatorTest is Test {
         assertEq(CommonAggregatorUpgraded(address(commonAggregator)).newMethod(), 42);
     }
 
-    function testInvalidUpgrades() public {
+    function testInvalidUpgradeNonContract() public {
         address nonContract = alice;
-        address nonUUPSImpl = address(new ERC4626MockUUPS());
 
         vm.prank(owner);
         commonManagement.submitUpgradeAggregator(nonContract);
-
-        vm.prank(owner);
-        commonManagement.submitUpgradeAggregator(nonUUPSImpl);
 
         vm.warp(STARTING_TIMESTAMP + 30 days);
 
         vm.prank(owner);
         vm.expectRevert();
         commonManagement.upgradeAggregator(nonContract, "");
+    }
+
+    function testInvalidUpgradeNonUUPSImpl() public {
+        address nonUUPSImpl = address(new ERC4626MockUUPS());
+
+        vm.prank(owner);
+        commonManagement.submitUpgradeAggregator(nonUUPSImpl);
+
+        vm.warp(STARTING_TIMESTAMP + 30 days);
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ERC1967Utils.ERC1967InvalidImplementation.selector, nonUUPSImpl));
@@ -147,7 +152,7 @@ contract CommonAggregatorTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonManagement.ActionTimelocked.selector,
-                keccak256(abi.encode(CommonManagement.TimelockTypes.AGGREGATOR_UPGRADE, newImplementation)),
+                keccak256(abi.encode(CommonManagement.TimelockTypes.AGGREGATOR_UPGRADE)),
                 STARTING_TIMESTAMP + 14 days
             )
         );
@@ -199,45 +204,56 @@ contract CommonAggregatorTest is Test {
     }
 
     function testRolesCancelling() public {
-        address[] memory impl = new address[](3);
-        for (uint256 i = 0; i < 3; i++) {
-            impl[i] = address(new CommonAggregatorUpgraded());
-            vm.prank(owner);
-            commonManagement.submitUpgradeAggregator(impl[i]);
-        }
+        address impl = address(new CommonAggregatorUpgraded());
+
+        vm.prank(owner);
+        commonManagement.submitUpgradeAggregator(impl);
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector));
-        commonManagement.cancelUpgradeAggregator(impl[0]);
+        commonManagement.cancelUpgradeAggregator(impl);
 
         vm.prank(rebalancer);
         vm.expectRevert(abi.encodeWithSelector(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector));
-        commonManagement.cancelUpgradeAggregator(impl[0]);
+        commonManagement.cancelUpgradeAggregator(impl);
 
         vm.prank(guardian);
-        commonManagement.cancelUpgradeAggregator(impl[0]);
-
-        vm.prank(manager);
-        commonManagement.cancelUpgradeAggregator(impl[1]);
-
-        vm.prank(owner);
-        commonManagement.cancelUpgradeAggregator(impl[2]);
+        commonManagement.cancelUpgradeAggregator(impl);
 
         vm.warp(STARTING_TIMESTAMP + 30 days);
+        expectUpgradeNotRegistered(impl);
 
-        for (uint256 i = 0; i < 3; i++) {
-            vm.prank(owner);
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CommonManagement.ActionNotRegistered.selector,
-                    keccak256(abi.encode(CommonManagement.TimelockTypes.AGGREGATOR_UPGRADE, impl[i]))
-                )
-            );
-            commonManagement.upgradeAggregator(impl[i], "");
-        }
+        vm.prank(owner);
+        commonManagement.submitUpgradeAggregator(impl);
+
+        vm.prank(manager);
+        commonManagement.cancelUpgradeAggregator(impl);
+
+        vm.warp(STARTING_TIMESTAMP + 60 days);
+        expectUpgradeNotRegistered(impl);
+
+        vm.prank(owner);
+        commonManagement.submitUpgradeAggregator(impl);
+
+        vm.prank(owner);
+        commonManagement.cancelUpgradeAggregator(impl);
+
+        vm.warp(STARTING_TIMESTAMP + 90 days);
+        expectUpgradeNotRegistered(impl);
     }
 
     function expectAutorizationRevert(address caller) private {
         vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, caller));
+    }
+
+    function expectUpgradeNotRegistered(address impl) private {
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonManagement.ActionNotRegistered.selector,
+                keccak256(abi.encode(CommonManagement.TimelockTypes.AGGREGATOR_UPGRADE))
+            )
+        );
+        commonManagement.upgradeAggregator(impl, "");
     }
 }
