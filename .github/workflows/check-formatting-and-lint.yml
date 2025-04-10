@@ -37,5 +37,5 @@ jobs:
 
       - name: Run linter
         run: |
-          make lint
+          pnpm solhint contracts/interfaces/*.sol contracts/*.sol scripts/*.sol
         id: lint
