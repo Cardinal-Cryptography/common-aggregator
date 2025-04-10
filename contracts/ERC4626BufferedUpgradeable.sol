@@ -76,7 +76,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     ///
     /// Alternatively (or additionally), it may be called by an off-chain component at times
     /// when difference between `assetsCached` and `totalAssets()` becomes significant.
-    function updateHoldingsState() public {
+    function _updateHoldingsState() internal {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         uint256 oldTotalAssets = $.assetsCached;
 
@@ -288,18 +288,22 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     }
 
     /// @inheritdoc IERC4626
+    /// @dev Doesn't update holdings state, so the result will be underestimated if there are pending gains.
     function maxWithdraw(address owner) public view virtual returns (uint256) {
         return convertToAssets(balanceOf(owner));
     }
 
     /// @inheritdoc IERC4626
+    /// @dev If `owner = protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
+    /// In that case, call the `updateHoldingsState()` right before calling this function,
+    /// to ensure that the value of `maxRedeem` is exact.
     function maxRedeem(address owner) public view virtual returns (uint256) {
         return balanceOf(owner);
     }
 
     /// @inheritdoc IERC4626
     function deposit(uint256 assets, address receiver) public virtual override(IERC4626) returns (uint256) {
-        updateHoldingsState();
+        _updateHoldingsState();
 
         uint256 maxAssets = maxDeposit(receiver);
         if (assets > maxAssets) {
@@ -314,8 +318,10 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     }
 
     /// @inheritdoc IERC4626
+    /// @dev If caller and receiver is `protocolFeeReceiver`, the balance of the `protocolFeeReceiver`
+    /// might change by more than `shares`, as there might be some pending protocol fees to be collected.
     function mint(uint256 shares, address receiver) public virtual override(IERC4626) returns (uint256) {
-        updateHoldingsState();
+        _updateHoldingsState();
         uint256 maxShares = maxMint(receiver);
         if (shares > maxShares) {
             revert ERC4626ExceededMaxMint(receiver, shares, maxShares);
@@ -335,7 +341,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         override(IERC4626)
         returns (uint256)
     {
-        updateHoldingsState();
+        _updateHoldingsState();
         uint256 maxAssets = maxWithdraw(owner);
         if (assets > maxAssets) {
             revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
@@ -355,7 +361,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         override(IERC4626)
         returns (uint256)
     {
-        updateHoldingsState();
+        _updateHoldingsState();
         uint256 maxShares = maxRedeem(owner);
         if (shares > maxShares) {
             revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
