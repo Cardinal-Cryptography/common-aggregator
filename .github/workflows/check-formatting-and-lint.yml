@@ -1,4 +1,4 @@
-name: Check formatting
+name: Check formatting and lint
 
 on: 
   pull_request:
@@ -34,3 +34,8 @@ jobs:
         run: |
           forge fmt --check
         id: fmt
+
+      - name: Run linter
+        run: |
+          make lint
+        id: lint

@@ -22,6 +22,11 @@ test: # Run tests
 test:
 	forge test
 
+.PHONY: fmt
+fmt: # Format contracts
+fmt:
+	forge fmt
+
 .PHONY: lint
 lint: # Run lint via solhint
 lint:
