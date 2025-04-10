@@ -33,6 +33,8 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         bytes32 actionData; // Used to enforce parameter consistency between action submission and execution.
     }
 
+    bytes32 private constant EMPTY_ACTION_DATA = 0;
+
     /// @custom:storage-location erc7201:common.storage.management
     struct ManagementStorage {
         mapping(bytes32 actionHash => TimelockData timelockData) registeredTimelocks;
@@ -67,7 +69,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         external
         override
         onlyManagerOrOwner
-        registersAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), 0, ADD_VAULT_TIMELOCK)
+        registersAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA, ADD_VAULT_TIMELOCK)
     {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.ensureVaultCanBeAdded(vault);
@@ -88,7 +90,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         external
         override
         onlyManagerOrOwner
-        executesAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), 0)
+        executesAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA)
     {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.addVault(vault);
@@ -109,7 +111,11 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         external
         override
         onlyManagerOrOwner
-        registersAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)), 0, FORCE_REMOVE_VAULT_TIMELOCK)
+        registersAction(
+            keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)),
+            EMPTY_ACTION_DATA,
+            FORCE_REMOVE_VAULT_TIMELOCK
+        )
     {
         ManagementStorage storage $ = _getManagementStorage();
 
@@ -140,7 +146,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         external
         override
         onlyManagerOrOwner
-        executesAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)), 0)
+        executesAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)), EMPTY_ACTION_DATA)
     {
         ManagementStorage storage $ = _getManagementStorage();
         $.aggregator.forceRemoveVault(vault);
