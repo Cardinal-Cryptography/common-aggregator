@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Script} from "forge-std/Script.sol";
 import {CommonAggregator, IERC20Metadata, IERC4626} from "../contracts/CommonAggregator.sol";
 import {CommonManagement} from "../contracts/CommonManagement.sol";
-import {CommonDeployer} from "../contracts/CommonDeployer.sol";
+import {CommonAggregatorDeployer} from "../contracts/CommonAggregatorDeployer.sol";
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 import "forge-std/console.sol";
 
@@ -28,7 +28,7 @@ contract DeployAggregatorScript is Script {
 
         vm.startBroadcast();
 
-        CommonDeployer factory = new CommonDeployer(owner);
+        CommonAggregatorDeployer factory = new CommonAggregatorDeployer(owner);
         address aggregatorImplementation = address(new CommonAggregator());
         address managementImplementation = address(new CommonManagement());
 

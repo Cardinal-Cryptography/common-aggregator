@@ -13,7 +13,7 @@ interface IManagementInitializator {
     function initialize(address owner, address aggregator) external;
 }
 
-contract CommonDeployer {
+contract CommonAggregatorDeployer {
     address public immutable owner;
 
     constructor(address _owner) {
