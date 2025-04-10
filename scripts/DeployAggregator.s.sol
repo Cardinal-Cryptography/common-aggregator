@@ -22,15 +22,15 @@ contract DeployAggregatorScript is Script {
         }
         address owner = msg.sender;
 
+        Options memory options;
+        Upgrades.validateImplementation("CommonAggregator.sol", options);
+        Upgrades.validateImplementation("CommonManagement.sol", options);
+
         vm.startBroadcast();
 
         CommonDeployer factory = new CommonDeployer(owner);
         address aggregatorImplementation = address(new CommonAggregator());
         address managementImplementation = address(new CommonManagement());
-
-        Options memory options;
-        Upgrades.validateImplementation("CommonAggregator.sol", options);
-        Upgrades.validateImplementation("CommonManagement.sol", options);
 
         (address aggregator, address management) =
             factory.deployAggregator(aggregatorImplementation, managementImplementation, asset, vaults);
