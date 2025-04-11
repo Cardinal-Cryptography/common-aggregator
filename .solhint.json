@@ -1,0 +1,25 @@
+{
+  "extends": "solhint:recommended",
+  "rules": {
+    "quotes": ["error", "double"],
+    "func-visibility": [
+      "warn",
+      {
+        "ignoreConstructors": true
+      }
+    ],
+    "duplicated-imports": "error",
+    "func-param-name-mixedcase": "error",
+    "imports-order": "error",
+    "no-empty-blocks": "off",
+    "no-inline-assembly": "off",
+
+    "gas-struct-packing": "warn",
+    "gas-calldata-parameters": "warn",
+    "gas-increment-by-one": "warn",
+    "gas-small-strings": "off",
+    "gas-indexed-events": "off",
+    "gas-length-in-loops": "off",
+    "gas-strict-inequalities": "off"
+  }
+}

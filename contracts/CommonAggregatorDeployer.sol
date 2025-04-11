@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 interface IAggregatorInitializator {
@@ -14,11 +14,11 @@ interface IManagementInitializator {
 }
 
 contract CommonAggregatorDeployer {
-    address public immutable deployer;
+    address public immutable DEPLOYER;
     bool public deployed;
 
     constructor() {
-        deployer = msg.sender;
+        DEPLOYER = msg.sender;
     }
 
     function deployAggregator(
@@ -26,9 +26,9 @@ contract CommonAggregatorDeployer {
         address managementImplementation,
         address owner,
         IERC20Metadata asset,
-        IERC4626[] memory vaults
+        IERC4626[] calldata vaults
     ) external returns (address aggregator, address management) {
-        assert(msg.sender == deployer);
+        assert(msg.sender == DEPLOYER);
         assert(!deployed);
 
         deployed = true;
