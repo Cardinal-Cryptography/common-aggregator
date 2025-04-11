@@ -20,6 +20,12 @@ no_match_path = "tests/aggregator/UpgradesOpenZeppelin.t.sol"
 [rpc_endpoints]
 aleph_evm_testnet = "${ALEPH_EVM_TESTNET_RPC_URL}"
 
+[doc]
+ignore = [
+    "contracts/Math.sol",
+    "contracts/interfaces/Initialiators.sol",
+]
+
 # Includes also openzeppelin foundry upgrades
 [profile.full]
 ffi = true
