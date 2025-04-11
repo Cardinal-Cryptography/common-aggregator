@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {CommonAggregatorDeployer} from "contracts/CommonAggregatorDeployer.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonAggregator, IERC4626} from "contracts/CommonAggregator.sol";
 import {CommonManagement} from "contracts/CommonManagement.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
