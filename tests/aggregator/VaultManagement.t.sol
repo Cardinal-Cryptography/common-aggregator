@@ -44,11 +44,11 @@ contract VaultManagementTest is Test {
 
     function _testAddVault(CommonAggregator aggregator, CommonManagement management, IERC4626 vault) private {
         vm.expectEmit(true, true, true, true, address(management), 1);
-        emit ICommonManagement.VaultAdditionSubmitted(address(vault), vm.getBlockTimestamp() + 7 days);
+        emit ICommonManagement.VaultAdditionSubmitted(address(vault), vm.getBlockTimestamp() + 3 days);
         vm.prank(manager);
         management.submitAddVault(vault);
 
-        vm.warp(vm.getBlockTimestamp() + 7 days + 5 hours);
+        vm.warp(vm.getBlockTimestamp() + 3 days + 5 hours);
 
         vm.expectEmit(true, true, true, true, address(aggregator), 1);
         emit ICommonAggregator.VaultAdded(address(vault));
@@ -68,11 +68,11 @@ contract VaultManagementTest is Test {
         management.submitAddVault(vault);
 
         // Limits are inclusive, so it's still too early
-        vm.warp(STARTING_TIMESTAMP + 7 days);
+        vm.warp(STARTING_TIMESTAMP + 3 days);
 
         bytes32 actionHash = keccak256(abi.encode(CommonManagement.TimelockTypes.ADD_VAULT, vault));
         vm.expectRevert(
-            abi.encodeWithSelector(CommonManagement.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 7 days)
+            abi.encodeWithSelector(CommonManagement.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 3 days)
         );
         vm.prank(manager);
         management.addVault(vault);
@@ -113,7 +113,7 @@ contract VaultManagementTest is Test {
         vm.prank(manager);
         management.submitAddVault(vault);
 
-        vm.warp(STARTING_TIMESTAMP + 8 days);
+        vm.warp(STARTING_TIMESTAMP + 4 days);
         vm.prank(manager);
         management.addVault(vault);
 
@@ -134,7 +134,7 @@ contract VaultManagementTest is Test {
         vm.prank(guardian);
         management.cancelAddVault(vault);
 
-        vm.warp(STARTING_TIMESTAMP + 8 days);
+        vm.warp(STARTING_TIMESTAMP + 4 days);
         vm.expectRevert();
         vm.prank(manager);
         management.addVault(vault);
@@ -156,12 +156,12 @@ contract VaultManagementTest is Test {
         vm.prank(manager);
         management.submitAddVault(vaultC);
 
-        vm.warp(STARTING_TIMESTAMP + 8 days + 1 seconds);
+        vm.warp(STARTING_TIMESTAMP + 4 days + 1 seconds);
 
         vm.prank(manager);
         management.addVault(vaultB);
 
-        vm.warp(STARTING_TIMESTAMP + 8 days + 2 seconds);
+        vm.warp(STARTING_TIMESTAMP + 4 days + 2 seconds);
 
         vm.prank(manager);
         management.addVault(vaultA);
@@ -181,7 +181,7 @@ contract VaultManagementTest is Test {
         vm.prank(manager);
         management.submitAddVault(vault);
 
-        vm.warp(STARTING_TIMESTAMP + 8 days);
+        vm.warp(STARTING_TIMESTAMP + 4 days);
         vm.prank(manager);
         management.addVault(vault);
 
@@ -306,12 +306,12 @@ contract VaultManagementTest is Test {
 
         vm.prank(manager);
         vm.expectEmit(true, true, true, true, address(management), 1);
-        emit ICommonManagement.VaultForceRemovalSubmitted(address(toRemove), vm.getBlockTimestamp() + 14 days);
+        emit ICommonManagement.VaultForceRemovalSubmitted(address(toRemove), vm.getBlockTimestamp() + 3 days);
         management.submitForceRemoveVault(toRemove);
 
         assertEq(aggregator.paused(), true);
 
-        vm.warp(STARTING_TIMESTAMP + 30 days);
+        vm.warp(STARTING_TIMESTAMP + 8 days);
 
         vm.prank(manager);
         vm.expectEmit(true, true, true, true, address(aggregator), 1);
@@ -341,11 +341,11 @@ contract VaultManagementTest is Test {
         management.submitForceRemoveVault(toRemove);
 
         // Limits are inclusive, so it's still too early
-        vm.warp(STARTING_TIMESTAMP + 14 days);
+        vm.warp(STARTING_TIMESTAMP + 3 days);
 
         bytes32 actionHash = keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove));
         vm.expectRevert(
-            abi.encodeWithSelector(CommonManagement.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 14 days)
+            abi.encodeWithSelector(CommonManagement.ActionTimelocked.selector, actionHash, STARTING_TIMESTAMP + 3 days)
         );
         vm.prank(manager);
         management.forceRemoveVault(toRemove);
@@ -396,7 +396,7 @@ contract VaultManagementTest is Test {
         // Successfull submission and cancellation
         vm.prank(manager);
         management.submitForceRemoveVault(toRemove);
-        vm.warp(STARTING_TIMESTAMP + 8 days);
+        vm.warp(STARTING_TIMESTAMP + 4 days);
         vm.expectEmit(true, true, true, true, address(management), 1);
         emit ICommonManagement.VaultForceRemovalCancelled(address(toRemove));
         vm.prank(guardian);
@@ -413,7 +413,7 @@ contract VaultManagementTest is Test {
         management.cancelForceRemoveVault(toRemove);
 
         // Force removal doesn't work after cancelling
-        vm.warp(STARTING_TIMESTAMP + 30 days);
+        vm.warp(STARTING_TIMESTAMP + 8 days);
         bytes32 actionHash = keccak256(abi.encode(CommonManagement.TimelockTypes.FORCE_REMOVE_VAULT, toRemove));
         vm.expectRevert(abi.encodeWithSelector(CommonManagement.ActionNotRegistered.selector, actionHash));
         vm.prank(manager);
@@ -548,7 +548,7 @@ contract VaultManagementTest is Test {
         vm.prank(manager);
         management.submitAddVault(vault2);
 
-        vm.warp(STARTING_TIMESTAMP + 8 days);
+        vm.warp(STARTING_TIMESTAMP + 4 days);
 
         vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(alice);
@@ -641,7 +641,7 @@ contract VaultManagementTest is Test {
         vm.prank(manager);
         management.submitForceRemoveVault(vault1);
 
-        vm.warp(STARTING_TIMESTAMP + 30 days);
+        vm.warp(STARTING_TIMESTAMP + 8 days);
 
         vm.expectRevert(ICommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(alice);
