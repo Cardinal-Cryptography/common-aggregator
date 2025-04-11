@@ -220,7 +220,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return (false, 0);
     }
 
-    /// @inheritdoc IERC20Metadata
+    /// @notice Returns decimals of the underlying share token.
     /// @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
     /// "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
     /// asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
@@ -229,7 +229,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return $.underlyingDecimals + _decimalsOffset();
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice Returns the address of the underlying ERC-20 token used for the vault for accounting, depositing, and withdrawing.
     function asset() public view virtual returns (address) {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         return address($.asset);
@@ -240,61 +240,75 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return _getERC4626BufferedStorage().assetsCached;
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
+    /// @notice Allows an on-chain or off-chain user to simulate the effects of their deposit at the current block, given
+    /// current on-chain conditions. Simulates holdings state update before the preview.
+    /// @dev Doesn't account for deposit limits given by `maxDeposit()`.
     function previewDeposit(uint256 assets) public view override(IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
         return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Floor);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
+    /// @notice Allows an on-chain or off-chain user to simulate the effects of their mint at the current block, given
+    /// current on-chain conditions. Simulates holdings state update before the preview.
+    /// @dev Doesn't account for mint limits given by `maxMint()`.
     function previewMint(uint256 shares) public view override(IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
         return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
+    /// @notice Allows an on-chain or off-chain user to simulate the effects of their withdraw at the current block, given
+    /// current on-chain conditions. Simulates holdings state update before the preview.
+    /// @dev Doesn't account for withdraw limits given by `maxWithdraw()`.
     function previewWithdraw(uint256 assets) public view override(IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
         return assets.mulDiv(newTotalSupply + 10 ** _decimalsOffset(), newTotalAssets + 1, Math.Rounding.Ceil);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Updates holdings state before the preview.
+    /// @notice Allows an on-chain or off-chain user to simulate the effects of their redeem at the current block, given
+    /// current on-chain conditions. Simulates holdings state update before the preview.
+    /// @dev Doesn't account for redeem limits given by `maxRedeem()`.
     function previewRedeem(uint256 shares) public view override(IERC4626) returns (uint256) {
         (uint256 newTotalAssets, uint256 newTotalSupply) = _previewUpdateHoldingsState();
         return shares.mulDiv(newTotalAssets + 1, newTotalSupply + 10 ** _decimalsOffset(), Math.Rounding.Floor);
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice Returns the amount of shares that the vault would exchange for the amount of assets provided, in an ideal
+    /// scenario where all the conditions are met.
+    /// @dev Accounts for shares burned in the reward buffer, but doesn't preview holdings state update.
     function convertToShares(uint256 assets) public view virtual returns (uint256) {
         return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1);
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice Returns the amount of assets that the vault would exchange for the amount of shares provided, in an ideal
+    /// scenario where all the conditions are met.
+    /// @dev Accounts for shares burned in the reward buffer, but doesn't preview holdings state update.
     function convertToAssets(uint256 shares) public view virtual returns (uint256) {
         return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset());
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice Returns the maximum amount of the underlying asset that can be deposited into the vault for the receiver,
+    /// through a deposit call.
     function maxDeposit(address) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice Returns the maximum amount of the underlying asset that can be minted for the receiver, through a mint call.
     function maxMint(address) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Doesn't update holdings state, so the result will be underestimated if there are pending gains.
+    /// @notice Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the
+    /// vault, through a withdraw call. Accounts for shares burned in the reward buffer, but doesn't preview holdings
+    /// state update.
+    /// @dev If `owner = protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
+    /// In that case, call the `updateHoldingsState()` right before calling this function,
+    /// to ensure that the value of `maxWithdraw` is exact.
     function maxWithdraw(address owner) public view virtual returns (uint256) {
         return convertToAssets(balanceOf(owner));
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice Returns the maximum amount of vault shares that can be redeemed from the owner balance in the vault,
+    /// through a redeem call.
     /// @dev If `owner = protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
     /// In that case, call the `updateHoldingsState()` right before calling this function,
     /// to ensure that the value of `maxRedeem` is exact.
@@ -302,7 +316,9 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return balanceOf(owner);
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice Mints shares vault shares to receiver by depositing exactly amount of underlying tokens.
+    /// Returns the amount of shares that were minted.
+    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
     function deposit(uint256 assets, address receiver) public virtual override(IERC4626) returns (uint256) {
         _updateHoldingsState();
 
@@ -318,8 +334,10 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return shares;
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev If caller and receiver is `protocolFeeReceiver`, the balance of the `protocolFeeReceiver`
+    /// @notice Mints exactly shares Vault shares to receiver by depositing amount of underlying tokens.
+    /// Returns the amount of assets that were deposited.
+    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
+    /// If caller and receiver is `protocolFeeReceiver`, the balance of the `protocolFeeReceiver`
     /// might change by more than `shares`, as there might be some pending protocol fees to be collected.
     function mint(uint256 shares, address receiver) public virtual override(IERC4626) returns (uint256) {
         _updateHoldingsState();
@@ -335,7 +353,9 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return assets;
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice Burns shares from owner and sends exactly assets of underlying tokens to receiver.
+    /// Returns the amount of shares that were burnt.
+    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
     function withdraw(uint256 assets, address receiver, address owner)
         public
         virtual
@@ -355,7 +375,9 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return shares;
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice  Burns exactly shares from owner and sends assets of underlying tokens to receiver.
+    /// Returns the amount of sent assets.
+    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
     function redeem(uint256 shares, address receiver, address owner)
         public
         virtual
@@ -405,6 +427,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
+    /// @notice Sets the protocol fee in bps. Protocol fee is a performance fee, which means,
+    /// it is taken from the profit made by the vault.
     function setProtocolFee(uint256 feeBps) public virtual override(IERC4626Buffered) {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         require(feeBps <= MAX_BPS, IncorrectProtocolFee());
