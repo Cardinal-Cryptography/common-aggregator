@@ -2,11 +2,12 @@
 // solhint-disable no-console
 pragma solidity ^0.8.28;
 
-import {Upgrades} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
+import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 import {console} from "forge-std/console.sol";
 import {Script} from "forge-std/Script.sol";
-import {CommonAggregator, IERC20Metadata, IERC4626} from "./../contracts/CommonAggregator.sol";
-import {CommonManagement} from "./../contracts/CommonManagement.sol";
+import {CommonAggregator, IERC20Metadata, IERC4626} from "../contracts/CommonAggregator.sol";
+import {CommonAggregatorDeployer} from "../contracts/CommonAggregatorDeployer.sol";
+import {CommonManagement} from "../contracts/CommonManagement.sol";
 
 /// @notice Deploy the CommonAggregator contract (implementation and upgradeable proxy).
 /// Use when deploying the contract for the first time.
@@ -22,19 +23,21 @@ contract DeployAggregatorScript is Script {
         }
         address owner = msg.sender;
 
+        Options memory options;
+        Upgrades.validateImplementation("CommonAggregator.sol", options);
+        Upgrades.validateImplementation("CommonManagement.sol", options);
+
         vm.startBroadcast();
 
-        address managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
-        address aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
+        CommonAggregatorDeployer factory = new CommonAggregatorDeployer();
+        address aggregatorImplementation = address(new CommonAggregator());
+        address managementImplementation = address(new CommonManagement());
 
-        CommonManagement management = CommonManagement(managementProxy);
-        CommonAggregator aggregator = CommonAggregator(aggregatorProxy);
+        (address aggregator, address management) =
+            factory.deployAggregator(aggregatorImplementation, managementImplementation, owner, asset, vaults);
 
-        aggregator.initialize(address(management), asset, vaults);
-        management.initialize(owner, aggregator);
-
-        console.log("Deployed CommonManagement contract to:", managementProxy);
-        console.log("Deployed CommonAggregator contract to:", aggregatorProxy);
+        console.log("Deployed CommonManagement contract to:", management);
+        console.log("Deployed CommonAggregator contract to:", aggregator);
 
         vm.stopBroadcast();
     }
