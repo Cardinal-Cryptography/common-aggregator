@@ -18,11 +18,11 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC4626;
 
-    uint256 public constant SET_TRADER_TIMELOCK = 5 days;
-    uint256 public constant ADD_VAULT_TIMELOCK = 7 days;
-    uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 14 days;
-    uint256 public constant AGGREGATOR_UPGRADE_TIMELOCK = 14 days;
-    uint256 public constant MANAGEMENT_UPGRADE_TIMELOCK = 14 days;
+    uint256 public constant SET_TRADER_TIMELOCK = 3 days;
+    uint256 public constant ADD_VAULT_TIMELOCK = 3 days;
+    uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 3 days;
+    uint256 public constant AGGREGATOR_UPGRADE_TIMELOCK = 3 days;
+    uint256 public constant MANAGEMENT_UPGRADE_TIMELOCK = 3 days;
 
     enum TimelockTypes {
         SET_TRADER,
