@@ -58,7 +58,7 @@ contract CommonAggregator is
     }
 
     /// @notice Initializer for the `CommonAggregator` contract, called by the proxy.
-    /// @param management The address of the *Management* address - usually the `CommonManagement` contract.
+    /// @param management The address of the *Management* - usually the `CommonManagement` contract.
     /// @param asset The address of the underlying ERC20 token. It must implement the `IERC20Metadata` interface.
     /// @param vaults The list of ERC4626 vaults to be aggregated initially. Vaults must aggregate the same `asset`,
     /// and be already initialized.

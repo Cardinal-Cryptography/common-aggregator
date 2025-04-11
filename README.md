@@ -12,12 +12,12 @@ strategy for optimizing between yield and risk.
 ### Security
 The `CommonManagement` contract implements the role-management and extra security layer to the aggregator,
 Let's assume in this section the *Management* is a deployed instance of the `CommonManagement` contract.
-Any security-sensitive actions by it, like adding a new vault to the protocol, are timelocked. This alllows users
+Any security-sensitive actions by it, like adding a new vault to the protocol, are timelocked. This allows users
 to react and withdraw their assets when they no longer agree with the strategy proposed by the *Management*.
 
 Additionally, the *Management* can designate *Guardians* to monitor the protocol, and react by pausing it when unexpected
-events occur, or cancel any incorrectly submitted timelocked actions. Importantly, even when the protocol is paused, users can still withdraw their assets
-using the `emergencyRedeem` method.
+events occur, or cancel any incorrectly submitted timelocked actions. Importantly, even when the protocol is paused, users
+can redeem their shares using the `emergencyRedeem` method, in exchange for shares of ther underlying vaults.
 
 ## Development
 

@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IAggregatorInitializator, IManagementInitializator} from "contracts/interfaces/Initialiators.sol";
+import {IAggregatorInitializator, IManagementInitializator} from "contracts/interfaces/Initializators.sol";
 
 contract CommonAggregatorDeployer {
     address public immutable DEPLOYER;
