@@ -15,6 +15,8 @@ import {
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
 import {MAX_BPS, saturatingAdd} from "./Math.sol";
 
+/// @notice Common Aggregator contract, extending the `ERC4626BufferedUpgradeable`. Provides all the necessary logic for
+/// the aggregation, leaving the role management to the `CommonManagement` contract.
 contract CommonAggregator is
     ICommonAggregator,
     UUPSUpgradeable,
@@ -24,9 +26,11 @@ contract CommonAggregator is
 {
     using Math for uint256;
     using SafeERC20 for IERC20;
-    using SafeERC20 for IERC4626;
 
+    /// @notice The maximum number of vaults that can be present at the same time in the aggregator.
     uint256 public constant MAX_VAULTS = 5;
+
+    /// @notice The maximum protocol fee, in basis poins, that can be set by the *Management*.
     uint256 public constant MAX_PROTOCOL_FEE_BPS = MAX_BPS / 2;
 
     /// @custom:storage-location erc7201:common.storage.aggregator
@@ -36,26 +40,28 @@ contract CommonAggregator is
         address management;
     }
 
+    /// @notice ERC-7201 storage location for the `CommonAggregator`: the `AggregatorStorage` struct.
     // keccak256(abi.encode(uint256(keccak256("common.storage.aggregator")) - 1)) & ~bytes32(uint256(0xff));
     bytes32 private constant AGGREGATOR_STORAGE_LOCATION =
         0x1344fc1d9208ab003bf22755fd527b5337aabe73460e3f8720ef6cfd49b61d00;
 
-    function _getAggregatorStorage() private pure returns (AggregatorStorage storage $) {
-        assembly {
-            $.slot := AGGREGATOR_STORAGE_LOCATION
-        }
-    }
-
-    function getVaults() external view returns (IERC4626[] memory) {
+    modifier onlyManagement() {
         AggregatorStorage storage $ = _getAggregatorStorage();
-        return $.vaults;
+        require(msg.sender == $.management, CallerNotManagement());
+        _;
     }
 
-    function getMaxAllocationLimit(IERC4626 vault) external view returns (uint256) {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        return $.allocationLimitBps[address(vault)];
+    /// @dev Constructor disabling the initializer, as per OpenZeppelin's UUPS pattern.
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
+    /// @notice Initializer for the `CommonAggregator` contract, called by the proxy.
+    /// @param management The address of the *Management* address - usually the `CommonManagement` contract.
+    /// @param asset The address of the underlying ERC20 token. It must implement the `IERC20Metadata` interface.
+    /// @param vaults The list of ERC4626 vaults to be aggregated initially. Vaults must aggregate the same `asset`,
+    /// and be already initialized.
     function initialize(address management, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
         __UUPSUpgradeable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
@@ -73,6 +79,7 @@ contract CommonAggregator is
         }
     }
 
+    /// @notice Ensures that the vault can be added to the aggregator. Reverts if it can't.
     function ensureVaultCanBeAdded(IERC4626 vault) public view {
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
 
@@ -81,26 +88,13 @@ contract CommonAggregator is
         require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 
-    function ensureVaultIsPresent(IERC4626 vault) public view returns (uint256) {
-        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
-        require(isVaultOnTheList, VaultNotOnTheList(vault));
-        return index;
-    }
-
-    function ensureTokenSafeToTransfer(address rewardToken) public view {
-        require(rewardToken != asset(), InvalidRewardToken(rewardToken));
-        require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
-        require(rewardToken != address(this), InvalidRewardToken(rewardToken));
-    }
+    /// @notice Called by the proxy to authorize the upgrade. Reverts if the caller is not the *Management*.
+    function _authorizeUpgrade(address newImplementation) internal override onlyManagement {}
 
     // ----- ERC4626 -----
 
-    function _decimalsOffset() internal pure override returns (uint8) {
-        return 4;
-    }
-
     /// @inheritdoc ERC4626BufferedUpgradeable
-    /// @notice Returns the maximum deposit amount of the given address at the current time.
+    /// @dev Returns 0 when the contract is paused.
     function maxDeposit(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
@@ -109,7 +103,7 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc ERC4626BufferedUpgradeable
-    /// @notice Returns the maximum mint amount of the given address at the current time.
+    /// @dev Returns 0 when the contract is paused.
     function maxMint(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
@@ -118,7 +112,7 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc ERC4626BufferedUpgradeable
-    /// @notice Returns the maximum withdraw amount of the given address at the current time.
+    /// @dev Returns 0 when the contract is paused. Users can use `emergencyRedeem` to exit the aggregator instead.
     function maxWithdraw(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
@@ -127,7 +121,7 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc ERC4626BufferedUpgradeable
-    /// @notice Returns the maximum redeem amount of the given address at the current time.
+    /// @dev Returns 0 when the contract is paused. Users can use `emergencyRedeem` to exit the aggregator instead.
     function maxRedeem(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
             return 0;
@@ -198,6 +192,7 @@ contract CommonAggregator is
         return super.redeem(shares, receiver, owner);
     }
 
+    /// @inheritdoc ERC4626BufferedUpgradeable
     function _postDeposit(uint256 assets) internal override {
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 cachedTotalAssets = totalAssets();
@@ -214,6 +209,7 @@ contract CommonAggregator is
         }
     }
 
+    /// @inheritdoc ERC4626BufferedUpgradeable
     function _preWithdrawal(uint256 assets) internal override {
         try CommonAggregator(address(this)).pullFundsProportional(assets) {}
         catch {
@@ -224,7 +220,8 @@ contract CommonAggregator is
 
     /// @dev Function is exposed as external but only callable by aggregator, because we want to be able
     /// to easily revert all changes in case of it's failure - it is not possible for internal functions.
-    function pullFundsProportional(uint256 assetsRequired) external onlyAggregator {
+    function pullFundsProportional(uint256 assetsRequired) external {
+        require(msg.sender == address(this), CallerNotAggregator());
         require(totalAssets() != 0, NotEnoughFunds());
 
         AggregatorStorage storage $ = _getAggregatorStorage();
@@ -259,11 +256,11 @@ contract CommonAggregator is
         }
     }
 
-    // ----- Emergency redeem -----
-
-    function maxEmergencyRedeem(address owner) public view returns (uint256) {
-        return super.maxRedeem(owner);
+    function _decimalsOffset() internal pure override returns (uint8) {
+        return 4;
     }
+
+    // ----- Emergency redeem -----
 
     /// @inheritdoc ICommonAggregator
     function emergencyRedeem(uint256 shares, address account, address owner)
@@ -295,7 +292,7 @@ contract CommonAggregator is
             valueInAssets += vault.convertToAssets(vaultShares[i]);
             // Reentracy could happen, so reentrant lock is needed.
             // This should also include locking adding and removing vaults.
-            vault.safeTransfer(account, vaultShares[i]);
+            IERC20(vault).safeTransfer(account, vaultShares[i]);
         }
 
         _decreaseAssets(valueInAssets);
@@ -303,6 +300,11 @@ contract CommonAggregator is
         IERC20(asset()).safeTransfer(account, assets);
 
         emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultShares);
+    }
+
+    /// @notice Returns the maximum amount of shares that can be emergency-redeemed by the given owner.
+    function maxEmergencyRedeem(address owner) public view returns (uint256) {
+        return super.maxRedeem(owner);
     }
 
     // ----- Reporting -----
@@ -359,17 +361,6 @@ contract CommonAggregator is
         emit VaultForceRemoved(address(vault));
     }
 
-    /// Tries to redeem as many shares as possible from the given vault.
-    /// Reverts only if the vault is not present on the list.
-    function tryExitVault(IERC4626 vault) external onlyManagement nonReentrant {
-        ensureVaultIsPresent(vault);
-
-        // Try redeeming as much shares of the removed vault as possible
-        try vault.maxRedeem(address(this)) returns (uint256 redeemableShares) {
-            try vault.redeem(redeemableShares, address(this), address(this)) {} catch {}
-        } catch {}
-    }
-
     /// @notice Removes vault from the list by the given index in the vaults array, without any checks.
     /// Updates the storage and removes the vault from mappings.
     function _removeVault(uint256 index) internal {
@@ -385,12 +376,48 @@ contract CommonAggregator is
         $.vaults.pop();
     }
 
+    /// Tries to redeem as many shares as possible from the given vault.
+    /// Reverts only if the vault is not present on the list.
+    function tryExitVault(IERC4626 vault) external onlyManagement nonReentrant {
+        ensureVaultIsPresent(vault);
+
+        // Try redeeming as much shares of the removed vault as possible
+        try vault.maxRedeem(address(this)) returns (uint256 redeemableShares) {
+            try vault.redeem(redeemableShares, address(this), address(this)) {} catch {}
+        } catch {}
+    }
+
+    /// @notice Checks if the vault is on the list of (fully-added) aggregated vaults currently. Reverts if it isn't.
+    /// Returns the index of the vault in the list.
+    function ensureVaultIsPresent(IERC4626 vault) public view returns (uint256) {
+        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
+        require(isVaultOnTheList, VaultNotOnTheList(vault));
+        return index;
+    }
+
+    /// @notice Returns true iff the vault is on the list of (fully-added) aggregated vaults currently.
+    function _isVaultOnTheList(IERC4626 vault) internal view returns (bool) {
+        (bool isVaultOnTheList,) = _getVaultIndex(vault);
+        return isVaultOnTheList;
+    }
+
+    function _getVaultIndex(IERC4626 vault) internal view returns (bool onTheList, uint256 index) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+
+        for (uint256 i = 0; i < $.vaults.length; ++i) {
+            if ($.vaults[i] == vault) {
+                return (true, i);
+            }
+        }
+        return (false, 0);
+    }
+
     // ----- Rebalancing -----
 
     /// @inheritdoc ICommonAggregator
     function pushFunds(uint256 assets, IERC4626 vault) external onlyManagement whenNotPaused nonReentrant {
         _updateHoldingsState();
-        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
+        ensureVaultIsPresent(vault);
         IERC20(asset()).approve(address(vault), assets);
         vault.deposit(assets, address(this));
         _checkLimit(IERC4626(vault));
@@ -400,7 +427,7 @@ contract CommonAggregator is
 
     /// @inheritdoc ICommonAggregator
     function pullFunds(uint256 assets, IERC4626 vault) external onlyManagement nonReentrant {
-        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
+        ensureVaultIsPresent(vault);
         IERC4626(vault).withdraw(assets, address(this), address(this));
 
         emit AssetsRebalanced(address(vault), address(this), assets);
@@ -408,7 +435,7 @@ contract CommonAggregator is
 
     /// @inheritdoc ICommonAggregator
     function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyManagement nonReentrant {
-        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
+        ensureVaultIsPresent(vault);
         uint256 assets = vault.redeem(shares, address(this), address(this));
 
         emit AssetsRebalanced(address(vault), address(this), assets);
@@ -420,7 +447,7 @@ contract CommonAggregator is
     /// @notice Doesn't rebalance the assets, after the action limits may be exceeded.
     function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyManagement nonReentrant {
         require(newLimitBps <= MAX_BPS, IncorrectMaxAllocationLimit());
-        require(_isVaultOnTheList(vault), VaultNotOnTheList(vault));
+        ensureVaultIsPresent(vault);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 oldLimit = $.allocationLimitBps[address(vault)];
@@ -430,6 +457,17 @@ contract CommonAggregator is
         $.allocationLimitBps[address(vault)] = newLimitBps;
 
         emit AllocationLimitSet(address(vault), newLimitBps);
+    }
+
+    /// @notice Checks if the allocation limit is not exceeded for the given vault.
+    /// Doesn't update the holdings state - the caller should decide when to do it.
+    /// @dev Results in undefined behavior if the vault is not on the list.
+    function _checkLimit(IERC4626 vault) internal view {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        uint256 assets = vault.convertToAssets(vault.balanceOf(address(this)));
+        uint256 total = totalAssets();
+
+        require(assets <= total.mulDiv($.allocationLimitBps[address(vault)], MAX_BPS), AllocationLimitExceeded(vault));
     }
 
     // ----- Fee management -----
@@ -468,32 +506,6 @@ contract CommonAggregator is
         emit ProtocolFeeReceiverChanged(oldProtocolFeeReceiver, protocolFeeReceiver);
     }
 
-    function _isVaultOnTheList(IERC4626 vault) internal view returns (bool onTheList) {
-        (onTheList,) = _getVaultIndex(vault);
-    }
-
-    function _getVaultIndex(IERC4626 vault) internal view returns (bool onTheList, uint256 index) {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-
-        for (uint256 i = 0; i < $.vaults.length; ++i) {
-            if ($.vaults[i] == vault) {
-                return (true, i);
-            }
-        }
-        return (false, 0);
-    }
-
-    /// @notice Checks if the allocation limit is not exceeded for the given vault.
-    /// Doesn't update the holdings state - the caller should decide when to do it.
-    /// @dev Results in undefined behavior if the vault is not on the list.
-    function _checkLimit(IERC4626 vault) internal view {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        uint256 assets = vault.convertToAssets(vault.balanceOf(address(this)));
-        uint256 total = totalAssets();
-
-        require(assets <= total.mulDiv($.allocationLimitBps[address(vault)], MAX_BPS), AllocationLimitExceeded(vault));
-    }
-
     // ----- Non-asset rewards trading -----
 
     /// @inheritdoc ICommonAggregator
@@ -501,9 +513,15 @@ contract CommonAggregator is
         ensureTokenSafeToTransfer(rewardToken);
         IERC20 transferrableToken = IERC20(rewardToken);
         uint256 amount = transferrableToken.balanceOf(address(this));
-        SafeERC20.safeTransfer(transferrableToken, rewardTrader, amount);
+        transferrableToken.safeTransfer(rewardTrader, amount);
 
         emit RewardsTransferred(rewardToken, amount, rewardTrader);
+    }
+
+    function ensureTokenSafeToTransfer(address rewardToken) public view {
+        require(rewardToken != asset(), InvalidRewardToken(rewardToken));
+        require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
+        require(rewardToken != address(this), InvalidRewardToken(rewardToken));
     }
 
     // ----- Pausing user interactions -----
@@ -523,21 +541,19 @@ contract CommonAggregator is
 
     // ----- Etc -----
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyManagement {}
-
-    modifier onlyAggregator() {
-        require(msg.sender == address(this), CallerNotAggregator());
-        _;
-    }
-
-    modifier onlyManagement() {
+    function getVaults() external view returns (IERC4626[] memory) {
         AggregatorStorage storage $ = _getAggregatorStorage();
-        require(msg.sender == $.management, CallerNotManagement());
-        _;
+        return $.vaults;
+    }
+
+    function getMaxAllocationLimit(IERC4626 vault) external view returns (uint256) {
+        AggregatorStorage storage $ = _getAggregatorStorage();
+        return $.allocationLimitBps[address(vault)];
+    }
+
+    function _getAggregatorStorage() private pure returns (AggregatorStorage storage $) {
+        assembly {
+            $.slot := AGGREGATOR_STORAGE_LOCATION
+        }
     }
 }
