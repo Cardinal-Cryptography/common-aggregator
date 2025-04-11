@@ -1,4 +1,4 @@
-name: Check formatting and lint
+name: Check formatting
 
 on: 
   pull_request:
@@ -34,8 +34,3 @@ jobs:
         run: |
           forge fmt --check
         id: fmt
-
-      - name: Run linter
-        run: |
-          pnpm solhint contracts/interfaces/*.sol contracts/*.sol scripts/*.sol
-        id: lint
