@@ -22,6 +22,16 @@ test: # Run tests
 test:
 	forge test
 
+.PHONY: fmt
+fmt: # Format contracts
+fmt:
+	forge fmt
+
+.PHONY: lint
+lint: # Run lint via solhint
+lint:
+	pnpm solhint contracts/interfaces/*.sol contracts/*.sol scripts/*.sol
+
 .PHONY: benchmark
 benchmark: # Run benchmark
 benchmark:

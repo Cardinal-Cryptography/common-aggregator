@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: UNKNOWN
+// solhint-disable no-console
 pragma solidity ^0.8.28;
 
-import {Script} from "forge-std/Script.sol";
-import {CommonManagement} from "contracts/CommonManagement.sol";
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
-import "forge-std/console.sol";
+import {CommonManagement} from "contracts/CommonManagement.sol";
+import {console} from "forge-std/console.sol";
+import {Script} from "forge-std/Script.sol";
 
 /// @notice Submit the upgrade of the CommonAggregator contract. Validates the upgrade,
 /// deploys the new implementation contract, and submits the pending upgrade to the CommonAggregator contract.

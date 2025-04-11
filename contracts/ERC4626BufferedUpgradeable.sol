@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
+import {
+    ERC20Upgradeable,
+    Initializable,
+    IERC20,
+    IERC20Metadata,
+    IERC4626,
+    Math,
+    SafeERC20
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {IERC4626Buffered} from "./interfaces/IERC4626Buffered.sol";
 import {checkedAdd, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
@@ -22,11 +23,10 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         uint256 bufferedShares;
         uint256 lastUpdate;
         uint256 currentBufferEnd;
-        address protocolFeeReceiver;
         uint256 protocolFeeBps;
-        IERC20 _asset;
-        uint8 _underlyingDecimals;
-        uint8 _decimalsOffset;
+        address protocolFeeReceiver;
+        uint8 underlyingDecimals;
+        IERC20 asset;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.erc4626buffered")) - 1)) & ~bytes32(uint256(0xff));
@@ -41,6 +41,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     // ----- Initialization -----
 
+    // solhint-disable-next-line func-name-mixedcase
     function __ERC4626Buffered_init(IERC20 _asset) internal onlyInitializing {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         $.lastUpdate = block.timestamp;
@@ -48,8 +49,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         $.protocolFeeReceiver = address(1);
 
         (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(_asset);
-        $._underlyingDecimals = success ? assetDecimals : 18;
-        $._asset = _asset;
+        $.underlyingDecimals = success ? assetDecimals : 18;
+        $.asset = _asset;
     }
 
     // ----- Buffering logic -----
@@ -225,13 +226,13 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
     function decimals() public view virtual override(IERC20Metadata, ERC20Upgradeable) returns (uint8) {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        return $._underlyingDecimals + _decimalsOffset();
+        return $.underlyingDecimals + _decimalsOffset();
     }
 
     /// @inheritdoc IERC4626
     function asset() public view virtual returns (address) {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        return address($._asset);
+        return address($.asset);
     }
 
     /// @notice Returns cached assets from the last holdings state update.
@@ -378,7 +379,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal virtual {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
 
-        SafeERC20.safeTransferFrom($._asset, caller, address(this), assets);
+        SafeERC20.safeTransferFrom($.asset, caller, address(this), assets);
         _mint(receiver, shares);
         _postDeposit(assets);
         _increaseAssets(assets);
@@ -399,7 +400,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         _preWithdrawal(assets);
         _burn(owner, shares);
         _decreaseAssets(assets);
-        SafeERC20.safeTransfer($._asset, receiver, assets);
+        SafeERC20.safeTransfer($.asset, receiver, assets);
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }

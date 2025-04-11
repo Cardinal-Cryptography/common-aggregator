@@ -36,23 +36,14 @@ function saturatingAdd(uint256 a, uint256 b) pure returns (uint256 result) {
 function weightedAvg(uint256 v1, uint256 w1, uint256 v2, uint256 w2) pure returns (uint256 result) {
     uint256 weightSum = checkedAdd(w1, w2, type(uint256).max);
 
-    (uint256 a, uint256 rA) = mulDivWithRemainder(v1, w1, weightSum);
-    (uint256 b, uint256 rB) = mulDivWithRemainder(v2, w2, weightSum);
+    uint256 a = Math.mulDiv(v1, w1, weightSum);
+    uint256 rA = mulmod(v1, w1, weightSum);
+    uint256 b = Math.mulDiv(v2, w2, weightSum);
+    uint256 rB = mulmod(v2, w2, weightSum);
 
     result = a + b;
 
     if (weightSum - rA <= rB) {
         ++result;
-    }
-}
-
-/// @notice Computes a.mulDiv(b,c) with full precision and returns also the remainder.
-/// Reverts if c is zero, or if the result overflows uint256.
-function mulDivWithRemainder(uint256 a, uint256 b, uint256 c) pure returns (uint256 result, uint256 remainder) {
-    result = Math.mulDiv(a, b, c);
-    unchecked {
-        uint256 x = a * b;
-        uint256 y = result * c;
-        remainder = x - y;
     }
 }

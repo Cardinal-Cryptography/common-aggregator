@@ -1,22 +1,19 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {
+    ERC4626BufferedUpgradeable,
     IERC20,
     IERC4626,
     IERC20Metadata,
-    SafeERC20,
-    ERC20Upgradeable,
-    ERC4626BufferedUpgradeable
+    Math,
+    SafeERC20
 } from "./ERC4626BufferedUpgradeable.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {saturatingAdd} from "./Math.sol";
-import {MAX_BPS} from "./Math.sol";
-import {ERC4626BufferedUpgradeable} from "./ERC4626BufferedUpgradeable.sol";
+import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
+import {MAX_BPS, saturatingAdd} from "./Math.sol";
 
 contract CommonAggregator is
     ICommonAggregator,
@@ -69,7 +66,7 @@ contract CommonAggregator is
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.management = management;
 
-        for (uint256 i = 0; i < vaults.length; i++) {
+        for (uint256 i = 0; i < vaults.length; ++i) {
             ensureVaultCanBeAdded(vaults[i]);
             $.vaults.push(vaults[i]);
             $.allocationLimitBps[address(vaults[i])] = MAX_BPS;
@@ -245,7 +242,7 @@ contract CommonAggregator is
         uint256 currentIdle = IERC20(asset()).balanceOf(address(this));
         uint256 assetsToPull = assetsRequired - assetsRequired.min(currentIdle);
 
-        for (uint256 i = 0; i < $.vaults.length && assetsToPull > 0; i++) {
+        for (uint256 i = 0; i < $.vaults.length && assetsToPull > 0; ++i) {
             IERC4626 vault = $.vaults[i];
             uint256 vaultMaxWithdraw = vault.maxWithdraw(address(this));
             uint256 assetsToPullFromVault = assetsToPull.min(vaultMaxWithdraw);
@@ -292,7 +289,7 @@ contract CommonAggregator is
         vaultShares = new uint256[]($.vaults.length);
         uint256 valueInAssets = assets;
 
-        for (uint256 i = 0; i < $.vaults.length; i++) {
+        for (uint256 i = 0; i < $.vaults.length; ++i) {
             IERC4626 vault = $.vaults[i];
             vaultShares[i] = shares.mulDiv(vault.balanceOf(address(this)), totalShares);
             valueInAssets += vault.convertToAssets(vaultShares[i]);
@@ -319,7 +316,7 @@ contract CommonAggregator is
         AggregatorStorage storage $ = _getAggregatorStorage();
 
         uint256 assets = IERC20(asset()).balanceOf(address(this));
-        for (uint256 i = 0; i < $.vaults.length; i++) {
+        for (uint256 i = 0; i < $.vaults.length; ++i) {
             assets += _aggregatedVaultAssets(IERC4626($.vaults[i]));
         }
         return assets;
@@ -381,7 +378,7 @@ contract CommonAggregator is
         delete $.allocationLimitBps[address($.vaults[index])];
 
         // Remove the vault from the list, shifting the rest of the array.
-        for (uint256 i = index; i < $.vaults.length - 1; i++) {
+        for (uint256 i = index; i < $.vaults.length - 1; ++i) {
             $.vaults[i] = $.vaults[i + 1];
         }
 
@@ -478,7 +475,7 @@ contract CommonAggregator is
     function _getVaultIndex(IERC4626 vault) internal view returns (bool onTheList, uint256 index) {
         AggregatorStorage storage $ = _getAggregatorStorage();
 
-        for (uint256 i = 0; i < $.vaults.length; i++) {
+        for (uint256 i = 0; i < $.vaults.length; ++i) {
             if ($.vaults[i] == vault) {
                 return (true, i);
             }
