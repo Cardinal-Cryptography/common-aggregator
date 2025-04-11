@@ -75,13 +75,13 @@ contract CommonAggregatorTest is Test {
             abi.encodeWithSelector(
                 CommonManagement.ActionTimelocked.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.SET_TRADER, address(reward))),
-                STARTING_TIMESTAMP + 5 days
+                STARTING_TIMESTAMP + 3 days
             )
         );
         vm.prank(owner);
         commonManagement.setRewardTrader(address(reward), trader);
 
-        vm.warp(STARTING_TIMESTAMP + 6 days);
+        vm.warp(STARTING_TIMESTAMP + 4 days);
 
         vm.expectRevert(
             abi.encodeWithSelector(

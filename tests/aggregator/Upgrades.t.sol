@@ -146,14 +146,14 @@ contract CommonAggregatorTest is Test {
         vm.prank(owner);
         commonManagement.submitUpgradeAggregator(newImplementation);
 
-        vm.warp(STARTING_TIMESTAMP + 13 days);
+        vm.warp(STARTING_TIMESTAMP + 2 days);
 
         vm.prank(owner);
         vm.expectRevert(
             abi.encodeWithSelector(
                 CommonManagement.ActionTimelocked.selector,
                 keccak256(abi.encode(CommonManagement.TimelockTypes.AGGREGATOR_UPGRADE)),
-                STARTING_TIMESTAMP + 14 days
+                STARTING_TIMESTAMP + 3 days
             )
         );
         commonManagement.upgradeAggregator(newImplementation, "");
