@@ -511,8 +511,9 @@ abstract contract ERC4626BufferedUpgradeableTest is Test {
         }
     }
 
+    /// forge-config: default.fuzz.runs = 5000
     function testFuzz_BigValues(
-        uint120[UPDATE_NUM] calldata _timeElapsed,
+        uint64[UPDATE_NUM] calldata _timeElapsed,
         uint128[UPDATE_NUM] calldata _gain,
         uint120 _offset
     ) public {
