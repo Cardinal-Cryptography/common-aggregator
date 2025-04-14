@@ -32,3 +32,15 @@ make deps
 ```
 make compile-contracts
 ```
+
+### Running tests
+
+```
+make test
+```
+
+### Bulding and serving docs locally
+
+```
+make doc-local
+```
