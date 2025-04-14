@@ -12,7 +12,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {checkedAdd, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
-/// @title Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
+/// @notice Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
 /// It adds buffering to any asset rewards/airdrops received.
 abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626 {
     event HoldingsStateUpdated(uint256 oldTotalAssets, uint256 newTotalAssets);

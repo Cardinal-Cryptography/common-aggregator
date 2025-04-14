@@ -13,6 +13,16 @@ import {CommonAggregator} from "./CommonAggregator.sol";
 import {ICommonManagement} from "./interfaces/ICommonManagement.sol";
 import {saturatingAdd} from "./Math.sol";
 
+/// @notice CommonManagement is the contract that manages the CommonAggregator, adding
+/// more fine-grained access control and timelocking the most sensitive actions.
+/// There are four roles specified:
+/// * `OWNER`: can grant and revoke other roles, set protocol fee and its receiver, set allocation
+///   limits per aggregated vault, and upgrade both the management and the aggregator contracts.
+///   except of that, it has all the permissions of the `MANAGER` role. There can be exactly one owner.
+/// * `MANAGER`: can add and remove vaults, or set reward traders. It also has all the permissions
+///   of the `GUARDIAN` and `REBALANCER` roles.
+/// * `GUARDIAN`: can pause and unpause the aggregator, and cancel timelocked actions.
+/// * `REBALANCER`: can rebalance funds between vaults, according to the allocation limits.
 contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -67,7 +77,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
 
     // ----- Aggregated vaults management -----
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Submits timelocked action for adding `vault` to the aggregator.
     function submitAddVault(IERC4626 vault)
         external
         override
@@ -80,6 +90,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit VaultAdditionSubmitted(address(vault), saturatingAdd(block.timestamp, ADD_VAULT_TIMELOCK));
     }
 
+    /// @notice Cancels timelocked action for adding `vault` to the aggregator.
     function cancelAddVault(IERC4626 vault)
         external
         override
@@ -89,6 +100,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit VaultAdditionCancelled(address(vault));
     }
 
+    /// @notice Adds `vault` to the aggregator, after the timelock has passed.
     function addVault(IERC4626 vault)
         external
         override
@@ -99,17 +111,22 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         $.aggregator.addVault(vault);
     }
 
+    /// @notice Allows the `MANAGER` or `OWNER` to call `remove(vault)` on aggregator.
+    /// @dev No timelock is used, as the action can't lose any assets.
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
         ManagementStorage storage $ = _getManagementStorage();
         require(
-            !_isActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
+            !isActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
             PendingVaultForceRemoval(vault)
         );
 
         $.aggregator.removeVault(vault);
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Submits timelocked force removal action for `vault`. Triggers a pause on the aggregator
+    /// allowing users only to emergency redeem. After `unlockTimestamp` passes, `forceRemoveVault`
+    /// can be called.
+    /// @dev Tries to redeem as many `vault`'s shares as possible.
     function submitForceRemoveVault(IERC4626 vault)
         external
         override
@@ -131,7 +148,8 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit VaultForceRemovalSubmitted(address(vault), saturatingAdd(block.timestamp, FORCE_REMOVE_VAULT_TIMELOCK));
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Cancels timelocked force removal action for `vault`.
+    /// Doesn't trigger unpause on the aggregator by itself.
     function cancelForceRemoveVault(IERC4626 vault)
         external
         override
@@ -143,7 +161,9 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit VaultForceRemovalCancelled(address(vault));
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Force-removes `vault` from the aggregator, losing all the assets allocated to it.
+    /// Doesn't trigger unpause on the aggregator by itself. The timelock must have passed after
+    /// the `submitForceRemoveVault` was called.
     function forceRemoveVault(IERC4626 vault)
         external
         override
@@ -156,44 +176,46 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     }
     // ----- Rebalancing -----
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Allows the `REBALANCER` or higher role holder to trigger `pushFunds` on the aggregator.
     function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
         _getManagementStorage().aggregator.pushFunds(assets, vault);
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Allows the `REBALANCER` or higher role holder to trigger `pullFunds` on the aggregator.
     function pullFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
         _getManagementStorage().aggregator.pullFunds(assets, vault);
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Allows the `REBALANCER` or higher role holder to triggers `pullFundsByShares` on the aggregator.
     function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyRebalancerOrHigherRole {
         _getManagementStorage().aggregator.pullFundsByShares(shares, vault);
     }
 
     // ----- Allocation Limits -----
 
-    /// @inheritdoc ICommonManagement
-    /// @notice Doesn't rebalance the assets, after the action limits may be exceeded.
+    /// @notice Allows the `OWNER` role holder to trigger `setLimit` on the aggregator.
     function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyOwner {
         _getManagementStorage().aggregator.setLimit(vault, newLimitBps);
     }
 
     // ----- Fee management -----
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Allows the `OWNER` role holder to trigger `setProtocolFee` on the aggregator.
     function setProtocolFee(uint256 protocolFeeBps) public override(ICommonManagement) onlyOwner {
         _getManagementStorage().aggregator.setProtocolFee(protocolFeeBps);
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Allows the `OWNER` role holder to trigger `setProtocolFeeReceiver` on the aggregator.
     function setProtocolFeeReceiver(address protocolFeeReceiver) public override(ICommonManagement) onlyOwner {
         _getManagementStorage().aggregator.setProtocolFeeReceiver(protocolFeeReceiver);
     }
 
     // ----- Non-asset rewards trading -----
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Proposes execution of `setRewardTrader` with given parameters.
+    /// @dev Ensures that the reward is not asset, aggregator share, one of the aggregated
+    /// vault's share, or share of a vault that is pending to be added. Caller must hold the
+    /// `OWNER` role.
     function submitSetRewardTrader(address rewardToken, address traderAddress)
         external
         onlyManagerOrOwner
@@ -204,7 +226,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         )
     {
         require(
-            !_isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
+            !isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
 
@@ -213,7 +235,8 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit SetRewardsTraderSubmitted(rewardToken, traderAddress, saturatingAdd(block.timestamp, SET_TRADER_TIMELOCK));
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Cancels reward trader setting action.
+    /// Caller must hold `GUARDIAN`, `MANAGER` or `OWNER` role.
     function cancelSetRewardTrader(address rewardToken, address traderAddress)
         external
         onlyGuardianOrHigherRole
@@ -222,7 +245,10 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit SetRewardsTraderCancelled(rewardToken, traderAddress);
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Allows transfering `rewardToken`s from aggregator to `traderAddress` using the
+    /// `transferRewardsForSale` method. Ensures that the reward is not asset, aggregator share, one of the aggregated
+    /// vault's share, or share of a vault that is pending to be added.
+    /// Can only be called after timelock initiated in `submitSetRewardTrader` has elapsed.
     function setRewardTrader(address rewardToken, address traderAddress)
         external
         onlyManagerOrOwner
@@ -230,7 +256,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     {
         ManagementStorage storage $ = _getManagementStorage();
         require(
-            !_isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
+            !isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
 
@@ -240,11 +266,15 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit RewardsTraderSet(rewardToken, traderAddress);
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Triggers `transferRewardsForSale` on the aggregator.
+    /// Can be called permissionlessly, and reward will be sent to the trader set.
+    /// @dev Ensures that the reward token is not a vault pending to be added,
+    /// and the called vault ensures that the token is not asset, aggregator share,
+    /// or one of the aggregated vault's share.
     function transferRewardsForSale(address rewardToken) external {
         ManagementStorage storage $ = _getManagementStorage();
         require(
-            !_isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
+            !isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
 
@@ -255,12 +285,12 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
 
     // ----- Pausing user interactions -----
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Allows the `GUARDIAN` or a higher role holder to trigger `pauseUserInteractions` on the aggregator.
     function pauseUserInteractions() external onlyGuardianOrHigherRole {
         _getManagementStorage().aggregator.pauseUserInteractions();
     }
 
-    /// @inheritdoc ICommonManagement
+    /// @notice Allows the `GUARDIAN` or a higher role holder to trigger `unpauseUserInteractions` on the aggregator.
     function unpauseUserInteractions() external onlyGuardianOrHigherRole {
         ManagementStorage storage $ = _getManagementStorage();
         uint256 pendingVaultForceRemovals = $.pendingVaultForceRemovals;
@@ -284,6 +314,13 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit ManagementUpgradeAuthorized(newImplementation);
     }
 
+    /// @notice Submits timelocked upgrade action of the management contract to `newImplementation`.
+    /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
+    /// @dev After the timelock passes, upgrader can upgradeToAndCall on the new implementation with
+    /// any calldata. No check against missing some storage or selectors are done on the contract
+    /// level. It's recommended to use the `openzeppelin-foundry-upgrades` libarary for updates.
+    /// There could be many pending upgrades, so it's the guardian's responsibility to cancel
+    /// the invalid ones.
     function submitUpgradeManagement(address newImplementation)
         external
         onlyOwner
@@ -296,6 +333,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit ManagementUpgradeSubmitted(newImplementation, saturatingAdd(block.timestamp, MANAGEMENT_UPGRADE_TIMELOCK));
     }
 
+    /// @notice Cancels timelocked upgrade of the management contract action to `newImplementation`.
     function cancelUpgradeManagement(address newImplementation)
         external
         onlyGuardianOrHigherRole
@@ -306,6 +344,8 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
 
     // ----- Aggregator upgrades -----
 
+    /// @notice Submits timelocked upgrade action of the aggregator contract to `newImplementation`.
+    /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
     function submitUpgradeAggregator(address newImplementation)
         external
         onlyOwner
@@ -318,6 +358,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit AggregatorUpgradeSubmitted(newImplementation, saturatingAdd(block.timestamp, AGGREGATOR_UPGRADE_TIMELOCK));
     }
 
+    /// @notice Cancels timelocked upgrade the aggregator contract action to `newImplementation`.
     function cancelUpgradeAggregator(address newImplementation)
         external
         onlyGuardianOrHigherRole
@@ -326,6 +367,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         emit AggregatorUpgradeCancelled(newImplementation);
     }
 
+    /// @notice Executes the upgrade of the aggregator contract to the new implementation.
     function upgradeAggregator(address newImplementation, bytes calldata callData)
         external
         onlyOwner
@@ -344,6 +386,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         return _getManagementStorage().roles[role][account];
     }
 
+    /// Grants one of the `Roles` to `account`.
     function grantRole(Roles role, address account) external onlyOwner {
         ManagementStorage storage $ = _getManagementStorage();
         if (!$.roles[role][account]) {
@@ -352,6 +395,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         }
     }
 
+    /// Removes the `role` from `account`.
     function revokeRole(Roles role, address account) external onlyOwner {
         ManagementStorage storage $ = _getManagementStorage();
         if ($.roles[role][account]) {
@@ -445,7 +489,8 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         delete $.registeredTimelocks[actionHash];
     }
 
-    function _isActionRegistered(bytes32 actionHash) public view returns (bool) {
+    /// @notice Checks if a timelocked action is registered.
+    function isActionRegistered(bytes32 actionHash) public view returns (bool) {
         return _getManagementStorage().registeredTimelocks[actionHash].lockedUntil != 0;
     }
 }
