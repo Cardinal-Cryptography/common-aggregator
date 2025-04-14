@@ -13,7 +13,7 @@ import {
     SafeERC20
 } from "./ERC4626BufferedUpgradeable.sol";
 import {ICommonAggregator} from "./interfaces/ICommonAggregator.sol";
-import {MAX_BPS, saturatingAdd} from "./Math.sol";
+import {MAX_BPS, saturatingAdd, saturatingSub} from "./Math.sol";
 
 /// @notice Common Aggregator contract, extending the `ERC4626BufferedUpgradeable`. Provides all the necessary logic for
 /// the aggregation, leaving the role management to the `CommonManagement` contract.
@@ -254,8 +254,8 @@ contract CommonAggregator is
         }
     }
 
-    function _decimalsOffset() internal pure override returns (uint8) {
-        return 6;
+    function _decimalsOffset() internal view override returns (uint8) {
+        return uint8(Math.min(6, saturatingSub(18, _getERC4626BufferedStorage().underlyingDecimals)));
     }
 
     // ----- Emergency redeem -----

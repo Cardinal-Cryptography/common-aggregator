@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Test} from "forge-std/Test.sol";
-import {weightedAvg, saturatingAdd} from "./../contracts/Math.sol";
+import {weightedAvg, saturatingAdd, saturatingSub} from "./../contracts/Math.sol";
 
 contract MathTest is Test {
     using Math for uint256;
@@ -14,6 +14,16 @@ contract MathTest is Test {
         assertEq(saturatingAdd(0, type(uint256).max), type(uint256).max);
         assertEq(saturatingAdd(5, type(uint256).max - 6), type(uint256).max - 1);
         assertEq(saturatingAdd(type(uint256).max, type(uint256).max), type(uint256).max);
+    }
+
+    function test_saturatingSub() public pure {
+        assertEq(saturatingSub(0, 0), 0);
+        assertEq(saturatingSub(18, 6), 12);
+        assertEq(saturatingSub(18, 18), 0);
+        assertEq(saturatingSub(18, 24), 0);
+        assertEq(saturatingSub(type(uint256).max, type(uint256).max), 0);
+        assertEq(saturatingSub(type(uint256).max, type(uint256).max - 1), 1);
+        assertEq(saturatingSub(type(uint256).max - 1, type(uint256).max), 0);
     }
 
     /// forge-config: default.fuzz.runs = 5000
