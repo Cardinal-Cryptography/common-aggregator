@@ -12,3 +12,6 @@ artifacts/
 
 # node modules
 node_modules/
+
+# docs
+docs/

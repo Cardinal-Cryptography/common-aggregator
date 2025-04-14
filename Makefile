@@ -36,3 +36,8 @@ lint:
 benchmark: # Run benchmark
 benchmark:
 	forge test --match-test Benchmark --gas-report
+
+.PHONY: doc-local
+doc-local: # Generate documentation for local usage
+doc-local:
+	forge doc --serve --port 14719
