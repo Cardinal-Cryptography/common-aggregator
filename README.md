@@ -80,6 +80,10 @@ Has all privileges of *Guardian* and *Rebalancer*.
 
 ## Development
 
+### Configuration
+
+In order to pass arguments to `make` instructions that follow, copy contents of `.env.example` to `.env` and fill in the values.
+
 ### Install dependencies
 
 ```
