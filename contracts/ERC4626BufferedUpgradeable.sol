@@ -300,7 +300,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// @notice Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the
     /// vault, through a withdraw call. Accounts for shares burned in the reward buffer, but doesn't preview holdings
     /// state update.
-    /// @dev If `owner = protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
+    /// @dev If `owner == protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
     /// In that case, call the `updateHoldingsState()` right before calling this function,
     /// to ensure that the value of `maxWithdraw` is exact.
     function maxWithdraw(address owner) public view virtual returns (uint256) {
@@ -309,14 +309,14 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     /// @notice Returns the maximum amount of vault shares that can be redeemed from the owner balance in the vault,
     /// through a redeem call.
-    /// @dev If `owner = protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
+    /// @dev If `owner == protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
     /// In that case, call the `updateHoldingsState()` right before calling this function,
     /// to ensure that the value of `maxRedeem` is exact.
     function maxRedeem(address owner) public view virtual returns (uint256) {
         return balanceOf(owner);
     }
 
-    /// @notice Mints shares vault shares to receiver by depositing exactly amount of underlying tokens.
+    /// @notice Mints vault shares to `receiver` by depositing exactly `assets` of underlying tokens.
     /// Returns the amount of shares that were minted.
     /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
     function deposit(uint256 assets, address receiver) public virtual override(IERC4626) returns (uint256) {
@@ -334,7 +334,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return shares;
     }
 
-    /// @notice Mints exactly shares Vault shares to receiver by depositing amount of underlying tokens.
+    /// @notice Mints exactly `shares` of vault's shares to `receiver` by depositing amount of underlying tokens.
     /// Returns the amount of assets that were deposited.
     /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
     /// If caller and receiver is `protocolFeeReceiver`, the balance of the `protocolFeeReceiver`
@@ -353,7 +353,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return assets;
     }
 
-    /// @notice Burns shares from owner and sends exactly assets of underlying tokens to receiver.
+    /// @notice Burns shares from `owner` and sends exactly `assets` of underlying tokens to `receiver`.
     /// Returns the amount of shares that were burnt.
     /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
     function withdraw(uint256 assets, address receiver, address owner)
@@ -375,7 +375,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return shares;
     }
 
-    /// @notice  Burns exactly shares from owner and sends assets of underlying tokens to receiver.
+    /// @notice  Burns exactly `shares` from `owner` and sends assets of underlying tokens to `receiver`.
     /// Returns the amount of sent assets.
     /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
     function redeem(uint256 shares, address receiver, address owner)
@@ -428,7 +428,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     }
 
     /// @notice Sets the protocol fee in bps. Protocol fee is a performance fee, which means,
-    /// it is taken from the profit made by the vault.
+    /// it is taken from the profit made by the aggregator.
     function setProtocolFee(uint256 feeBps) public virtual override(IERC4626Buffered) {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         require(feeBps <= MAX_BPS, IncorrectProtocolFee());
