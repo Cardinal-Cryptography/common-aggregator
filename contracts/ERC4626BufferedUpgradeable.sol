@@ -402,8 +402,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal virtual {
         SafeERC20.safeTransferFrom(_getERC4626BufferedStorage().asset, caller, address(this), assets);
         _mint(receiver, shares);
-        _postDeposit(assets);
         _increaseAssets(assets);
+        _postDeposit(assets);
 
         emit Deposit(caller, receiver, assets, shares);
     }
@@ -413,11 +413,11 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         internal
         virtual
     {
+        _preWithdrawal(assets);
+
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
-
-        _preWithdrawal(assets);
         _burn(owner, shares);
         _decreaseAssets(assets);
         SafeERC20.safeTransfer(_getERC4626BufferedStorage().asset, receiver, assets);

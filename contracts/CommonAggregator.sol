@@ -200,11 +200,11 @@ contract CommonAggregator is
     /// the rest is left in the aggregator.
     function _postDeposit(uint256 assets) internal override {
         AggregatorStorage storage $ = _getAggregatorStorage();
-        uint256 cachedTotalAssets = totalAssets();
-        if (cachedTotalAssets > 0) {
+        uint256 totalAssetsWithoutDeposit = totalAssets() - assets;
+        if (totalAssetsWithoutDeposit > 0) {
             for (uint256 i = 0; i < $.vaults.length; ++i) {
                 IERC4626 vault = $.vaults[i];
-                uint256 assetsToDepositToVault = assets.mulDiv(_aggregatedVaultAssets(vault), cachedTotalAssets);
+                uint256 assetsToDepositToVault = assets.mulDiv(_aggregatedVaultAssets(vault), totalAssetsWithoutDeposit);
                 uint256 maxVaultDeposit = vault.maxDeposit(address(this));
                 uint256 depositAmount = assetsToDepositToVault.min(maxVaultDeposit);
                 IERC20(asset()).approve(address(vault), depositAmount);
