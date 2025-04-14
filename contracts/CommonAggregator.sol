@@ -85,7 +85,7 @@ contract CommonAggregator is
     function ensureVaultCanBeAdded(IERC4626 vault) public view {
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
         require(_getAggregatorStorage().vaults.length < MAX_VAULTS, VaultLimitExceeded());
-        require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
+        require(!isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 
     /// @notice Called by the proxy to authorize the upgrade. Reverts if the caller is not the *Management*.
@@ -438,7 +438,7 @@ contract CommonAggregator is
     }
 
     /// @notice Returns true iff the vault is on the list of (fully-added) aggregated vaults currently.
-    function _isVaultOnTheList(IERC4626 vault) internal view returns (bool) {
+    function isVaultOnTheList(IERC4626 vault) public view returns (bool) {
         (bool isVaultOnTheList,) = _getVaultIndex(vault);
         return isVaultOnTheList;
     }
@@ -579,7 +579,7 @@ contract CommonAggregator is
     /// or the aggregator share itself.
     function ensureTokenIsNotAssetNorShare(address token) public view {
         require(token != asset(), InvalidRewardToken(token));
-        require(!_isVaultOnTheList(IERC4626(token)), InvalidRewardToken(token));
+        require(!isVaultOnTheList(IERC4626(token)), InvalidRewardToken(token));
         require(token != address(this), InvalidRewardToken(token));
     }
 

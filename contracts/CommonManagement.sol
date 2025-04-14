@@ -9,7 +9,7 @@ import {
     Math,
     SafeERC20
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {CommonAggregator} from "./CommonAggregator.sol";
+import {CommonAggregator, ICommonAggregator} from "./CommonAggregator.sol";
 import {ICommonManagement} from "./interfaces/ICommonManagement.sol";
 import {saturatingAdd} from "./Math.sol";
 
@@ -85,7 +85,10 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         registersAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA, ADD_VAULT_TIMELOCK)
     {
         ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.ensureVaultCanBeAdded(vault);
+        require(
+            $.aggregator.asset() == vault.asset(), ICommonAggregator.IncorrectAsset($.aggregator.asset(), vault.asset())
+        );
+        require(!$.aggregator.isVaultOnTheList(vault), ICommonAggregator.VaultAlreadyAdded(vault));
 
         emit VaultAdditionSubmitted(address(vault), saturatingAdd(block.timestamp, ADD_VAULT_TIMELOCK));
     }
