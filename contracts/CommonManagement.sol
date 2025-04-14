@@ -62,8 +62,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         __UUPSUpgradeable_init();
         __Ownable_init(owner);
 
-        ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator = aggregator;
+        _getManagementStorage().aggregator = aggregator;
     }
 
     // ----- Aggregated vaults management -----
@@ -139,8 +138,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         onlyGuardianOrHigherRole
         cancelsAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
     {
-        ManagementStorage storage $ = _getManagementStorage();
-        --$.pendingVaultForceRemovals;
+        --_getManagementStorage().pendingVaultForceRemovals;
 
         emit VaultForceRemovalCancelled(address(vault));
     }
@@ -160,20 +158,17 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
 
     /// @inheritdoc ICommonManagement
     function pushFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
-        ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.pushFunds(assets, vault);
+        _getManagementStorage().aggregator.pushFunds(assets, vault);
     }
 
     /// @inheritdoc ICommonManagement
     function pullFunds(uint256 assets, IERC4626 vault) external onlyRebalancerOrHigherRole {
-        ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.pullFunds(assets, vault);
+        _getManagementStorage().aggregator.pullFunds(assets, vault);
     }
 
     /// @inheritdoc ICommonManagement
     function pullFundsByShares(uint256 shares, IERC4626 vault) external onlyRebalancerOrHigherRole {
-        ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.pullFundsByShares(shares, vault);
+        _getManagementStorage().aggregator.pullFundsByShares(shares, vault);
     }
 
     // ----- Allocation Limits -----
@@ -181,22 +176,19 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     /// @inheritdoc ICommonManagement
     /// @notice Doesn't rebalance the assets, after the action limits may be exceeded.
     function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyOwner {
-        ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.setLimit(vault, newLimitBps);
+        _getManagementStorage().aggregator.setLimit(vault, newLimitBps);
     }
 
     // ----- Fee management -----
 
     /// @inheritdoc ICommonManagement
     function setProtocolFee(uint256 protocolFeeBps) public override(ICommonManagement) onlyOwner {
-        ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.setProtocolFee(protocolFeeBps);
+        _getManagementStorage().aggregator.setProtocolFee(protocolFeeBps);
     }
 
     /// @inheritdoc ICommonManagement
     function setProtocolFeeReceiver(address protocolFeeReceiver) public override(ICommonManagement) onlyOwner {
-        ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.setProtocolFeeReceiver(protocolFeeReceiver);
+        _getManagementStorage().aggregator.setProtocolFeeReceiver(protocolFeeReceiver);
     }
 
     // ----- Non-asset rewards trading -----
@@ -211,13 +203,12 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
             SET_TRADER_TIMELOCK
         )
     {
-        ManagementStorage storage $ = _getManagementStorage();
         require(
             !_isActionRegistered(keccak256(abi.encode(TimelockTypes.ADD_VAULT, rewardToken))),
             InvalidRewardToken(rewardToken)
         );
 
-        $.aggregator.ensureTokenSafeToTransfer(rewardToken);
+        _getManagementStorage().aggregator.ensureTokenSafeToTransfer(rewardToken);
 
         emit SetRewardsTraderSubmitted(rewardToken, traderAddress, saturatingAdd(block.timestamp, SET_TRADER_TIMELOCK));
     }
@@ -266,8 +257,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
 
     /// @inheritdoc ICommonManagement
     function pauseUserInteractions() external onlyGuardianOrHigherRole {
-        ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.pauseUserInteractions();
+        _getManagementStorage().aggregator.pauseUserInteractions();
     }
 
     /// @inheritdoc ICommonManagement
@@ -341,8 +331,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         onlyOwner
         executesAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE)), keccak256(abi.encode(newImplementation)))
     {
-        ManagementStorage storage $ = _getManagementStorage();
-        UUPSUpgradeable($.aggregator).upgradeToAndCall(newImplementation, callData);
+        UUPSUpgradeable(_getManagementStorage().aggregator).upgradeToAndCall(newImplementation, callData);
         emit AggregatorUpgraded(newImplementation);
     }
 
@@ -352,8 +341,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     function renounceOwnership() public override onlyOwner {}
 
     function hasRole(Roles role, address account) public view returns (bool) {
-        ManagementStorage storage $ = _getManagementStorage();
-        return $.roles[role][account];
+        return _getManagementStorage().roles[role][account];
     }
 
     function grantRole(Roles role, address account) external onlyOwner {

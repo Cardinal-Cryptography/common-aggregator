@@ -64,7 +64,7 @@ contract CommonAggregator is
     /// and be already initialized.
     function initialize(address management, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
         __UUPSUpgradeable_init();
-        __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
+        __ERC20_init(string.concat("Common-Aggregator-", asset.name()), string.concat("ca", asset.symbol()));
         __ERC4626Buffered_init(asset);
         __ReentrancyGuard_init();
         __Pausable_init();
@@ -82,9 +82,7 @@ contract CommonAggregator is
     /// @notice Ensures that the vault can be added to the aggregator. Reverts if it can't.
     function ensureVaultCanBeAdded(IERC4626 vault) public view {
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
-
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        require($.vaults.length < MAX_VAULTS, VaultLimitExceeded());
+        require(_getAggregatorStorage().vaults.length < MAX_VAULTS, VaultLimitExceeded());
         require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 
@@ -257,7 +255,7 @@ contract CommonAggregator is
     }
 
     function _decimalsOffset() internal pure override returns (uint8) {
-        return 4;
+        return 6;
     }
 
     // ----- Emergency redeem -----
@@ -542,13 +540,11 @@ contract CommonAggregator is
     // ----- Etc -----
 
     function getVaults() external view returns (IERC4626[] memory) {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        return $.vaults;
+        return _getAggregatorStorage().vaults;
     }
 
     function getMaxAllocationLimit(IERC4626 vault) external view returns (uint256) {
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        return $.allocationLimitBps[address(vault)];
+        return _getAggregatorStorage().allocationLimitBps[address(vault)];
     }
 
     function _getAggregatorStorage() private pure returns (AggregatorStorage storage $) {

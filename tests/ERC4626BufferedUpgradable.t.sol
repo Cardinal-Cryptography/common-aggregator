@@ -665,7 +665,7 @@ contract ERC4626BufferedUpgradeableTestNoDecimalOffset is Test, ERC4626BufferedU
 }
 
 contract ERC4626BufferedUpgradeableWithDecimalOffset is Test, ERC4626BufferedUpgradeableTest {
-    uint8 private constant DECIMALS_OFFSET = 4;
+    uint8 private constant DECIMALS_OFFSET = 6;
 
     constructor() {
         DECIMAL_OFFSET_POWER = 10 ** DECIMALS_OFFSET;

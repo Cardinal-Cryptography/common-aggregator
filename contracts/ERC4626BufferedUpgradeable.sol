@@ -58,15 +58,13 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// @dev Increases the buffer's `assetsCached` field.
     /// Used when deposit or mint has been made to the vault.
     function _increaseAssets(uint256 assets) internal {
-        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        $.assetsCached += assets;
+        _getERC4626BufferedStorage().assetsCached += assets;
     }
 
     /// @dev Increases the buffer's `assetsCached` field.
     /// Used when withdrawal or redemption has been made to the vault.
     function _decreaseAssets(uint256 assets) internal {
-        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        $.assetsCached -= assets;
+        _getERC4626BufferedStorage().assetsCached -= assets;
     }
 
     /// @notice Updates holdings state based on currently held assets and time elapsed from last update.
@@ -225,14 +223,12 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
     /// asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
     function decimals() public view virtual override(IERC20Metadata, ERC20Upgradeable) returns (uint8) {
-        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        return $.underlyingDecimals + _decimalsOffset();
+        return _getERC4626BufferedStorage().underlyingDecimals + _decimalsOffset();
     }
 
     /// @notice Returns the address of the underlying ERC-20 token used for the vault for accounting, depositing, and withdrawing.
     function asset() public view virtual returns (address) {
-        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-        return address($.asset);
+        return address(_getERC4626BufferedStorage().asset);
     }
 
     /// @notice Returns cached assets from the last holdings state update.
@@ -399,9 +395,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     /// @dev Deposit/mint common workflow.
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal virtual {
-        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
-
-        SafeERC20.safeTransferFrom($.asset, caller, address(this), assets);
+        SafeERC20.safeTransferFrom(_getERC4626BufferedStorage().asset, caller, address(this), assets);
         _mint(receiver, shares);
         _postDeposit(assets);
         _increaseAssets(assets);
@@ -414,7 +408,6 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         internal
         virtual
     {
-        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         if (caller != owner) {
             _spendAllowance(owner, caller, shares);
         }
@@ -422,7 +415,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         _preWithdrawal(assets);
         _burn(owner, shares);
         _decreaseAssets(assets);
-        SafeERC20.safeTransfer($.asset, receiver, assets);
+        SafeERC20.safeTransfer(_getERC4626BufferedStorage().asset, receiver, assets);
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
@@ -430,9 +423,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// @notice Sets the protocol fee in bps. Protocol fee is a performance fee, which means,
     /// it is taken from the profit made by the aggregator.
     function setProtocolFee(uint256 feeBps) public virtual override(IERC4626Buffered) {
-        ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         require(feeBps <= MAX_BPS, IncorrectProtocolFee());
-        $.protocolFeeBps = feeBps;
+        _getERC4626BufferedStorage().protocolFeeBps = feeBps;
     }
 
     function setProtocolFeeReceiver(address receiver) public virtual override(IERC4626Buffered) {
