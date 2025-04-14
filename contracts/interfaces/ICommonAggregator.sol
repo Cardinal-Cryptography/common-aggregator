@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import {IERC4626Buffered, IERC4626} from "./IERC4626Buffered.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
-interface ICommonAggregator is IERC4626Buffered {
+interface ICommonAggregator is IERC4626 {
     // ----- Reporting -----
 
     event VaultWithdrawFailed(IERC4626 vault);
@@ -39,30 +39,13 @@ interface ICommonAggregator is IERC4626Buffered {
 
     event AssetsRebalanced(address indexed from, address indexed to, uint256 amount);
 
-    /// @notice Deposits `assets` from aggregator's own balance into `vault`.
-    /// Vault must be present on the vault list. Allocation limits are checked.
     function pushFunds(uint256 assets, IERC4626 vault) external;
-
-    /// @notice Withdraws `assets` from `vault` into aggregator's own balance.
-    /// Vault must be present on the vault list.
-    /// @dev Doesn't check the allocation limits, as even if they are still
-    /// exceeded, the total excess will be lowered.
     function pullFunds(uint256 assets, IERC4626 vault) external;
-
-    /// @notice Redeems `shares` from `vault`, returning assets into
-    /// aggregator's own balance. Vault must be present on the vault list.
-    /// @dev Similarly to `pullFunds`, doesn't check the allocation limits.
     function pullFundsByShares(uint256 shares, IERC4626 vault) external;
 
     error AllocationLimitExceeded(IERC4626 vault);
 
     // ----- Allocation Limits -----
-
-    /// @notice Sets allocation limit of `vault` to `newLimitBps`.
-    /// The limit is expressed in bps, and is applied on the assets.
-    /// It's a no-op if `newLimitBps` is the same as the current limit.
-    /// Reverts if `newLimitBps` is higher MAX_BPS, or if `vault` is not present
-    /// on the vault list.
 
     event AllocationLimitSet(address indexed vault, uint256 newLimitBps);
 
@@ -78,15 +61,10 @@ interface ICommonAggregator is IERC4626Buffered {
 
     error ProtocolFeeTooHigh();
 
-    /// @notice Sets bps-wise protocol fee.
-    /// The protocol fee is applied on the profit made, with each holdings state update.
-    /// It's a no-op if `protocolFeeBps` is the same as the current `protocolFeeBps`.
     function setProtocolFee(uint256 protocolFeeBps) external;
 
     error SelfProtocolFeeReceiver();
 
-    /// @notice Sets the protocol fee receiver.
-    /// It's a no-op if `protocolFeeReceiver` is the same as the current `protocolFeeReceiver`.
     function setProtocolFeeReceiver(address protocolFeeReceiver) external;
 
     // ----- Non-asset rewards trading -----
@@ -95,7 +73,6 @@ interface ICommonAggregator is IERC4626Buffered {
 
     error InvalidRewardToken(address token);
 
-    /// @notice Transfers all `rewardToken`s held in the aggregator to `rewardTrader`
     function transferRewardsForSale(address rewardToken, address rewardTrader) external;
 
     // ----- Emergency redeem -----
@@ -115,11 +92,6 @@ interface ICommonAggregator is IERC4626Buffered {
         uint256[] vaultShares
     );
 
-    /// @notice Burns exactly shares from owner and sends proportional amounts of aggregated vaults' shares and idle assets.
-    /// @dev MUST emit the EmergencyWithdraw event.
-    /// MUST never be paused.
-    /// @return assets Amount of the underlying assets transferred to the `receiver`
-    /// @return vaultsShares List of the aggregated vaults' shares amounts that were transferred to the `receiver`.
     function emergencyRedeem(uint256 shares, address receiver, address owner)
         external
         returns (uint256 assets, uint256[] memory vaultsShares);

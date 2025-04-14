@@ -208,7 +208,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
             InvalidRewardToken(rewardToken)
         );
 
-        _getManagementStorage().aggregator.ensureTokenSafeToTransfer(rewardToken);
+        _getManagementStorage().aggregator.ensureTokenIsNotAssetNorShare(rewardToken);
 
         emit SetRewardsTraderSubmitted(rewardToken, traderAddress, saturatingAdd(block.timestamp, SET_TRADER_TIMELOCK));
     }
@@ -234,7 +234,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
             InvalidRewardToken(rewardToken)
         );
 
-        $.aggregator.ensureTokenSafeToTransfer(rewardToken);
+        $.aggregator.ensureTokenIsNotAssetNorShare(rewardToken);
         $.rewardTrader[rewardToken] = traderAddress;
 
         emit RewardsTraderSet(rewardToken, traderAddress);

@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Test} from "forge-std/Test.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
-import {ERC4626BufferedUpgradeable, IERC4626Buffered} from "./../contracts/ERC4626BufferedUpgradeable.sol";
+import {ERC4626BufferedUpgradeable} from "./../contracts/ERC4626BufferedUpgradeable.sol";
 import {MAX_BPS} from "./../contracts/Math.sol";
 
 contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
@@ -317,7 +317,7 @@ abstract contract ERC4626BufferedUpgradeableTest is Test {
         assertEq(bufferedVault.getProtocolFee(), 0);
         assertEq(bufferedVault.getProtocolFeeReceiver(), address(1));
 
-        vm.expectRevert(IERC4626Buffered.IncorrectProtocolFee.selector);
+        vm.expectRevert(ERC4626BufferedUpgradeable.IncorrectProtocolFee.selector);
         bufferedVault.setProtocolFee(MAX_BPS + 1);
 
         bufferedVault.setProtocolFee(0);
@@ -325,7 +325,7 @@ abstract contract ERC4626BufferedUpgradeableTest is Test {
         bufferedVault.setProtocolFee(MAX_BPS);
         assertEq(bufferedVault.getProtocolFee(), MAX_BPS);
 
-        vm.expectRevert(IERC4626Buffered.ZeroProtocolFeeReceiver.selector);
+        vm.expectRevert(ERC4626BufferedUpgradeable.ZeroProtocolFeeReceiver.selector);
         bufferedVault.setProtocolFeeReceiver(address(0));
 
         bufferedVault.setProtocolFeeReceiver(alice);
@@ -665,7 +665,7 @@ contract ERC4626BufferedUpgradeableTestNoDecimalOffset is Test, ERC4626BufferedU
 }
 
 contract ERC4626BufferedUpgradeableWithDecimalOffset is Test, ERC4626BufferedUpgradeableTest {
-    uint8 private constant DECIMALS_OFFSET = 6;
+    uint8 private constant DECIMALS_OFFSET = 4;
 
     constructor() {
         DECIMAL_OFFSET_POWER = 10 ** DECIMALS_OFFSET;
