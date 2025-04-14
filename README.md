@@ -20,7 +20,7 @@ In such a case, aggregator will withdraw disregarding the current proportions, p
 
 ### `ERC4626BufferedUpgradeable` - reward buffering
 
-We implement an abstract contract from which `CommonAggregator` inherits the reward buffering feature.
+We implement an abstract contract `ERC4626BufferedUpgradeable` from which `CommonAggregator` inherits the reward buffering feature.
 
 Reward buffering ensures that incoming `asset`s will be distributed to the depositors over some longer period of time, instead of doing it instantly.
 Its goal is to prevent potential attack in which user deposits right before a reward distribution event,
@@ -40,10 +40,9 @@ for long periods of time.
 ### Reward trading
 
 `CommonAggregator` makes it possible to distribute rewards which are paid out in tokens different than the `asset` token (eg. boosting airdrops).
-It is achieved by allowing *Management* to designate a *reward trader* for such a token.
-When set, such token can be transferred to the trader.
+It is achieved by allowing *Management* to designate a *reward trader* for such a token - an account to which given token can be freely transferred.
 
-The intended usage of this feature is that *reward trader* should be a non-upgradable contract which has a single method 
+The intended usage of this feature is that *reward trader* should be a non-upgradable contract, which has a single method 
 trading the given token for `asset` (on some decentralized exchange) and tranferring it back to aggregator.
 
 It is also possible for *reward trader* to be a trusted EOA in cases when CEX trading or other complex interactions are required. 
