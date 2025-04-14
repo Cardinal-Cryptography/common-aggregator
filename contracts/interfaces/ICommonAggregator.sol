@@ -117,7 +117,7 @@ interface ICommonAggregator is IERC4626Buffered {
 
     /// @notice Burns exactly shares from owner and sends proportional amounts of aggregated vaults' shares and idle assets.
     /// @dev MUST emit the EmergencyWithdraw event.
-    /// @dev MUST never be paused.
+    /// MUST never be paused.
     /// @return assets Amount of the underlying assets transferred to the `receiver`
     /// @return vaultsShares List of the aggregated vaults' shares amounts that were transferred to the `receiver`.
     function emergencyRedeem(uint256 shares, address receiver, address owner)

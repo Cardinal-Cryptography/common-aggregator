@@ -23,7 +23,7 @@ aleph_evm_testnet = "${ALEPH_EVM_TESTNET_RPC_URL}"
 [doc]
 ignore = [
     "contracts/Math.sol",
-    "contracts/interfaces/Initializators.sol",
+    "contracts/interfaces/Initializers.sol",
 ]
 
 # Includes also openzeppelin foundry upgrades

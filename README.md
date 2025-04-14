@@ -17,7 +17,7 @@ to react and withdraw their assets when they no longer agree with the strategy p
 
 Additionally, the *Management* can designate *Guardians* to monitor the protocol, and react by pausing it when unexpected
 events occur, or cancel any incorrectly submitted timelocked actions. Importantly, even when the protocol is paused, users
-can redeem their shares using the `emergencyRedeem` method, in exchange for shares of ther underlying vaults.
+can redeem their shares using the `emergencyRedeem` method, in exchange for shares of their underlying vaults.
 
 ## Development
 

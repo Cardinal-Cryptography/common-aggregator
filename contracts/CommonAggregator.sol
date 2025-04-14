@@ -376,8 +376,8 @@ contract CommonAggregator is
         $.vaults.pop();
     }
 
-    /// Tries to redeem as many shares as possible from the given vault.
-    /// Reverts only if the vault is not present on the list.
+    /// @notice Tries to redeem as many shares as possible from the given vault.
+    /// @dev Reverts only if the vault is not present on the list.
     function tryExitVault(IERC4626 vault) external onlyManagement nonReentrant {
         ensureVaultIsPresent(vault);
 
