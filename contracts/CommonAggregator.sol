@@ -8,6 +8,7 @@ import {
     ERC4626BufferedUpgradeable,
     IERC20,
     IERC4626,
+    IERC4626Buffered,
     IERC20Metadata,
     Math,
     SafeERC20
@@ -528,7 +529,7 @@ contract CommonAggregator is
     /// The protocol fee is applied on the profit made, with each holdings state update.
     function setProtocolFee(uint256 protocolFeeBps)
         public
-        override(ERC4626BufferedUpgradeable, ICommonAggregator)
+        override(ERC4626BufferedUpgradeable, IERC4626Buffered)
         onlyManagement
         nonReentrant
     {
@@ -546,7 +547,7 @@ contract CommonAggregator is
     /// Has to be different from the aggregator itself, and from the zero address.
     function setProtocolFeeReceiver(address protocolFeeReceiver)
         public
-        override(ERC4626BufferedUpgradeable, ICommonAggregator)
+        override(ERC4626BufferedUpgradeable, IERC4626Buffered)
         onlyManagement
         nonReentrant
     {
