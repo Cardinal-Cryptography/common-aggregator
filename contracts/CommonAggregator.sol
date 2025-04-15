@@ -64,7 +64,7 @@ contract CommonAggregator is
     /// and be already initialized.
     function initialize(address management, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
         __UUPSUpgradeable_init();
-        __ERC20_init(string.concat("Common-Aggregator-", asset.name(), "-v1"), string.concat("ca", asset.symbol()));
+        __ERC20_init(string.concat("Common-Aggregator-", asset.name()), string.concat("ca", asset.symbol()));
         __ERC4626Buffered_init(asset);
         __ReentrancyGuard_init();
         __Pausable_init();
@@ -82,10 +82,8 @@ contract CommonAggregator is
     /// @notice Ensures that the vault can be added to the aggregator. Reverts if it can't.
     function ensureVaultCanBeAdded(IERC4626 vault) public view {
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
-
-        AggregatorStorage storage $ = _getAggregatorStorage();
-        require($.vaults.length < MAX_VAULTS, VaultLimitExceeded());
-        require(!_isVaultOnTheList(vault), VaultAlreadyAdded(vault));
+        require(_getAggregatorStorage().vaults.length < MAX_VAULTS, VaultLimitExceeded());
+        require(!isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 
     /// @notice Called by the proxy to authorize the upgrade. Reverts if the caller is not the *Management*.
@@ -195,11 +193,11 @@ contract CommonAggregator is
     /// @inheritdoc ERC4626BufferedUpgradeable
     function _postDeposit(uint256 assets) internal override {
         AggregatorStorage storage $ = _getAggregatorStorage();
-        uint256 cachedTotalAssets = totalAssets();
-        if (cachedTotalAssets > 0) {
+        uint256 totalAssetsWithoutDeposit = totalAssets() - assets;
+        if (totalAssetsWithoutDeposit > 0) {
             for (uint256 i = 0; i < $.vaults.length; ++i) {
                 IERC4626 vault = $.vaults[i];
-                uint256 assetsToDepositToVault = assets.mulDiv(_aggregatedVaultAssets(vault), cachedTotalAssets);
+                uint256 assetsToDepositToVault = assets.mulDiv(_aggregatedVaultAssets(vault), totalAssetsWithoutDeposit);
                 uint256 maxVaultDeposit = vault.maxDeposit(address(this));
                 uint256 depositAmount = assetsToDepositToVault.min(maxVaultDeposit);
                 IERC20(asset()).approve(address(vault), depositAmount);
@@ -266,7 +264,7 @@ contract CommonAggregator is
     function emergencyRedeem(uint256 shares, address account, address owner)
         external
         nonReentrant
-        returns (uint256 assets, uint256[] memory vaultShares)
+        returns (uint256 assets, uint256[] memory vaultsShares)
     {
         _updateHoldingsState();
         uint256 maxShares = maxEmergencyRedeem(owner);
@@ -283,23 +281,23 @@ contract CommonAggregator is
         assets = shares.mulDiv(IERC20(asset()).balanceOf(address(this)), totalShares);
 
         AggregatorStorage storage $ = _getAggregatorStorage();
-        vaultShares = new uint256[]($.vaults.length);
+        vaultsShares = new uint256[]($.vaults.length);
         uint256 valueInAssets = assets;
 
         for (uint256 i = 0; i < $.vaults.length; ++i) {
             IERC4626 vault = $.vaults[i];
-            vaultShares[i] = shares.mulDiv(vault.balanceOf(address(this)), totalShares);
-            valueInAssets += vault.convertToAssets(vaultShares[i]);
+            vaultsShares[i] = shares.mulDiv(vault.balanceOf(address(this)), totalShares);
+            valueInAssets += vault.convertToAssets(vaultsShares[i]);
             // Reentracy could happen, so reentrant lock is needed.
             // This should also include locking adding and removing vaults.
-            IERC20(vault).safeTransfer(account, vaultShares[i]);
+            IERC20(vault).safeTransfer(account, vaultsShares[i]);
         }
 
         _decreaseAssets(valueInAssets);
 
         IERC20(asset()).safeTransfer(account, assets);
 
-        emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultShares);
+        emit EmergencyWithdraw(msg.sender, account, owner, assets, shares, vaultsShares);
     }
 
     /// @notice Returns the maximum amount of shares that can be emergency-redeemed by the given owner.
@@ -396,7 +394,7 @@ contract CommonAggregator is
     }
 
     /// @notice Returns true iff the vault is on the list of (fully-added) aggregated vaults currently.
-    function _isVaultOnTheList(IERC4626 vault) internal view returns (bool) {
+    function isVaultOnTheList(IERC4626 vault) public view returns (bool) {
         (bool isVaultOnTheList,) = _getVaultIndex(vault);
         return isVaultOnTheList;
     }
@@ -510,7 +508,7 @@ contract CommonAggregator is
 
     /// @inheritdoc ICommonAggregator
     function transferRewardsForSale(address rewardToken, address rewardTrader) external onlyManagement nonReentrant {
-        ensureTokenSafeToTransfer(rewardToken);
+        ensureTokenIsNotInherentlyUsed(rewardToken);
         IERC20 transferrableToken = IERC20(rewardToken);
         uint256 amount = transferrableToken.balanceOf(address(this));
         transferrableToken.safeTransfer(rewardTrader, amount);
@@ -518,10 +516,10 @@ contract CommonAggregator is
         emit RewardsTransferred(rewardToken, amount, rewardTrader);
     }
 
-    function ensureTokenSafeToTransfer(address rewardToken) public view {
-        require(rewardToken != asset(), InvalidRewardToken(rewardToken));
-        require(!_isVaultOnTheList(IERC4626(rewardToken)), InvalidRewardToken(rewardToken));
-        require(rewardToken != address(this), InvalidRewardToken(rewardToken));
+    function ensureTokenIsNotInherentlyUsed(address token) public view {
+        require(token != asset(), InvalidRewardToken(token));
+        require(!isVaultOnTheList(IERC4626(token)), InvalidRewardToken(token));
+        require(token != address(this), InvalidRewardToken(token));
     }
 
     // ----- Pausing user interactions -----
@@ -549,6 +547,10 @@ contract CommonAggregator is
     function getMaxAllocationLimit(IERC4626 vault) external view returns (uint256) {
         AggregatorStorage storage $ = _getAggregatorStorage();
         return $.allocationLimitBps[address(vault)];
+    }
+
+    function getManagement() external view returns (address) {
+        return _getAggregatorStorage().management;
     }
 
     function _getAggregatorStorage() private pure returns (AggregatorStorage storage $) {
