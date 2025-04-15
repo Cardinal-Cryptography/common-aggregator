@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {IERC4626, IERC4626Buffered} from "contracts/interfaces/IERC4626Buffered.sol";
 
-interface ICommonAggregator is IERC4626 {
+interface ICommonAggregator is IERC4626Buffered {
     // ----- Reporting -----
 
     event VaultWithdrawFailed(IERC4626 vault);
@@ -62,12 +62,7 @@ interface ICommonAggregator is IERC4626 {
     event ProtocolFeeReceiverChanged(address indexed oldPorotocolFeeReceiver, address indexed newPorotocolFeeReceiver);
 
     error ProtocolFeeTooHigh();
-
-    function setProtocolFee(uint256 protocolFeeBps) external;
-
     error SelfProtocolFeeReceiver();
-
-    function setProtocolFeeReceiver(address protocolFeeReceiver) external;
 
     // ----- Non-asset rewards trading -----
 
