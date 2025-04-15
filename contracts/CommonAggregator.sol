@@ -29,7 +29,7 @@ contract CommonAggregator is
     using SafeERC20 for IERC20;
 
     /// @notice The maximum number of vaults that can be present at the same time in the aggregator.
-    uint256 public constant MAX_VAULTS = 5;
+    uint256 public constant MAX_VAULTS = 8;
 
     /// @notice The maximum protocol fee, in basis points, that can be set by the *Management*.
     uint256 public constant MAX_PROTOCOL_FEE_BPS = MAX_BPS / 2;

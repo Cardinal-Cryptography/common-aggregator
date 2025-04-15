@@ -141,7 +141,7 @@ contract VaultManagementTest is Test {
     }
 
     function testAddManyVaults() public {
-        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithSixVault();
         IERC4626 vaultA = new ERC4626Mock(address(asset));
         IERC4626 vaultB = new ERC4626Mock(address(asset));
         IERC4626 vaultC = new ERC4626Mock(address(asset));
@@ -166,9 +166,9 @@ contract VaultManagementTest is Test {
         vm.prank(manager);
         management.addVault(vaultA);
 
-        assertEq(aggregator.getVaults().length, 5);
-        assertEq(address(aggregator.getVaults()[3]), address(vaultB));
-        assertEq(address(aggregator.getVaults()[4]), address(vaultA));
+        assertEq(aggregator.getVaults().length, 8);
+        assertEq(address(aggregator.getVaults()[6]), address(vaultB));
+        assertEq(address(aggregator.getVaults()[7]), address(vaultA));
 
         vm.prank(manager);
         vm.expectRevert(ICommonAggregator.VaultLimitExceeded.selector);
@@ -664,6 +664,16 @@ contract VaultManagementTest is Test {
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
         vaults[2] = new ERC4626Mock(address(asset));
+
+        (aggregator, management) = setUpAggregator(owner, asset, vaults);
+        _grantRoles(management);
+    }
+
+    function _aggregatorWithSixVault() private returns (CommonAggregator aggregator, CommonManagement management) {
+        IERC4626[] memory vaults = new IERC4626[](6);
+        for (uint256 i = 0; i < vaults.length; ++i) {
+            vaults[i] = new ERC4626Mock(address(asset));
+        }
 
         (aggregator, management) = setUpAggregator(owner, asset, vaults);
         _grantRoles(management);
