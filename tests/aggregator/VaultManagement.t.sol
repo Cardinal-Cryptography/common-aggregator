@@ -87,6 +87,15 @@ contract VaultManagementTest is Test {
         management.submitAddVault(vault);
     }
 
+    function testCantSubmitVaultWithDifferentAsset() public {
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
+        IERC4626 vault = new ERC4626Mock(address(0x111));
+
+        vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.IncorrectAsset.selector, asset, address(0x111)));
+        vm.prank(manager);
+        management.submitAddVault(vault);
+    }
+
     function testCantSubmitAddSameVaultTwice() public {
         (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626 vault = new ERC4626Mock(address(asset));

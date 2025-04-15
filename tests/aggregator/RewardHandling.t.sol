@@ -104,6 +104,31 @@ contract CommonAggregatorTest is Test {
         commonManagement.transferRewardsForSale(address(reward));
     }
 
+    function testRewardTradingWithPendingAddVaults() public {
+        IERC4626 newVaultA = new ERC4626Mock(address(asset));
+        IERC4626 newVaultB = new ERC4626Mock(address(asset));
+
+        vm.startPrank(owner);
+        commonManagement.submitAddVault(newVaultA);
+
+        vm.expectRevert(abi.encodeWithSelector(CommonManagement.InvalidRewardToken.selector, address(newVaultA)));
+        commonManagement.submitSetRewardTrader(address(newVaultA), trader);
+
+        // in other direction it works
+        commonManagement.submitSetRewardTrader(address(newVaultB), trader);
+        commonManagement.submitAddVault(newVaultB);
+
+        vm.warp(STARTING_TIMESTAMP + 30 days);
+
+        vm.expectRevert(abi.encodeWithSelector(CommonManagement.InvalidRewardToken.selector, address(newVaultB)));
+        commonManagement.setRewardTrader(address(newVaultB), trader);
+
+        commonManagement.cancelAddVault(newVaultB);
+
+        // should succeed
+        commonManagement.setRewardTrader(address(newVaultB), trader);
+    }
+
     function testPermissions() public {
         vm.expectRevert(CommonManagement.CallerNotManagerNorOwner.selector);
         vm.prank(rebalancer);

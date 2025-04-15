@@ -263,6 +263,10 @@ contract CommonAggregatorTest is Test {
         commonManagement.setProtocolFee(100); // 1%
 
         vm.prank(owner);
+        vm.expectRevert(ICommonAggregator.ProtocolFeeTooHigh.selector);
+        commonManagement.setProtocolFee(MAX_BPS / 2 + 1);
+
+        vm.prank(owner);
         vm.expectRevert();
         commonManagement.setProtocolFeeReceiver(address(0));
 
