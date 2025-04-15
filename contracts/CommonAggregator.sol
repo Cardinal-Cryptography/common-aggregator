@@ -420,7 +420,7 @@ contract CommonAggregator is
     /// @notice Tries to redeem as many shares as possible from the given vault.
     /// @dev Reverts only if the vault is not present on the list, including the case
     /// when the `vault` can revert on any of the calls.
-    function tryExitVault(IERC4626 vault) external onlyManagement nonReentrant {
+    function tryExitVault(IERC4626 vault) external override onlyManagement nonReentrant {
         ensureVaultIsPresent(vault);
 
         // Try redeeming as much shares of the removed vault as possible
@@ -438,7 +438,7 @@ contract CommonAggregator is
     }
 
     /// @notice Returns true iff the vault is on the list of (fully-added) aggregated vaults currently.
-    function isVaultOnTheList(IERC4626 vault) public view returns (bool) {
+    function isVaultOnTheList(IERC4626 vault) public view override returns (bool) {
         (bool vaultOnTheList,) = _getVaultIndex(vault);
         return vaultOnTheList;
     }
@@ -577,7 +577,7 @@ contract CommonAggregator is
 
     /// @notice Reverts if `token` is the asset, one of the aggregated vaults share,
     /// or the aggregator share itself.
-    function ensureTokenIsNotInherentlyUsed(address token) public view {
+    function ensureTokenIsNotInherentlyUsed(address token) public view override {
         require(token != asset(), InvalidRewardToken(token));
         require(!isVaultOnTheList(IERC4626(token)), InvalidRewardToken(token));
         require(token != address(this), InvalidRewardToken(token));
