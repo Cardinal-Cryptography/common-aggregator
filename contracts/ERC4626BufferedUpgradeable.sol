@@ -55,13 +55,13 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     // ----- Buffering logic -----
 
-    /// @dev Increases the buffer's `assetsCached` field.
+    /// @dev Increases the`assetsCached` field without changing the amount of buffered shares.
     /// Used when deposit or mint has been made to the vault.
     function _increaseAssets(uint256 assets) internal {
         _getERC4626BufferedStorage().assetsCached += assets;
     }
 
-    /// @dev Increases the buffer's `assetsCached` field.
+    /// @dev Decreases `assetsCached` field without changing the amount of buffered shares.
     /// Used when withdrawal or redemption has been made to the vault.
     function _decreaseAssets(uint256 assets) internal {
         _getERC4626BufferedStorage().assetsCached -= assets;
