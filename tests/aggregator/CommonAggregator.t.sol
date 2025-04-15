@@ -63,6 +63,14 @@ contract CommonAggregatorTest is Test {
         vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
         commonAggregator.pushFunds(1000, vaults[0]);
 
+        vm.startPrank(owner);
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pullFunds(0, vaults[0]);
+
+        vm.startPrank(owner);
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pullFundsByShares(0, vaults[0]);
+
         vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
         commonAggregator.setLimit(vaults[0], 10);
 
