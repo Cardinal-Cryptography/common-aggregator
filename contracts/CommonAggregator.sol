@@ -340,7 +340,7 @@ contract CommonAggregator is
     /// amount of aggregator's shares are minted or burned in the reward buffer.
     /// Additionally, it may be called by an off-chain component at times
     /// when difference between `totalAssets()` and `_totalAssetsNotCached()` becomes significant.
-    function updateHoldingsState() external nonReentrant {
+    function updateHoldingsState() external override nonReentrant {
         _updateHoldingsState();
     }
 
@@ -432,15 +432,15 @@ contract CommonAggregator is
     /// @notice Checks if the vault is on the list of (fully-added) aggregated vaults currently. Reverts if it isn't.
     /// Returns the index of the vault in the list.
     function ensureVaultIsPresent(IERC4626 vault) public view returns (uint256) {
-        (bool isVaultOnTheList, uint256 index) = _getVaultIndex(vault);
-        require(isVaultOnTheList, VaultNotOnTheList(vault));
+        (bool onTheList, uint256 index) = _getVaultIndex(vault);
+        require(onTheList, VaultNotOnTheList(vault));
         return index;
     }
 
     /// @notice Returns true iff the vault is on the list of (fully-added) aggregated vaults currently.
     function isVaultOnTheList(IERC4626 vault) public view returns (bool) {
-        (bool isVaultOnTheList,) = _getVaultIndex(vault);
-        return isVaultOnTheList;
+        (bool vaultOnTheList,) = _getVaultIndex(vault);
+        return vaultOnTheList;
     }
 
     function _getVaultIndex(IERC4626 vault) internal view returns (bool onTheList, uint256 index) {

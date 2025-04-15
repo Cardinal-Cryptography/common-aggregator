@@ -91,6 +91,7 @@ contract CommonAggregatorUpgradeMissingStorageFields is
     }
 
     function _authorizeUpgrade(address newImplementation) internal override {}
+    function updateHoldingsState() external override {}
 }
 
 contract CommonAggregatorTest is Test {

@@ -10,16 +10,12 @@ import {
     Math,
     SafeERC20
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {IERC4626Buffered} from "./interfaces/IERC4626Buffered.sol";
 import {checkedAdd, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
 /// @notice Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
 /// It adds buffering to any asset rewards/airdrops received.
-abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626 {
-    event HoldingsStateUpdated(uint256 oldTotalAssets, uint256 newTotalAssets);
-
-    error IncorrectProtocolFee();
-    error ZeroProtocolFeeReceiver();
-
+abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626Buffered {
     using Math for uint256;
 
     struct ERC4626BufferedStorage {
@@ -427,23 +423,23 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     /// @notice Sets bps-wise protocol fee.
     /// The protocol fee is applied on the profit made, with each holdings state update.
-    function setProtocolFee(uint256 feeBps) public virtual {
+    function setProtocolFee(uint256 feeBps) public virtual override {
         require(feeBps <= MAX_BPS, IncorrectProtocolFee());
         _getERC4626BufferedStorage().protocolFeeBps = feeBps;
     }
 
-    function setProtocolFeeReceiver(address receiver) public virtual {
+    function setProtocolFeeReceiver(address receiver) public virtual override {
         require(receiver != address(0), ZeroProtocolFeeReceiver());
         _getERC4626BufferedStorage().protocolFeeReceiver = receiver;
     }
 
     /// @notice Returns the protocol fee, in basis points (1 bps = 0.01%).
-    function getProtocolFee() public view returns (uint256) {
+    function getProtocolFee() public view override returns (uint256) {
         return _getERC4626BufferedStorage().protocolFeeBps;
     }
 
     /// @notice Returns the protocol fee receiver address.
-    function getProtocolFeeReceiver() public view returns (address) {
+    function getProtocolFeeReceiver() public view override returns (address) {
         return _getERC4626BufferedStorage().protocolFeeReceiver;
     }
 
