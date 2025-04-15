@@ -22,9 +22,9 @@ In such a case, aggregator will withdraw disregarding the current proportions, p
 
 We implement an abstract contract `ERC4626BufferedUpgradeable` from which `CommonAggregator` inherits the reward buffering feature.
 
-Reward buffering ensures that incoming `asset`s will be distributed to the depositors over some longer period of time, instead of doing it instantly.
+Reward buffering ensures that incoming `asset`s will be distributed to the depositors over some longer period of time, instead of instantly.
 Its goal is to prevent potential attack in which user deposits right before a reward distribution event,
-effectively capturing a portion of share holders' rewards for himself.
+effectively capturing a portion of share holders' rewards for themselves.
 
 ### State updates
 
@@ -40,7 +40,7 @@ for long periods of time.
 ### Reward trading
 
 `CommonAggregator` makes it possible to distribute rewards which are paid out in tokens different than the `asset` token (eg. boosting airdrops).
-It is achieved by allowing *Management* to designate a *reward trader* for such a token - an account to which given token can be freely transferred.
+It is achieved by allowing *Management* to designate a *reward trader* for such a token - an address to which given token can be freely transferred.
 
 The intended usage of this feature is that *reward trader* should be a non-upgradable contract, which has a single method 
 trading the given token for `asset` (on some decentralized exchange) and tranferring it back to aggregator.
@@ -64,7 +64,7 @@ can redeem their shares using the `emergencyRedeem` method, in exchange for shar
 
 ### Roles
 
-`CommonManagement` defines several roles, with different set of privileges.
+`CommonManagement` defines several roles, with different sets of privileges.
 
 *Owner* - owner of the `CommonManagement` contract. Has ability to assign and revoke all other roles
 and has all of their privileges. Can upgrade `CommonManagement` and `CommonAggregator` contracts (subject to a timelock).
