@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC4626, CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
-import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
+import {CommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -53,7 +53,7 @@ contract PausingTest is Test {
 
     function testRegularUserCantPauseUnpauseGlobal() public {
         vm.prank(alice);
-        vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
+        vm.expectRevert(CommonManagement.CallerNotGuardianOrWithHigherRole.selector);
 
         management.pauseUserInteractions();
 
@@ -62,7 +62,7 @@ contract PausingTest is Test {
         management.pauseUserInteractions();
 
         vm.prank(alice);
-        vm.expectRevert(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector);
+        vm.expectRevert(CommonManagement.CallerNotGuardianOrWithHigherRole.selector);
         management.unpauseUserInteractions();
     }
 
@@ -288,14 +288,14 @@ contract PausingTest is Test {
         management.submitForceRemoveVault(vault1);
 
         vm.prank(guardian);
-        vm.expectRevert(abi.encodeWithSelector(ICommonManagement.PendingVaultForceRemovals.selector, 2));
+        vm.expectRevert(abi.encodeWithSelector(CommonManagement.PendingVaultForceRemovals.selector, 2));
         management.unpauseUserInteractions();
 
         vm.prank(guardian);
         management.cancelForceRemoveVault(vault0);
 
         vm.prank(guardian);
-        vm.expectRevert(abi.encodeWithSelector(ICommonManagement.PendingVaultForceRemovals.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(CommonManagement.PendingVaultForceRemovals.selector, 1));
         management.unpauseUserInteractions();
 
         vm.warp(30 days);
@@ -310,8 +310,8 @@ contract PausingTest is Test {
 
     function _grantRoles() private {
         vm.prank(owner);
-        management.grantRole(ICommonManagement.Roles.Manager, manager);
+        management.grantRole(CommonManagement.Roles.Manager, manager);
         vm.prank(owner);
-        management.grantRole(ICommonManagement.Roles.Guardian, guardian);
+        management.grantRole(CommonManagement.Roles.Guardian, guardian);
     }
 }

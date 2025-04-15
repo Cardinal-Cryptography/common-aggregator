@@ -10,7 +10,6 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {CommonAggregator, ICommonAggregator} from "./CommonAggregator.sol";
-import {ICommonManagement} from "./interfaces/ICommonManagement.sol";
 import {saturatingAdd} from "./Math.sol";
 
 /// @notice CommonManagement is the contract that manages the CommonAggregator, adding
@@ -23,7 +22,7 @@ import {saturatingAdd} from "./Math.sol";
 ///   of the `GUARDIAN` and `REBALANCER` roles.
 /// * `GUARDIAN`: can pause and unpause the aggregator, and cancel timelocked actions.
 /// * `REBALANCER`: can rebalance funds between vaults, according to the allocation limits.
-contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpgradeable {
+contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
     using SafeERC20 for IERC4626;
@@ -34,12 +33,53 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     uint256 public constant AGGREGATOR_UPGRADE_TIMELOCK = 3 days;
     uint256 public constant MANAGEMENT_UPGRADE_TIMELOCK = 3 days;
 
+    event AggregatorUpgradeSubmitted(address indexed newImplementation, uint256 unlockTimestamp);
+    event AggregatorUpgradeCancelled(address indexed newImplementation);
+    event AggregatorUpgraded(address indexed newImplementation);
+
+    event ManagementUpgradeSubmitted(address indexed newImplementation, uint256 unlockTimestamp);
+    event ManagementUpgradeCancelled(address indexed newImplementation);
+    event ManagementUpgradeAuthorized(address indexed newImplementation);
+
+    event VaultAdditionSubmitted(address indexed vault, uint256 unlockTimestamp);
+    event VaultAdditionCancelled(address indexed vault);
+
+    event VaultForceRemovalSubmitted(address indexed vault, uint256 unlockTimestamp);
+    event VaultForceRemovalCancelled(address indexed vault);
+
+    event SetRewardsTraderSubmitted(
+        address indexed rewardToken, address indexed traderAddress, uint256 unlockTimestamp
+    );
+    event SetRewardsTraderCancelled(address indexed rewardToken, address indexed traderAddress);
+    event RewardsTraderSet(address indexed rewardToken, address indexed traderAddress);
+
+    event RoleGranted(Roles role, address indexed account);
+    event RoleRevoked(Roles role, address indexed account);
+
+    error PendingVaultForceRemoval(IERC4626 vault);
+    error VaultAdditionAlreadyPending(IERC4626 vault);
+
+    error InvalidRewardToken(address token);
+    error NoTraderSetForToken(address token);
+
+    error PendingVaultForceRemovals(uint256 count);
+
+    error CallerNotRebalancerOrWithHigherRole();
+    error CallerNotManagerNorOwner();
+    error CallerNotGuardianOrWithHigherRole();
+
     enum TimelockTypes {
         SET_TRADER,
         ADD_VAULT,
         FORCE_REMOVE_VAULT,
         AGGREGATOR_UPGRADE,
         MANAGEMENT_UPGRADE
+    }
+
+    enum Roles {
+        Manager,
+        Rebalancer,
+        Guardian
     }
 
     struct TimelockData {
@@ -80,7 +120,6 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     /// @notice Submits timelocked action for adding `vault` to the aggregator.
     function submitAddVault(IERC4626 vault)
         external
-        override
         onlyManagerOrOwner
         registersAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA, ADD_VAULT_TIMELOCK)
     {
@@ -96,7 +135,6 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     /// @notice Cancels timelocked action for adding `vault` to the aggregator.
     function cancelAddVault(IERC4626 vault)
         external
-        override
         onlyGuardianOrHigherRole
         cancelsAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)))
     {
@@ -106,7 +144,6 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     /// @notice Adds `vault` to the aggregator, after the timelock has passed.
     function addVault(IERC4626 vault)
         external
-        override
         onlyManagerOrOwner
         executesAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA)
     {
@@ -115,7 +152,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
 
     /// @notice Allows the `MANAGER` or `OWNER` to call `remove(vault)` on aggregator.
     /// @dev No timelock is used, as the action can't lose any assets.
-    function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
+    function removeVault(IERC4626 vault) external onlyManagerOrOwner {
         require(
             !isActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
             PendingVaultForceRemoval(vault)
@@ -130,7 +167,6 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     /// @dev Tries to redeem as many `vault`'s shares as possible.
     function submitForceRemoveVault(IERC4626 vault)
         external
-        override
         onlyManagerOrOwner
         registersAction(
             keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)),
@@ -153,7 +189,6 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     /// Doesn't trigger unpause on the aggregator by itself.
     function cancelForceRemoveVault(IERC4626 vault)
         external
-        override
         onlyGuardianOrHigherRole
         cancelsAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)))
     {
@@ -167,7 +202,6 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     /// the `submitForceRemoveVault` was called.
     function forceRemoveVault(IERC4626 vault)
         external
-        override
         onlyManagerOrOwner
         executesAction(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault)), EMPTY_ACTION_DATA)
     {
@@ -195,19 +229,19 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
     // ----- Allocation Limits -----
 
     /// @notice Allows the `OWNER` role holder to trigger `setLimit` on the aggregator.
-    function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyOwner {
+    function setLimit(IERC4626 vault, uint256 newLimitBps) external onlyOwner {
         _getManagementStorage().aggregator.setLimit(vault, newLimitBps);
     }
 
     // ----- Fee management -----
 
     /// @notice Allows the `OWNER` role holder to trigger `setProtocolFee` on the aggregator.
-    function setProtocolFee(uint256 protocolFeeBps) public override(ICommonManagement) onlyOwner {
+    function setProtocolFee(uint256 protocolFeeBps) public onlyOwner {
         _getManagementStorage().aggregator.setProtocolFee(protocolFeeBps);
     }
 
     /// @notice Allows the `OWNER` role holder to trigger `setProtocolFeeReceiver` on the aggregator.
-    function setProtocolFeeReceiver(address protocolFeeReceiver) public override(ICommonManagement) onlyOwner {
+    function setProtocolFeeReceiver(address protocolFeeReceiver) public onlyOwner {
         _getManagementStorage().aggregator.setProtocolFeeReceiver(protocolFeeReceiver);
     }
 

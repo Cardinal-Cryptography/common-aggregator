@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
-import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
+import {CommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy, ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
@@ -59,11 +59,11 @@ contract CommonAggregatorTest is Test {
 
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
+        commonManagement.grantRole(CommonManagement.Roles.Manager, manager);
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Rebalancer, rebalancer);
+        commonManagement.grantRole(CommonManagement.Roles.Rebalancer, rebalancer);
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Guardian, guardian);
+        commonManagement.grantRole(CommonManagement.Roles.Guardian, guardian);
     }
 
     function testUpgrade() public {
@@ -210,11 +210,11 @@ contract CommonAggregatorTest is Test {
         commonManagement.submitUpgradeAggregator(impl);
 
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector));
+        vm.expectRevert(abi.encodeWithSelector(CommonManagement.CallerNotGuardianOrWithHigherRole.selector));
         commonManagement.cancelUpgradeAggregator(impl);
 
         vm.prank(rebalancer);
-        vm.expectRevert(abi.encodeWithSelector(ICommonManagement.CallerNotGuardianOrWithHigherRole.selector));
+        vm.expectRevert(abi.encodeWithSelector(CommonManagement.CallerNotGuardianOrWithHigherRole.selector));
         commonManagement.cancelUpgradeAggregator(impl);
 
         vm.prank(guardian);

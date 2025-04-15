@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 
 import {console} from "forge-std/console.sol";
 import {Script} from "forge-std/Script.sol";
-import {ICommonManagement} from "./../contracts/interfaces/ICommonManagement.sol";
+import {CommonManagement} from "./../contracts/CommonManagement.sol";
 
 /// @notice Finalize the upgrade of the CommonAggregator contract. The contract should be submitted
 /// via SubmitUpgradeAggregatorScript.s.sol before running this script, and the time lock should pass.
@@ -16,7 +16,7 @@ contract FinalizeUpgradeAggregatorScript is Script {
 
         vm.startBroadcast();
 
-        ICommonManagement(commonManagement).upgradeAggregator(newImplementation, callData);
+        CommonManagement(commonManagement).upgradeAggregator(newImplementation, callData);
         console.log("Upgrade finalized successfully");
 
         vm.stopBroadcast();

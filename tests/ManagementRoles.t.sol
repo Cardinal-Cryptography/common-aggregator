@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {CommonAggregator} from "contracts/CommonAggregator.sol";
 import {CommonManagement} from "contracts/CommonManagement.sol";
-import {ICommonManagement} from "contracts/interfaces/ICommonManagement.sol";
 import {Test} from "forge-std/Test.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
@@ -28,42 +27,42 @@ contract CommonAggregatorTest is Test {
     }
 
     function testRoleGranting() public {
-        assertFalse(commonManagement.hasRole(ICommonManagement.Roles.Manager, alice));
+        assertFalse(commonManagement.hasRole(CommonManagement.Roles.Manager, alice));
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Manager, alice);
-        assertTrue(commonManagement.hasRole(ICommonManagement.Roles.Manager, alice));
+        commonManagement.grantRole(CommonManagement.Roles.Manager, alice);
+        assertTrue(commonManagement.hasRole(CommonManagement.Roles.Manager, alice));
 
-        assertFalse(commonManagement.hasRole(ICommonManagement.Roles.Guardian, alice));
+        assertFalse(commonManagement.hasRole(CommonManagement.Roles.Guardian, alice));
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Guardian, alice);
-        assertTrue(commonManagement.hasRole(ICommonManagement.Roles.Guardian, alice));
+        commonManagement.grantRole(CommonManagement.Roles.Guardian, alice);
+        assertTrue(commonManagement.hasRole(CommonManagement.Roles.Guardian, alice));
 
-        assertFalse(commonManagement.hasRole(ICommonManagement.Roles.Rebalancer, alice));
+        assertFalse(commonManagement.hasRole(CommonManagement.Roles.Rebalancer, alice));
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Rebalancer, alice);
-        assertTrue(commonManagement.hasRole(ICommonManagement.Roles.Rebalancer, alice));
+        commonManagement.grantRole(CommonManagement.Roles.Rebalancer, alice);
+        assertTrue(commonManagement.hasRole(CommonManagement.Roles.Rebalancer, alice));
     }
 
     function testRoleRevoking() public {
         vm.startPrank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Manager, bob);
-        commonManagement.grantRole(ICommonManagement.Roles.Guardian, bob);
-        commonManagement.grantRole(ICommonManagement.Roles.Rebalancer, bob);
+        commonManagement.grantRole(CommonManagement.Roles.Manager, bob);
+        commonManagement.grantRole(CommonManagement.Roles.Guardian, bob);
+        commonManagement.grantRole(CommonManagement.Roles.Rebalancer, bob);
         vm.stopPrank();
 
-        assertTrue(commonManagement.hasRole(ICommonManagement.Roles.Manager, bob));
+        assertTrue(commonManagement.hasRole(CommonManagement.Roles.Manager, bob));
         vm.prank(owner);
-        commonManagement.revokeRole(ICommonManagement.Roles.Manager, bob);
-        assertFalse(commonManagement.hasRole(ICommonManagement.Roles.Manager, bob));
+        commonManagement.revokeRole(CommonManagement.Roles.Manager, bob);
+        assertFalse(commonManagement.hasRole(CommonManagement.Roles.Manager, bob));
 
-        assertTrue(commonManagement.hasRole(ICommonManagement.Roles.Guardian, bob));
+        assertTrue(commonManagement.hasRole(CommonManagement.Roles.Guardian, bob));
         vm.prank(owner);
-        commonManagement.revokeRole(ICommonManagement.Roles.Guardian, bob);
-        assertFalse(commonManagement.hasRole(ICommonManagement.Roles.Guardian, bob));
+        commonManagement.revokeRole(CommonManagement.Roles.Guardian, bob);
+        assertFalse(commonManagement.hasRole(CommonManagement.Roles.Guardian, bob));
 
-        assertTrue(commonManagement.hasRole(ICommonManagement.Roles.Rebalancer, bob));
+        assertTrue(commonManagement.hasRole(CommonManagement.Roles.Rebalancer, bob));
         vm.prank(owner);
-        commonManagement.revokeRole(ICommonManagement.Roles.Rebalancer, bob);
-        assertFalse(commonManagement.hasRole(ICommonManagement.Roles.Rebalancer, bob));
+        commonManagement.revokeRole(CommonManagement.Roles.Rebalancer, bob);
+        assertFalse(commonManagement.hasRole(CommonManagement.Roles.Rebalancer, bob));
     }
 }

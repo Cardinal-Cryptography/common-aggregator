@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {CommonAggregator, CommonManagement, ICommonManagement, IERC20, IERC4626} from "contracts/CommonManagement.sol";
+import {CommonAggregator, CommonManagement, IERC20, IERC4626} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
@@ -44,11 +44,11 @@ contract CommonAggregatorTest is Test {
 
         address otherAccount = address(0x456);
         assertNotEq(commonManagement.owner(), otherAccount);
-        assertFalse(commonManagement.hasRole(ICommonManagement.Roles.Manager, otherAccount));
+        assertFalse(commonManagement.hasRole(CommonManagement.Roles.Manager, otherAccount));
 
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Manager, otherAccount);
-        assertTrue(commonManagement.hasRole(ICommonManagement.Roles.Manager, otherAccount));
+        commonManagement.grantRole(CommonManagement.Roles.Manager, otherAccount);
+        assertTrue(commonManagement.hasRole(CommonManagement.Roles.Manager, otherAccount));
     }
 
     // Reporting
