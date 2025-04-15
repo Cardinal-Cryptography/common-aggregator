@@ -2,15 +2,12 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
-import {CommonManagement} from "contracts/CommonManagement.sol";
-import {ICommonManagement} from "contracts/interfaces/ICommonManagement.sol";
+import {CommonAggregator, CommonManagement, ICommonManagement, IERC20, IERC4626} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {setUpAggregator} from "tests/utils.sol";
+import {MAX_BPS} from "contracts/Math.sol";
 
 contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
@@ -30,6 +27,16 @@ contract CommonAggregatorTest is Test {
         vaults[1] = new ERC4626Mock(address(asset));
 
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
+    }
+
+    function testExternalStorageGetters() public {
+        assertEq(commonAggregator.getManagement(), address(commonManagement));
+        for (uint256 i = 0; i < vaults.length; i++) {
+            assertEq(address(commonAggregator.getVaults()[i]), address(vaults[i]));
+        }
+        assertEq(commonAggregator.getMaxAllocationLimit(vaults[0]), MAX_BPS);
+        assertEq(commonAggregator.getMaxAllocationLimit(vaults[1]), MAX_BPS);
+        assertEq(commonAggregator.getMaxAllocationLimit(IERC4626(address(0x3451254))), 0);
     }
 
     function testRoleGranting() public {

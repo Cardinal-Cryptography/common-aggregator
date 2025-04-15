@@ -567,7 +567,7 @@ contract CommonAggregator is
     /// send it back to the aggregator. The communication between these two contracts
     /// is done simply via an async ERC20's transfer calls.
     function transferRewardsForSale(address rewardToken, address rewardTrader) external onlyManagement nonReentrant {
-        ensureTokenIsNotAssetNorShare(rewardToken);
+        ensureTokenIsNotInherentlyUsed(rewardToken);
         IERC20 transferrableToken = IERC20(rewardToken);
         uint256 amount = transferrableToken.balanceOf(address(this));
         transferrableToken.safeTransfer(rewardTrader, amount);
@@ -577,7 +577,7 @@ contract CommonAggregator is
 
     /// @notice Reverts if `token` is the asset, one of the aggregated vaults share,
     /// or the aggregator share itself.
-    function ensureTokenIsNotAssetNorShare(address token) public view {
+    function ensureTokenIsNotInherentlyUsed(address token) public view {
         require(token != asset(), InvalidRewardToken(token));
         require(!isVaultOnTheList(IERC4626(token)), InvalidRewardToken(token));
         require(token != address(this), InvalidRewardToken(token));
@@ -608,6 +608,10 @@ contract CommonAggregator is
     /// @notice Returns the allocation limit of the given vault, in basis points.
     function getMaxAllocationLimit(IERC4626 vault) external view returns (uint256) {
         return _getAggregatorStorage().allocationLimitBps[address(vault)];
+    }
+
+    function getManagement() external view returns (address) {
+        return _getAggregatorStorage().management;
     }
 
     function _getAggregatorStorage() private pure returns (AggregatorStorage storage $) {

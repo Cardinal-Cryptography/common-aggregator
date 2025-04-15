@@ -110,20 +110,18 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
         onlyManagerOrOwner
         executesAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA)
     {
-        ManagementStorage storage $ = _getManagementStorage();
-        $.aggregator.addVault(vault);
+        _getManagementStorage().aggregator.addVault(vault);
     }
 
     /// @notice Allows the `MANAGER` or `OWNER` to call `remove(vault)` on aggregator.
     /// @dev No timelock is used, as the action can't lose any assets.
     function removeVault(IERC4626 vault) external override onlyManagerOrOwner {
-        ManagementStorage storage $ = _getManagementStorage();
         require(
             !isActionRegistered(keccak256(abi.encode(TimelockTypes.FORCE_REMOVE_VAULT, vault))),
             PendingVaultForceRemoval(vault)
         );
 
-        $.aggregator.removeVault(vault);
+        _getManagementStorage().aggregator.removeVault(vault);
     }
 
     /// @notice Submits timelocked force removal action for `vault`. Triggers a pause on the aggregator
@@ -233,7 +231,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
             InvalidRewardToken(rewardToken)
         );
 
-        _getManagementStorage().aggregator.ensureTokenIsNotAssetNorShare(rewardToken);
+        _getManagementStorage().aggregator.ensureTokenIsNotInherentlyUsed(rewardToken);
 
         emit SetRewardsTraderSubmitted(rewardToken, traderAddress, saturatingAdd(block.timestamp, SET_TRADER_TIMELOCK));
     }
@@ -263,7 +261,7 @@ contract CommonManagement is ICommonManagement, UUPSUpgradeable, Ownable2StepUpg
             InvalidRewardToken(rewardToken)
         );
 
-        $.aggregator.ensureTokenIsNotAssetNorShare(rewardToken);
+        $.aggregator.ensureTokenIsNotInherentlyUsed(rewardToken);
         $.rewardTrader[rewardToken] = traderAddress;
 
         emit RewardsTraderSet(rewardToken, traderAddress);
