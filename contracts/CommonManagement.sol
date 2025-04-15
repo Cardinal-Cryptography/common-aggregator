@@ -9,7 +9,7 @@ import {
     Math,
     SafeERC20
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {CommonAggregator, ICommonAggregator} from "./CommonAggregator.sol";
+import {ICommonAggregator} from "./CommonAggregator.sol";
 import {saturatingAdd} from "./Math.sol";
 
 /// @notice CommonManagement is the contract that manages the CommonAggregator, adding
@@ -95,7 +95,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         mapping(address rewardToken => address traderAddress) rewardTrader;
         mapping(Roles => mapping(address => bool)) roles;
         uint256 pendingVaultForceRemovals;
-        CommonAggregator aggregator;
+        ICommonAggregator aggregator;
     }
 
     // keccak256(abi.encode(uint256(keccak256("common.storage.management")) - 1)) & ~bytes32(uint256(0xff));
@@ -108,7 +108,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         }
     }
 
-    function initialize(address owner, CommonAggregator aggregator) public initializer {
+    function initialize(address owner, ICommonAggregator aggregator) public initializer {
         __UUPSUpgradeable_init();
         __Ownable_init(owner);
 
@@ -408,7 +408,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         onlyOwner
         executesAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE)), keccak256(abi.encode(newImplementation)))
     {
-        UUPSUpgradeable(_getManagementStorage().aggregator).upgradeToAndCall(newImplementation, callData);
+        UUPSUpgradeable(address(_getManagementStorage().aggregator)).upgradeToAndCall(newImplementation, callData);
         emit AggregatorUpgraded(newImplementation);
     }
 

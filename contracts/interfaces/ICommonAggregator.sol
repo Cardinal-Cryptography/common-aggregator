@@ -23,6 +23,8 @@ interface ICommonAggregator is IERC4626 {
     function removeVault(IERC4626 vault) external;
     function forceRemoveVault(IERC4626 vault) external;
 
+    function tryExitVault(IERC4626 vault) external;
+
     // ----- Deposits -----
 
     event DepositedToVault(address indexed vault, uint256 amountPlanned, uint256 amountDeposited);
@@ -75,6 +77,8 @@ interface ICommonAggregator is IERC4626 {
 
     function transferRewardsForSale(address rewardToken, address rewardTrader) external;
 
+    function isVaultOnTheList(IERC4626 vault) external view returns (bool);
+
     // ----- Emergency redeem -----
 
     /// @param sender Account executing the withdrawal.
@@ -99,4 +103,12 @@ interface ICommonAggregator is IERC4626 {
     // ----- Access control -----
 
     error CallerNotManagement();
+
+    function ensureTokenIsNotInherentlyUsed(address token) external;
+
+    // ----- Pausable -----
+
+    function pauseUserInteractions() external;
+    function unpauseUserInteractions() external;
+    function paused() external view returns (bool);
 }

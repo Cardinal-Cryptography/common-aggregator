@@ -589,13 +589,17 @@ contract CommonAggregator is
     /// and also management's `pushFunds`.
     /// To be used in case of an emergency. Users can still use `emergencyRedeem`
     /// to exit the aggregator.
-    function pauseUserInteractions() public onlyManagement {
+    function pauseUserInteractions() public override onlyManagement {
         _pause();
     }
 
     /// @notice Unpauses user interactions. To be used after mitigating a potential emergency.
-    function unpauseUserInteractions() public onlyManagement {
+    function unpauseUserInteractions() public override onlyManagement {
         _unpause();
+    }
+
+    function paused() public view override(ICommonAggregator, PausableUpgradeable) returns (bool) {
+        return super.paused();
     }
 
     // ----- Etc -----
