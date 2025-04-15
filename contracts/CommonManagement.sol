@@ -304,7 +304,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     /// @notice Triggers `transferRewardsForSale` on the aggregator.
     /// Can be called permissionlessly, and reward will be sent to the trader set.
     /// @dev Ensures that the reward token is not a vault pending to be added,
-    /// and the called vault ensures that the token is not asset, aggregator share,
+    /// and the aggregator ensures that the token is not asset, aggregator share,
     /// or one of the aggregated vault's share.
     function transferRewardsForSale(address rewardToken) external {
         ManagementStorage storage $ = _getManagementStorage();
@@ -351,7 +351,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
 
     /// @notice Submits timelocked upgrade action of the management contract to `newImplementation`.
     /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
-    /// @dev After the timelock passes, upgrader can upgradeToAndCall on the new implementation with
+    /// @dev After the timelock passes, upgrader can `upgradeToAndCall` on the new implementation with
     /// any calldata. No check against missing some storage or selectors are done on the contract
     /// level. It's recommended to use the `openzeppelin-foundry-upgrades` libarary for updates.
     /// There could be many pending upgrades, so it's the guardian's responsibility to cancel
@@ -421,7 +421,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         return _getManagementStorage().roles[role][account];
     }
 
-    /// Grants one of the `Roles` to `account`.
+    /// @notice Grants one of the `Roles` to `account`.
     function grantRole(Roles role, address account) external onlyOwner {
         ManagementStorage storage $ = _getManagementStorage();
         if (!$.roles[role][account]) {
@@ -430,7 +430,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         }
     }
 
-    /// Removes the `role` from `account`.
+    /// @notice Removes the `role` from `account`.
     function revokeRole(Roles role, address account) external onlyOwner {
         ManagementStorage storage $ = _getManagementStorage();
         if ($.roles[role][account]) {

@@ -14,7 +14,13 @@ import {IERC4626Buffered} from "./interfaces/IERC4626Buffered.sol";
 import {checkedAdd, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
 /// @notice Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
-/// It adds buffering to any asset rewards/airdrops received.
+/// It adds buffering to any vault profit or donated amount and distributes it to the holders
+/// over time, and an optional protocol fee from the profit.
+/// @dev Its goal is to prevent potential attack in which user deposits right before
+/// a reward distribution event, effectively capturing a portion of share holders' rewards for themselves.
+/// Moreover, any potential losses are covered by the buffer first, so that the price-per-share
+/// drops only after the buffer is emptied.
+/// Protocol fees are final and they are not refunded in case of a loss.
 abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable, IERC4626Buffered {
     using Math for uint256;
 
@@ -314,7 +320,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     /// @notice Mints vault shares to `receiver` by depositing exactly `assets` of underlying tokens.
     /// Returns the amount of shares that were minted.
-    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
+    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is taken into account.
     function deposit(uint256 assets, address receiver) public virtual override(IERC4626) returns (uint256) {
         _updateHoldingsState();
 
@@ -333,7 +339,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// @notice Mints exactly `shares` of vault's shares to `receiver` by depositing amount of underlying tokens.
     /// Returns the amount of assets that were deposited.
     /// @dev Updates the holdings state before the deposit,
-    /// so that any pending gain or loss report is recent. If caller and receiver is `protocolFeeReceiver`,
+    /// so that any pending gain or loss report is taken into account. If caller and receiver is `protocolFeeReceiver`,
     /// the balance of the `protocolFeeReceiver` might change by more than `shares`, as there might be
     /// some pending protocol fees to be collected.
     function mint(uint256 shares, address receiver) public virtual override(IERC4626) returns (uint256) {
@@ -352,7 +358,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     /// @notice Burns shares from `owner` and sends exactly `assets` of underlying tokens to `receiver`.
     /// Returns the amount of shares that were burnt.
-    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
+    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is taken into account.
     function withdraw(uint256 assets, address receiver, address owner)
         public
         virtual
@@ -374,7 +380,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     /// @notice  Burns exactly `shares` from `owner` and sends assets of underlying tokens to `receiver`.
     /// Returns the amount of sent assets.
-    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is recent.
+    /// @dev Updates the holdings state before the deposit, so that any pending gain or loss report is taken into account.
     function redeem(uint256 shares, address receiver, address owner)
         public
         virtual

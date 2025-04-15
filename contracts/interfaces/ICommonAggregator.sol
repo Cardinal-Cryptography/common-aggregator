@@ -76,12 +76,6 @@ interface ICommonAggregator is IERC4626Buffered {
 
     // ----- Emergency redeem -----
 
-    /// @param sender Account executing the withdrawal.
-    /// @param receiver Account that received the assets and the aggregated vaults' shares.
-    /// @param owner Owner of the aggregator shares that were burnt.
-    /// @param assets Amount of underlying assets transferred to the `receiver`
-    /// @param shares Amount of the aggregator shares that were burnt.
-    /// @param vaultShares List of the aggregated vaults' shares amounts that were transferred to the `receiver`.
     event EmergencyWithdraw(
         address indexed sender,
         address indexed receiver,

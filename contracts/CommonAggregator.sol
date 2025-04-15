@@ -227,8 +227,8 @@ contract CommonAggregator is
         }
     }
 
-    /// @notice Withdraws `assetsRequired` from aggregated vaults, proportionally to their current allocation.
-    /// Reverts if any of the withdrawals revert for any reason.
+    /// @notice Withdraws `assetsRequired` from aggregated vaults and from the aggregator's balance,
+    /// proportionally to their current allocation. Reverts if any of the withdrawals revert for any reason.
     /// @dev Can pull one more asset than needed from each vault, due to the rounding.
     /// Function is exposed as external but only callable by aggregator, because we want to be able
     /// to easily revert all changes in case of it's failure - it is not possible for internal functions.
@@ -278,8 +278,8 @@ contract CommonAggregator is
 
     // ----- Emergency redeem -----
 
-    /// @notice Burns exactly shares from owner and sends proportional amounts of aggregated vaults' shares
-    /// and idle assets. This function can called even if the contract is paused.
+    /// @notice Burns exactly `shares` from `owner` and sends proportional amounts of aggregated vaults' shares
+    /// and idle assets to `account`. This function can called even if the contract is paused.
     ///
     /// @param shares Amount of shares to be redeemed.
     /// @param account Account that will receive the assets and the aggregated vaults' shares.
@@ -346,7 +346,7 @@ contract CommonAggregator is
     }
 
     /// @notice Hook called to get the actual number of assets held by the aggregator,
-    /// either in idle assets or in aggregated vaults.
+    /// both in idle assets and in aggregated vaults.
     function _totalAssetsNotCached() internal view override returns (uint256) {
         AggregatorStorage storage $ = _getAggregatorStorage();
 
