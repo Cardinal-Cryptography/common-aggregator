@@ -13,9 +13,9 @@ import {MAX_BPS} from "./../contracts/Math.sol";
 contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
     uint8 internal decimalsOffset;
 
-    function initialize(uint8 _decimalsOffset, IERC20 _asset) public initializer {
+    function initialize(uint8 __decimalsOffset, IERC20 _asset) public initializer {
         __ERC4626Buffered_init(_asset);
-        decimalsOffset = _decimalsOffset;
+        decimalsOffset = __decimalsOffset;
     }
 
     function currentBufferEnd() external view returns (uint256) {
