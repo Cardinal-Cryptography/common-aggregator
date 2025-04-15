@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {CommonAggregator, IERC20, IERC4626} from "contracts/CommonAggregator.sol";
+import {CommonAggregator, ICommonAggregator, IERC20, IERC4626} from "contracts/CommonAggregator.sol";
 import {CommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
@@ -52,7 +52,51 @@ contract CommonAggregatorTest is Test {
         assertTrue(commonManagement.hasRole(CommonManagement.Roles.Manager, otherAccount));
     }
 
-    // Reporting
+    function testOnlyManagementModifier() public {
+        asset.mint(alice, 1000);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 1000);
+        vm.prank(alice);
+        commonAggregator.deposit(1000, alice);
+
+        vm.startPrank(owner);
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pushFunds(1000, vaults[0]);
+
+        vm.startPrank(owner);
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pullFunds(0, vaults[0]);
+
+        vm.startPrank(owner);
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pullFundsByShares(0, vaults[0]);
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.setLimit(vaults[0], 10);
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.setProtocolFee(10);
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.setProtocolFeeReceiver(address(1));
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pauseUserInteractions();
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.addVault(IERC4626(address(1)));
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.removeVault(vaults[0]);
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.forceRemoveVault(vaults[0]);
+
+        commonManagement.pauseUserInteractions();
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.unpauseUserInteractions();
+    }
 
     function testFirstDeposit() public {
         asset.mint(alice, 1000);
@@ -227,8 +271,16 @@ contract CommonAggregatorTest is Test {
         commonManagement.setProtocolFee(100); // 1%
 
         vm.prank(owner);
+        vm.expectRevert(ICommonAggregator.ProtocolFeeTooHigh.selector);
+        commonManagement.setProtocolFee(MAX_BPS / 2 + 1);
+
+        vm.prank(owner);
         vm.expectRevert();
         commonManagement.setProtocolFeeReceiver(address(0));
+
+        vm.prank(owner);
+        vm.expectRevert();
+        commonManagement.setProtocolFeeReceiver(address(commonAggregator));
 
         vm.prank(owner);
         commonManagement.setProtocolFeeReceiver(owner);

@@ -200,6 +200,10 @@ contract CommonAggregatorTest is Test {
         commonManagement.upgradeAggregator(newImplementation, "");
 
         vm.prank(owner);
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        UUPSUpgradeable(address(commonAggregator)).upgradeToAndCall(newImplementation, "");
+
+        vm.prank(owner);
         commonManagement.upgradeAggregator(newImplementation, "");
     }
 
