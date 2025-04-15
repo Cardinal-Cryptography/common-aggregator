@@ -14,8 +14,8 @@ import {IERC4626Buffered} from "./interfaces/IERC4626Buffered.sol";
 import {checkedAdd, checkedSub, MAX_BPS, weightedAvg} from "./Math.sol";
 
 /// @notice Vault implementation based on OpenZeppelin's ERC4626Upgradeable.
-/// It adds buffering to any vault profit or donated amount and distributes it to the holders
-/// over time, and an optional protocol fee from the profit.
+/// It adds buffering to the profit or donated amount, distributed to the holders
+/// over time, and an optional protocol fee from the profit (including donations).
 /// @dev Its goal is to prevent potential attack in which user deposits right before
 /// a reward distribution event, effectively capturing a portion of share holders' rewards for themselves.
 /// Moreover, any potential losses are covered by the buffer first, so that the price-per-share
