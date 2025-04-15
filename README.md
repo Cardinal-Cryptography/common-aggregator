@@ -68,7 +68,6 @@ can redeem their shares using the `emergencyRedeem` method, in exchange for shar
 
 *Owner* - owner of the `CommonManagement` contract. Has ability to assign and revoke all other roles
 and has all of their privileges. Can upgrade `CommonManagement` and `CommonAggregator` contracts (subject to a timelock).
-Highly trusted role.
 
 *Manager* - role performing management actions for `CommonAggregator`, less privilaged than *Owner*.
 Has ability to add/remove aggregated vaults and set *reward traders* (both subject to a timelock). 
