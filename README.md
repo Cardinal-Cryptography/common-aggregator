@@ -15,8 +15,12 @@ strategy for optimizing between yield and risk.
 
 By default, user deposits and withdrawals do not change proportions of the funds distributed between aggregated vaults.
 
-Exception to this rule is a situation in which withdrawing the desired amount from one of the vaults is not possible at the moment.
-In such a case, aggregator will withdraw disregarding the current proportions, prioritizing that the user is able to withdraw at all. 
+One exception to this rule is a situation in which withdrawing the desired amount from one of the vaults is not possible at the moment.
+In such a case, aggregator will withdraw disregarding the current proportions, prioritizing that the user is able to withdraw at all.
+
+Another is that if one of the vaults imposes a limit on how much assets can `CommonAggregator` deposit to it 
+(lower than the amount needed to maintain the proportions), then the deposit will succeed,
+but the surplus will go to aggregator's own balance (until *Rebalancer* moves it to one of the vaults). 
 
 ### `ERC4626BufferedUpgradeable` - reward buffering
 
