@@ -549,6 +549,10 @@ contract CommonAggregator is
         return $.allocationLimitBps[address(vault)];
     }
 
+    function getManagement() external view returns (address) {
+        return _getAggregatorStorage().management;
+    }
+
     function _getAggregatorStorage() private pure returns (AggregatorStorage storage $) {
         assembly {
             $.slot := AGGREGATOR_STORAGE_LOCATION
