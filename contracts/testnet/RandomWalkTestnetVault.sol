@@ -14,7 +14,8 @@ error IncorrectMinAprBps();
 error IncorrectMaxAprBps();
 
 /// @title ERC4626 testnet vault with random-walk-like changing APR.
-/// @notice For each of these 30 minutes, APR delta is randomly chosen between -maxChange and maxChange BPS points, and
+/// @notice Let's split time into segments of configured length. For each of these segments,
+/// APR delta is randomly chosen between -maxChange and maxChange BPS points, and
 /// the new APR is calculated as the previous APR + delta. The new APR is clipped between `minAprBps` and `maxAprBps`,
 /// which can be negative. If no update (like deposit, withdraw, or update) has been made for 4 days,
 /// the APR stays constant for the rest of the time until updating.
@@ -29,7 +30,8 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
 
     uint256 lastUpdateTimestamp;
 
-    // Invariant: lastAprChangeTimestamp should be at most lastUpdateTimestamp, but not less than it by 30 minutes or more.
+    // Invariant: lastAprChangeTimestamp should be at most lastUpdateTimestamp,
+    // but not less than it by `TIME_SEGMENT_DURATION` minutes or more.
     uint256 lastAprChangeTimestamp;
     int256 aprBps;
 
@@ -37,6 +39,8 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
     int256 maxAprBps;
     uint256 maxAprChangeBps;
     uint256 nonceForRandomness;
+
+    uint256 immutable TIME_SEGMENT_DURATION;
 
     /// @dev Do not use in production, this is just for testing and its value can be easily manipulated.
     function getPseudoRandomNumber(uint256 nonce) public pure returns (uint256) {
@@ -50,7 +54,8 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
         int256 _startingAprBps,
         int256 _minAprBps,
         int256 _maxAprBps,
-        uint256 _maxAprChangeBps
+        uint256 _maxAprChangeBps,
+        uint256 _timeSegmentDuration
     ) Ownable(msg.sender) ERC4626(_asset) ERC20(_name, _symbol) Pausable() {
         aprBps = _startingAprBps;
         lastAprChangeTimestamp = block.timestamp;
@@ -59,6 +64,7 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
         minAprBps = _minAprBps;
         maxAprBps = _maxAprBps;
         maxAprChangeBps = _maxAprChangeBps;
+        TIME_SEGMENT_DURATION = _timeSegmentDuration;
 
         require(_minAprBps <= _startingAprBps, IncorrectMinAprBps());
         require(_maxAprBps >= _startingAprBps, IncorrectMaxAprBps());
@@ -132,9 +138,9 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
         newNonceForRandomness = nonceForRandomness;
         aprChangeTimestamp = lastAprChangeTimestamp;
 
-        // Loop over time segments, each (except possibly last) of length 30 minutes.
+        // Loop over time segments, each (except possibly last) of length `TIME_SEGMENT_DURATION` seconds.
         for (uint256 time = lastAprChangeTimestamp; time <= block.timestamp;) {
-            uint256 timeSegmentDuration = 30 minutes;
+            uint256 timeSegmentDuration = TIME_SEGMENT_DURATION;
             if (iters > 0) {
                 // Change APR by random number from -maxAprChangeBps to maxAprChangeBps percentage points
                 int256 r = int256(getPseudoRandomNumber(newNonceForRandomness) % (2 * maxAprChangeBps + 1))
@@ -153,10 +159,10 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
 
                 if (iters >= 24 * 2 * 4) {
                     // More than 4 days with no update. Extend the duration of current time segment
-                    // from 30 minutes until the end. Keep the APR constant in that time segment.
-                    uint256 itersYetExceptThis = (block.timestamp - time) / uint256(30 minutes);
-                    timeSegmentDuration = (30 minutes) * (itersYetExceptThis + 1);
-                    aprChangeTimestamp = time + (timeSegmentDuration - 30 minutes);
+                    // from `TIME_SEGMENT_DURATION` until the end. Keep the APR constant in that time segment.
+                    uint256 itersYetExceptThis = (block.timestamp - time) / uint256(TIME_SEGMENT_DURATION);
+                    timeSegmentDuration = (TIME_SEGMENT_DURATION) * (itersYetExceptThis + 1);
+                    aprChangeTimestamp = time + (timeSegmentDuration - TIME_SEGMENT_DURATION);
                     unchecked {
                         newNonceForRandomness = newNonceForRandomness + itersYetExceptThis;
                     }

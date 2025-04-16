@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 interface MintableERC20 is IERC20 {
@@ -14,8 +13,7 @@ interface MintableERC20 is IERC20 {
 /// @notice This vault is designed to be used on testnets only.
 /// @dev This contract should have permissions to mint `_asset`. For safety,
 /// the maximum amount of assets that can be minted in one call is limited to 10**64.
-/// Additionally, the contract can be paused to stop minting tokens.
-contract SteadyTestnetVault is Ownable2Step, ERC4626, Pausable {
+contract SteadyTestnetVault is Ownable2Step, ERC4626 {
     using Math for uint256;
 
     uint256 lastUpdateTimestamp;
@@ -26,7 +24,6 @@ contract SteadyTestnetVault is Ownable2Step, ERC4626, Pausable {
         Ownable(msg.sender)
         ERC4626(_asset)
         ERC20(_name, _symbol)
-        Pausable()
     {
         aprBps = _aprBps;
         lastUpdateTimestamp = block.timestamp;
@@ -70,24 +67,23 @@ contract SteadyTestnetVault is Ownable2Step, ERC4626, Pausable {
     }
 
     function totalAssets() public view override returns (uint256) {
-        if (paused()) {
-            return assetsHeld;
-        }
         uint256 timeElapsed = block.timestamp - lastUpdateTimestamp;
         uint256 mintAmount = assetsHeld.mulDiv(timeElapsed * aprBps, 10_000 * 365 days);
         uint256 cappedMintAmount = Math.min(mintAmount, 10 ** 64);
         return assetsHeld + cappedMintAmount;
     }
 
-    /// @notice Pauses minting tokens.
-    /// @dev This will "lose" all earnings that preview functions have seen since the previous update,
-    /// as the next update won't mint any new tokens at all.
-    function pause() public onlyOwner {
-        _pause();
+    function changeApr(uint256 newAprBps) external onlyOwner {
+        update();
+        aprBps = newAprBps;
     }
 
-    function unpause() public onlyOwner {
-        _unpause();
+    function getApr() external view returns (uint256) {
+        return aprBps;
+    }
+
+    function takeAssets(uint256 amount) external onlyOwner {
+        SafeERC20.safeTransfer(IERC20(asset()), msg.sender, amount);
     }
 
     function _decimalsOffset() internal pure override returns (uint8) {

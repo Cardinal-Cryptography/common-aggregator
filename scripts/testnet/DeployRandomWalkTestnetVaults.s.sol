@@ -17,10 +17,11 @@ contract DeployRandomWalkTestnetVaults is Script {
             MintableERC20(token),
             string.concat("Random Walk Testnet Vault Slow ", tokenName),
             string.concat("rwtvs", tokenSymbol),
-            600, // 6% APY start
-            200, // 2% APY min
-            700, // 7% APY max
-            8 // 0.08 percentage points APY max change
+            600, // 6% APR start
+            200, // 2% APR min
+            700, // 7% APR max
+            8, // 0.08 percentage points APR max change
+            30 minutes // 30 minutes APR change interval
         );
 
         RandomWalkTestnetVault vaultMid = new RandomWalkTestnetVault(
@@ -30,7 +31,8 @@ contract DeployRandomWalkTestnetVaults is Script {
             600, // 6% APY start
             100, // 1% APY min
             1000, // 10% APY max
-            25 // 0.25 percentage points APY max change
+            25, // 0.25 percentage points APY max change
+            30 minutes // 30 minutes APR change interval
         );
 
         RandomWalkTestnetVault vaultFast = new RandomWalkTestnetVault(
@@ -40,7 +42,8 @@ contract DeployRandomWalkTestnetVaults is Script {
             600, // 6% APY start
             -100, // -1% APY min
             1200, // 12% APY max
-            50 // 0.5 percentage points APY max change
+            50, // 0.5 percentage points APY max change
+            30 minutes // 30 minutes APR change interval
         );
 
         console.log(string.concat(tokenName, " Slow Vault deployed to: "), address(vaultSlow));

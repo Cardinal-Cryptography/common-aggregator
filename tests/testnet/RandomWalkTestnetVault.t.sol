@@ -13,8 +13,20 @@ contract RandomWalkTestnetVaultExtended is RandomWalkTestnetVault {
         int256 _aprBps,
         int256 _minAprBps,
         int256 _maxAprBps,
-        uint256 _maxAprChangeBps
-    ) RandomWalkTestnetVault(_asset, _name, _symbol, _aprBps, _minAprBps, _maxAprBps, _maxAprChangeBps) {}
+        uint256 _maxAprChangeBps,
+        uint256 _timeSegmentDuration
+    )
+        RandomWalkTestnetVault(
+            _asset,
+            _name,
+            _symbol,
+            _aprBps,
+            _minAprBps,
+            _maxAprBps,
+            _maxAprChangeBps,
+            _timeSegmentDuration
+        )
+    {}
 
     function setNonceForRandomness(uint256 newNonce) public {
         nonceForRandomness = newNonce;
@@ -39,10 +51,11 @@ contract VariablyEarningVaultTest is Test {
             600, // 6% APR start
             100, // 1% APR min
             1000, // 10% APR max
-            25 // 0.25 percentage points APR max change
+            25, // 0.25 percentage points APR max change
+            30 minutes // time segment duration
         );
         vault2 = new RandomWalkTestnetVaultExtended(
-            MintableERC20(address(token)), "Random Walk Testnet Vault Mirror", "rwtv2", 600, 100, 1000, 25
+            MintableERC20(address(token)), "Random Walk Testnet Vault Mirror", "rwtv2", 600, 100, 1000, 25, 30 minutes
         );
 
         vault.setNonceForRandomness(1);
@@ -63,7 +76,8 @@ contract VariablyEarningVaultTest is Test {
             50, // 0.5% APR start
             -500, // -5% APR min
             50, // 0.5% APR max
-            25 // 0.25 percentage points APR max change
+            25, // 0.25 percentage points APR max change
+            30 minutes // time segment duration
         );
         vm.prank(user);
         token.approve(address(losingVault), type(uint256).max);
