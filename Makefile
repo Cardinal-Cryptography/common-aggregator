@@ -22,6 +22,14 @@ test: # Run tests
 test:
 	forge test
 
+.PHONY: coverage-contracts
+coverage-contracts: # Run coverage
+coverage-contracts:
+	mkdir -p coverage
+	forge coverage --no-match-coverage='^(scripts|tests)' --report lcov --report-file coverage/lcov.info
+	genhtml coverage/lcov.info --branch-coverage --output-dir coverage
+	@echo "Coverage report generated at coverage/index.html"
+
 .PHONY: fmt
 fmt: # Format contracts
 fmt:

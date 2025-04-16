@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Test} from "forge-std/Test.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
+import {InvalidERC20} from "tests/mock/InvalidERC20.sol";
 import {ERC4626BufferedUpgradeable, IERC4626Buffered} from "./../contracts/ERC4626BufferedUpgradeable.sol";
 import {MAX_BPS} from "./../contracts/Math.sol";
 
@@ -37,6 +38,18 @@ contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
     function _decimalsOffset() internal view override returns (uint8) {
         return decimalsOffset;
     }
+
+    function getDefaultDecimalsOffset() public view returns (uint8) {
+        return super._decimalsOffset();
+    }
+
+    function maxDeposit(address) public pure override returns (uint256) {
+        return type(uint232).max;
+    }
+
+    function maxMint(address) public pure override returns (uint256) {
+        return type(uint232).max;
+    }
 }
 
 abstract contract ERC4626BufferedUpgradeableTest is Test {
@@ -57,6 +70,7 @@ abstract contract ERC4626BufferedUpgradeableTest is Test {
     function testAssetsAfterInit() public view {
         assertEq(bufferedVault.asset(), address(asset));
         assertEq(bufferedVault.totalAssets(), 0);
+        assertEq(bufferedVault.getDefaultDecimalsOffset(), 0);
     }
 
     function testZeroDepositsAndDrops() public {
@@ -435,6 +449,43 @@ abstract contract ERC4626BufferedUpgradeableTest is Test {
         assertEq(bufferedVault.balanceOf(alice), 10 ** 6 * DECIMAL_OFFSET_POWER * 11 / 10);
     }
 
+    function testMaxLimits() public {
+        asset.mint(alice, 1 << 250);
+
+        vm.startPrank(alice);
+        asset.approve(address(bufferedVault), type(uint256).max);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ERC4626BufferedUpgradeable.ERC4626ExceededMaxDeposit.selector, alice, 1 << 232, (1 << 232) - 1
+            )
+        );
+        bufferedVault.deposit(1 << 232, alice);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ERC4626BufferedUpgradeable.ERC4626ExceededMaxMint.selector, alice, 1 << 232, (1 << 232) - 1
+            )
+        );
+        bufferedVault.mint(1 << 232, alice);
+
+        bufferedVault.deposit((1 << 232) - 1, alice);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ERC4626BufferedUpgradeable.ERC4626ExceededMaxWithdraw.selector, alice, 1 << 232, (1 << 232) - 1
+            )
+        );
+        bufferedVault.withdraw(1 << 232, alice, alice);
+
+        uint256 maxRedeem = bufferedVault.maxRedeem(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ERC4626BufferedUpgradeable.ERC4626ExceededMaxRedeem.selector, alice, maxRedeem + 1, maxRedeem
+            )
+        );
+        bufferedVault.redeem(maxRedeem + 1, alice, alice);
+    }
+
     uint256 internal constant UPDATE_NUM = 10;
 
     function testFuzz_BufferEndIsNeverLowerThanLastUpdate(
@@ -625,6 +676,18 @@ contract ERC4626BufferedUpgradeableTestNoDecimalOffset is Test, ERC4626BufferedU
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
         bufferedVault = ERC4626BufferedUpgradeableConcrete(address(proxy));
+    }
+
+    function testTryGetAssetDecimals() public {
+        ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeableConcrete();
+        IERC20 assetToManyDecimals = new InvalidERC20();
+        bytes memory initializeData = abi.encodeWithSelector(
+            ERC4626BufferedUpgradeableConcrete.initialize.selector, DECIMALS_OFFSET, assetToManyDecimals
+        );
+
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
+        bufferedVault = ERC4626BufferedUpgradeableConcrete(address(proxy));
+        assertEq(bufferedVault.decimals(), 18, "Fallback asset decimals");
     }
 
     function testFuzz_WithUserActions(
