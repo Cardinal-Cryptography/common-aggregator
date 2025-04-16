@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Test} from "forge-std/Test.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
-import {InvalidERC20} from "tests/mock/InvalidERC20.sol";
+import {RevertingDecimalsERC20} from "tests/mock/RevertingDecimalsERC20.sol";
 import {ERC4626BufferedUpgradeable, IERC4626Buffered} from "./../contracts/ERC4626BufferedUpgradeable.sol";
 import {MAX_BPS} from "./../contracts/Math.sol";
 
@@ -680,7 +680,7 @@ contract ERC4626BufferedUpgradeableTestNoDecimalOffset is Test, ERC4626BufferedU
 
     function testTryGetAssetDecimals() public {
         ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeableConcrete();
-        IERC20 assetToManyDecimals = new InvalidERC20();
+        IERC20 assetToManyDecimals = new RevertingDecimalsERC20();
         bytes memory initializeData = abi.encodeWithSelector(
             ERC4626BufferedUpgradeableConcrete.initialize.selector, DECIMALS_OFFSET, assetToManyDecimals
         );

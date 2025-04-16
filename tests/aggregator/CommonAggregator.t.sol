@@ -30,7 +30,7 @@ contract CommonAggregatorTest is Test {
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
     }
 
-    function testExternalStorageGetters() view public {
+    function testExternalStorageGetters() public view {
         assertEq(commonAggregator.getManagement(), address(commonManagement));
         for (uint256 i = 0; i < vaults.length; i++) {
             assertEq(address(commonAggregator.getVaults()[i]), address(vaults[i]));
