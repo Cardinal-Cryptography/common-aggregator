@@ -680,9 +680,9 @@ contract ERC4626BufferedUpgradeableTestNoDecimalOffset is Test, ERC4626BufferedU
 
     function testTryGetAssetDecimals() public {
         ERC4626BufferedUpgradeable implementation = new ERC4626BufferedUpgradeableConcrete();
-        IERC20 assetToManyDecimals = new RevertingDecimalsERC20();
+        IERC20 revertingERC20 = new RevertingDecimalsERC20();
         bytes memory initializeData = abi.encodeWithSelector(
-            ERC4626BufferedUpgradeableConcrete.initialize.selector, DECIMALS_OFFSET, assetToManyDecimals
+            ERC4626BufferedUpgradeableConcrete.initialize.selector, DECIMALS_OFFSET, revertingERC20
         );
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
