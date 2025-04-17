@@ -2,15 +2,13 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonAggregator, ICommonAggregator, IERC20, IERC4626} from "contracts/CommonAggregator.sol";
 import {CommonManagement} from "contracts/CommonManagement.sol";
-import {ICommonManagement} from "contracts/interfaces/ICommonManagement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 import {setUpAggregator} from "tests/utils.sol";
+import {MAX_BPS} from "contracts/Math.sol";
 
 contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
@@ -32,19 +30,73 @@ contract CommonAggregatorTest is Test {
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
     }
 
+    function testExternalStorageGetters() public {
+        assertEq(commonAggregator.getManagement(), address(commonManagement));
+        for (uint256 i = 0; i < vaults.length; i++) {
+            assertEq(address(commonAggregator.getVaults()[i]), address(vaults[i]));
+        }
+        assertEq(commonAggregator.getMaxAllocationLimit(vaults[0]), MAX_BPS);
+        assertEq(commonAggregator.getMaxAllocationLimit(vaults[1]), MAX_BPS);
+        assertEq(commonAggregator.getMaxAllocationLimit(IERC4626(address(0x3451254))), 0);
+    }
+
     function testRoleGranting() public {
         assertEq(commonManagement.owner(), owner);
 
         address otherAccount = address(0x456);
         assertNotEq(commonManagement.owner(), otherAccount);
-        assertFalse(commonManagement.hasRole(ICommonManagement.Roles.Manager, otherAccount));
+        assertFalse(commonManagement.hasRole(CommonManagement.Roles.Manager, otherAccount));
 
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Manager, otherAccount);
-        assertTrue(commonManagement.hasRole(ICommonManagement.Roles.Manager, otherAccount));
+        commonManagement.grantRole(CommonManagement.Roles.Manager, otherAccount);
+        assertTrue(commonManagement.hasRole(CommonManagement.Roles.Manager, otherAccount));
     }
 
-    // Reporting
+    function testOnlyManagementModifier() public {
+        asset.mint(alice, 1000);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 1000);
+        vm.prank(alice);
+        commonAggregator.deposit(1000, alice);
+
+        vm.startPrank(owner);
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pushFunds(1000, vaults[0]);
+
+        vm.startPrank(owner);
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pullFunds(0, vaults[0]);
+
+        vm.startPrank(owner);
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pullFundsByShares(0, vaults[0]);
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.setLimit(vaults[0], 10);
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.setProtocolFee(10);
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.setProtocolFeeReceiver(address(1));
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.pauseUserInteractions();
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.addVault(IERC4626(address(1)));
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.removeVault(vaults[0]);
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.forceRemoveVault(vaults[0]);
+
+        commonManagement.pauseUserInteractions();
+
+        vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
+        commonAggregator.unpauseUserInteractions();
+    }
 
     function testFirstDeposit() public {
         asset.mint(alice, 1000);
@@ -219,8 +271,16 @@ contract CommonAggregatorTest is Test {
         commonManagement.setProtocolFee(100); // 1%
 
         vm.prank(owner);
+        vm.expectRevert(ICommonAggregator.ProtocolFeeTooHigh.selector);
+        commonManagement.setProtocolFee(MAX_BPS / 2 + 1);
+
+        vm.prank(owner);
         vm.expectRevert();
         commonManagement.setProtocolFeeReceiver(address(0));
+
+        vm.prank(owner);
+        vm.expectRevert();
+        commonManagement.setProtocolFeeReceiver(address(commonAggregator));
 
         vm.prank(owner);
         commonManagement.setProtocolFeeReceiver(owner);

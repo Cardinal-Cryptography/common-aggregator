@@ -22,7 +22,22 @@ test: # Run tests
 test:
 	forge test
 
+.PHONY: fmt
+fmt: # Format contracts
+fmt:
+	forge fmt
+
+.PHONY: lint
+lint: # Run lint via solhint
+lint:
+	pnpm solhint contracts/interfaces/*.sol contracts/*.sol scripts/*.sol
+
 .PHONY: benchmark
 benchmark: # Run benchmark
 benchmark:
 	forge test --match-test Benchmark --gas-report
+
+.PHONY: doc-local
+doc-local: # Generate documentation for local usage
+doc-local:
+	forge doc --serve --port 14719

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {CommonAggregator, ICommonAggregator, ERC4626BufferedUpgradeable} from "contracts/CommonAggregator.sol";
-import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
+import {CommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy, ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
@@ -91,6 +91,7 @@ contract CommonAggregatorUpgradeMissingStorageFields is
     }
 
     function _authorizeUpgrade(address newImplementation) internal override {}
+    function updateHoldingsState() external override {}
 }
 
 contract CommonAggregatorTest is Test {

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {CommonAggregator, ICommonAggregator} from "contracts/CommonAggregator.sol";
-import {CommonManagement, ICommonManagement} from "contracts/CommonManagement.sol";
+import {CommonManagement} from "contracts/CommonManagement.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -37,7 +37,7 @@ contract CommonAggregatorTest is Test {
 
         (commonAggregator, commonManagement) = setUpAggregator(owner, asset, ierc4626Vaults);
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Rebalancer, rebalancer);
+        commonManagement.grantRole(CommonManagement.Roles.Rebalancer, rebalancer);
     }
 
     function testPushFunds() public {
@@ -246,7 +246,7 @@ contract CommonAggregatorTest is Test {
     function testRolesPushPullFunds() public {
         address manager = address(0x111);
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
+        commonManagement.grantRole(CommonManagement.Roles.Manager, manager);
 
         uint256 amount = 100;
         asset.mint(alice, amount);
@@ -261,7 +261,7 @@ contract CommonAggregatorTest is Test {
         commonManagement.pushFunds(1, vaults[0]);
         vm.prank(owner);
         commonManagement.pushFunds(1, vaults[0]);
-        vm.expectRevert(ICommonManagement.CallerNotRebalancerOrWithHigherRole.selector);
+        vm.expectRevert(CommonManagement.CallerNotRebalancerOrWithHigherRole.selector);
         vm.prank(alice);
         commonManagement.pushFunds(1, vaults[0]);
 
@@ -269,7 +269,7 @@ contract CommonAggregatorTest is Test {
         commonManagement.pullFunds(1, vaults[0]);
         vm.prank(owner);
         commonManagement.pullFunds(1, vaults[0]);
-        vm.expectRevert(ICommonManagement.CallerNotRebalancerOrWithHigherRole.selector);
+        vm.expectRevert(CommonManagement.CallerNotRebalancerOrWithHigherRole.selector);
         vm.prank(alice);
         commonManagement.pullFunds(1, vaults[0]);
 
@@ -277,7 +277,7 @@ contract CommonAggregatorTest is Test {
         commonManagement.pullFundsByShares(1, vaults[0]);
         vm.prank(owner);
         commonManagement.pullFundsByShares(1, vaults[0]);
-        vm.expectRevert(ICommonManagement.CallerNotRebalancerOrWithHigherRole.selector);
+        vm.expectRevert(CommonManagement.CallerNotRebalancerOrWithHigherRole.selector);
         vm.prank(alice);
         commonManagement.pullFundsByShares(1, vaults[0]);
     }
@@ -285,7 +285,7 @@ contract CommonAggregatorTest is Test {
     function testRolesSetLimit() public {
         address manager = address(0x111);
         vm.prank(owner);
-        commonManagement.grantRole(ICommonManagement.Roles.Manager, manager);
+        commonManagement.grantRole(CommonManagement.Roles.Manager, manager);
         bytes4 errorSelector = OwnableUpgradeable.OwnableUnauthorizedAccount.selector;
 
         address[] memory notAllowed = new address[](3);

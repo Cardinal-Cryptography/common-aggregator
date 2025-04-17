@@ -11,7 +11,7 @@ import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
 
 contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
-    uint256 constant VAULT_COUNT = 5;
+    uint256 constant VAULT_COUNT = 8;
     uint256 constant BASE_AMOUNT = 1_000_000;
     uint256 constant DROP_AMOUNT = 1_000;
 

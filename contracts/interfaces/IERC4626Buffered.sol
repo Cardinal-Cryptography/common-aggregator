@@ -8,6 +8,7 @@ interface IERC4626Buffered is IERC4626 {
 
     function setProtocolFee(uint256 protocolFee) external;
     function setProtocolFeeReceiver(address protocolFeeReceiver) external;
+    function updateHoldingsState() external;
 
     error IncorrectProtocolFee();
     error ZeroProtocolFeeReceiver();
