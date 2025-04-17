@@ -157,8 +157,8 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
                 }
                 aprChangeTimestamp = time;
 
-                if (iters >= 24 * 2 * 4) {
-                    // More than 4 days with no update. Extend the duration of current time segment
+                if (iters >= 200) {
+                    // Too much time from last update. Extend the duration of current time segment
                     // from `TIME_SEGMENT_DURATION` until the end. Keep the APR constant in that time segment.
                     uint256 itersYetExceptThis = (block.timestamp - time) / uint256(TIME_SEGMENT_DURATION);
                     timeSegmentDuration = (TIME_SEGMENT_DURATION) * (itersYetExceptThis + 1);

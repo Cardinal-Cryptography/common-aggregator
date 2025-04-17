@@ -13,38 +13,38 @@ contract DeployRandomWalkTestnetVaults is Script {
         string memory tokenName = IERC20Metadata(token).name();
         string memory tokenSymbol = IERC20Metadata(token).symbol();
 
-        RandomWalkTestnetVault vaultSlow = new RandomWalkTestnetVault(
-            MintableERC20(token),
-            string.concat("Random Walk Testnet Vault Slow ", tokenName),
-            string.concat("rwtvs", tokenSymbol),
-            600, // 6% APR start
-            200, // 2% APR min
-            700, // 7% APR max
-            8, // 0.08 percentage points APR max change
-            30 minutes // 30 minutes APR change interval
-        );
+        RandomWalkTestnetVault vaultSlow = new RandomWalkTestnetVault({
+            _asset: MintableERC20(token),
+            _name: string.concat("Random Walk Testnet Vault Slow ", tokenName),
+            _symbol: string.concat("rwtvs", tokenSymbol),
+            _startingAprBps: 600,
+            _minAprBps: 200,
+            _maxAprBps: 700,
+            _maxAprChangeBps: 8,
+            _timeSegmentDuration: 2 hours
+        });
 
-        RandomWalkTestnetVault vaultMid = new RandomWalkTestnetVault(
-            MintableERC20(token),
-            string.concat("Random Walk Testnet Vault Mid", tokenName),
-            string.concat("rwtvm", tokenSymbol),
-            600, // 6% APY start
-            100, // 1% APY min
-            1000, // 10% APY max
-            25, // 0.25 percentage points APY max change
-            30 minutes // 30 minutes APR change interval
-        );
+        RandomWalkTestnetVault vaultMid = new RandomWalkTestnetVault({
+            _asset: MintableERC20(token),
+            _name: string.concat("Random Walk Testnet Vault Mid ", tokenName),
+            _symbol: string.concat("rwtvm", tokenSymbol),
+            _startingAprBps: 600,
+            _minAprBps: 100,
+            _maxAprBps: 1000,
+            _maxAprChangeBps: 25,
+            _timeSegmentDuration: 2 hours
+        });
 
-        RandomWalkTestnetVault vaultFast = new RandomWalkTestnetVault(
-            MintableERC20(token),
-            string.concat("Random Walk Testnet Vault Fast", tokenName),
-            string.concat("rwtvf", tokenSymbol),
-            600, // 6% APY start
-            -100, // -1% APY min
-            1200, // 12% APY max
-            50, // 0.5 percentage points APY max change
-            30 minutes // 30 minutes APR change interval
-        );
+        RandomWalkTestnetVault vaultFast = new RandomWalkTestnetVault({
+            _asset: MintableERC20(token),
+            _name: string.concat("Random Walk Testnet Vault Fast ", tokenName),
+            _symbol: string.concat("rwtvf", tokenSymbol),
+            _startingAprBps: 600,
+            _minAprBps: -100,
+            _maxAprBps: 1200,
+            _maxAprChangeBps: 50,
+            _timeSegmentDuration: 2 hours
+        });
 
         console.log(string.concat(tokenName, " Slow Vault deployed to: "), address(vaultSlow));
         console.log(string.concat(tokenName, " Mid Vault deployed to: "), address(vaultMid));

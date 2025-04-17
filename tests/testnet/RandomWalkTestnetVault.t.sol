@@ -52,10 +52,10 @@ contract VariablyEarningVaultTest is Test {
             100, // 1% APR min
             1000, // 10% APR max
             25, // 0.25 percentage points APR max change
-            30 minutes // time segment duration
+            2 hours // time segment duration
         );
         vault2 = new RandomWalkTestnetVaultExtended(
-            MintableERC20(address(token)), "Random Walk Testnet Vault Mirror", "rwtv2", 600, 100, 1000, 25, 30 minutes
+            MintableERC20(address(token)), "Random Walk Testnet Vault Mirror", "rwtv2", 600, 100, 1000, 25, 2 hours
         );
 
         vault.setNonceForRandomness(1);
@@ -77,7 +77,7 @@ contract VariablyEarningVaultTest is Test {
             -500, // -5% APR min
             50, // 0.5% APR max
             25, // 0.25 percentage points APR max change
-            30 minutes // time segment duration
+            2 hours // time segment duration
         );
         vm.prank(user);
         token.approve(address(losingVault), type(uint256).max);
@@ -108,19 +108,19 @@ contract VariablyEarningVaultTest is Test {
         vault.update();
         assertEq(vault.getAprBps(), 600);
 
-        vm.warp(STARTING_TIMESTAMP + 30 minutes - 1);
+        vm.warp(STARTING_TIMESTAMP + 2 hours - 1);
         vault.update();
         assertEq(vault.getAprBps(), 600);
 
-        vm.warp(STARTING_TIMESTAMP + 30 minutes);
+        vm.warp(STARTING_TIMESTAMP + 2 hours);
         vault.update();
         // with some probability
         assertNotEq(vault.getAprBps(), 600);
     }
 
     uint256 constant MAX_FUZZ_ITERS = 16;
-    /// forge-config: default.fuzz.runs = 1000
 
+    /// forge-config: default.fuzz.runs = 1000
     function testFuzz_AprChanges(uint256[MAX_FUZZ_ITERS] calldata timeIntervals, uint8[MAX_FUZZ_ITERS] calldata updates)
         public
     {
@@ -132,7 +132,7 @@ contract VariablyEarningVaultTest is Test {
         uint256 currentTimestamp = STARTING_TIMESTAMP;
         for (uint256 i = 0; i < MAX_FUZZ_ITERS; i++) {
             uint256 u = bound(updates[i], 0, 2);
-            uint256 timeInterval = bound(timeIntervals[i], 1, 5 hours);
+            uint256 timeInterval = bound(timeIntervals[i], 1, 14 hours);
 
             currentTimestamp += timeInterval;
             vm.warp(currentTimestamp);
@@ -155,13 +155,13 @@ contract VariablyEarningVaultTest is Test {
         assertEq(vault.getAprBps(), 600);
         assertEq(vault.totalAssets(), 1000 * 10 ** 6);
 
-        vm.warp(STARTING_TIMESTAMP + 6 days);
+        vm.warp(STARTING_TIMESTAMP + 25 days);
         uint256 totalAssetsA = vault.totalAssets();
 
-        vm.warp(STARTING_TIMESTAMP + 16 days);
+        vm.warp(STARTING_TIMESTAMP + 35 days);
         uint256 totalAssetsB = vault.totalAssets();
 
-        vm.warp(STARTING_TIMESTAMP + 206 days);
+        vm.warp(STARTING_TIMESTAMP + 225 days);
         vault.update();
 
         assertGe((vault.totalAssets() - totalAssetsA), (totalAssetsB - totalAssetsA) * 20 - 20, ">=");
