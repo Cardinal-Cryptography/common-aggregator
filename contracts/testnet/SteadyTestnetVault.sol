@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {ERC4626, ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {ERC4626, ERC20, IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 interface MintableERC20 is IERC20 {
@@ -35,7 +35,7 @@ contract SteadyTestnetVault is Ownable2Step, ERC4626 {
         if (newTotalAssets >= assetsHeld) {
             MintableERC20(asset()).mint(address(this), newTotalAssets - assetsHeld);
         } else {
-            IERC20(asset()).transfer(address(1), assetsHeld - newTotalAssets);
+            SafeERC20.safeTransfer(IERC20(asset()), address(1), assetsHeld - newTotalAssets);
         }
         lastUpdateTimestamp = block.timestamp;
         // take any donations
