@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {ERC4626, ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 interface MintableERC20 is IERC20 {
     function mint(address to, uint256 amount) external;
@@ -26,21 +26,21 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
     using Math for uint256;
 
     // Internal accounting, so that the amount to mint with update can't be manipulated with a donation just before the update.
-    uint256 assetsHeld;
+    uint256 private assetsHeld;
 
-    uint256 lastUpdateTimestamp;
+    uint256 private lastUpdateTimestamp;
 
     // Invariant: lastAprChangeTimestamp should be at most lastUpdateTimestamp,
     // but not less than it by `TIME_SEGMENT_DURATION` minutes or more.
-    uint256 lastAprChangeTimestamp;
-    int256 aprBps;
+    uint256 private lastAprChangeTimestamp;
+    int256 private aprBps;
 
-    int256 minAprBps;
-    int256 maxAprBps;
-    uint256 maxAprChangeBps;
-    uint256 nonceForRandomness;
+    int256 private minAprBps;
+    int256 private maxAprBps;
+    uint256 private maxAprChangeBps;
+    uint256 private nonceForRandomness;
 
-    uint256 immutable TIME_SEGMENT_DURATION;
+    uint256 private immutable TIME_SEGMENT_DURATION;
 
     /// @dev Do not use in production, this is just for testing and its value can be easily manipulated.
     function getPseudoRandomNumber(uint256 nonce) public pure returns (uint256) {
@@ -146,7 +146,7 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
                 int256 r = int256(getPseudoRandomNumber(newNonceForRandomness) % (2 * maxAprChangeBps + 1))
                     - int256(maxAprChangeBps);
                 unchecked {
-                    newNonceForRandomness++;
+                    ++newNonceForRandomness;
                 }
                 newAprBps = newAprBps + r;
                 if (newAprBps < minAprBps) {
@@ -178,7 +178,7 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
             asset =
                 uint256(int256(asset) + (int256(asset) * newAprBps * int256(timeElapsed)) / int256(10_000 * 365 days));
 
-            iters++;
+            ++iters;
             time += timeSegmentDuration;
         }
 

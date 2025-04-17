@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {ERC4626, ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 interface MintableERC20 is IERC20 {
     function mint(address to, uint256 amount) external;
@@ -16,9 +16,9 @@ interface MintableERC20 is IERC20 {
 contract SteadyTestnetVault is Ownable2Step, ERC4626 {
     using Math for uint256;
 
-    uint256 lastUpdateTimestamp;
-    uint256 aprBps;
-    uint256 assetsHeld;
+    uint256 private lastUpdateTimestamp;
+    uint256 private aprBps;
+    uint256 private assetsHeld;
 
     constructor(MintableERC20 _asset, string memory _name, string memory _symbol, uint256 _aprBps)
         Ownable(msg.sender)
