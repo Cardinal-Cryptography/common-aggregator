@@ -105,6 +105,15 @@ make compile-contracts
 make test
 ```
 
+Test coverage report is also available. For this `lcov` needs to be installed. This can be done on Debian/Ubuntu by running `sudo apt-get install lcov`.
+
+To run coverage tests:
+```
+make coverage-local
+```
+Results will be generated to `coverage/index.html` file.
+
+
 ### Bulding and serving docs locally
 
 ```

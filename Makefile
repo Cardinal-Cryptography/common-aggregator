@@ -22,6 +22,17 @@ test: # Run tests
 test:
 	forge test
 
+.PHONY: coverage-contracts
+coverage-contracts: # Run coverage
+coverage-contracts:
+	mkdir -p coverage
+	forge coverage --no-match-coverage='^(scripts|tests)' --report lcov --report-file coverage/lcov.info
+	@if ! genhtml coverage/lcov.info --branch-coverage --output-dir coverage; then \
+		echo "Error generating coverage report. Maybe you haven't installed lcov"; \
+		exit 1; \
+	fi
+	@echo "Coverage report generated at coverage/index.html"
+
 .PHONY: fmt
 fmt: # Format contracts
 fmt:
