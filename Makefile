@@ -52,3 +52,10 @@ benchmark:
 doc-local: # Generate documentation for local usage
 doc-local:
 	forge doc --serve --port 14719
+
+.PHONY: deploy-mocks-on-testnet
+deploy-mocks-on-testnet:
+deploy-mocks-on-testnet:
+	@echo "Deploying mocks on testnet..."
+	forge script ./scripts/testnet/DeploySteadyTestnetVault.s.sol --rpc-url $TESTNET_RPC_URL --broadcast --verify
+	forge script ./scripts/testnet/RandomWalkTestnetVault.s.sol --rpc-url $TESTNET_RPC_URL --broadcast --verify
