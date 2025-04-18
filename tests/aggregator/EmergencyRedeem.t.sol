@@ -2,12 +2,12 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {CommonAggregator} from "contracts/CommonAggregator.sol";
+import {CommonAggregator, ERC4626BufferedUpgradeable} from "contracts/CommonAggregator.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20, IERC20Errors} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC4626Mock} from "tests/mock/ERC4626Mock.sol";
 import {ERC20Mock} from "tests/mock/ERC20Mock.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract CommonAggregatorTest is Test {
     using Math for uint256;
@@ -46,6 +46,14 @@ contract CommonAggregatorTest is Test {
 
         uint256 expectedAliceAssets = _expectedUserAssets(aliceShares);
         uint256[VAULT_COUNT] memory expectedAliceVaultsShares = _expectedUserVaultsShares(aliceShares);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ERC4626BufferedUpgradeable.ERC4626ExceededMaxRedeem.selector, alice, aliceShares + 1, aliceShares
+            )
+        );
+        commonAggregator.emergencyRedeem(aliceShares + 1, alice, alice);
 
         vm.prank(alice);
         (uint256 assets, uint256[] memory aliceVaultShares) =
@@ -100,6 +108,41 @@ contract CommonAggregatorTest is Test {
         for (uint256 i = 0; i < VAULT_COUNT; i++) {
             assertEq(0, aliceVaultShares[i]);
             assertEq(0, IERC20(vaults[i]).balanceOf(alice));
+        }
+    }
+
+    function testEmergencyRedeemPartialSharesWithAllowance() public {
+        uint256 aliceShares = _deposit(1000, alice);
+        _deposit(500, bob);
+
+        _distribute([uint256(400), 300, 200]);
+
+        uint256 sharesToRedeem = aliceShares / 4;
+
+        vm.prank(alice);
+        commonAggregator.approve(bob, sharesToRedeem);
+
+        uint256 expectedAliceAssets = _expectedUserAssets(sharesToRedeem);
+        uint256[VAULT_COUNT] memory expectedAliceVaultsShares = _expectedUserVaultsShares(sharesToRedeem);
+
+        address charlie = address(0x4321);
+
+        vm.prank(bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IERC20Errors.ERC20InsufficientAllowance.selector, bob, sharesToRedeem, sharesToRedeem + 1
+            )
+        );
+        commonAggregator.emergencyRedeem(sharesToRedeem + 1, charlie, alice);
+
+        vm.prank(bob);
+        (, uint256[] memory aliceVaultShares) = commonAggregator.emergencyRedeem(sharesToRedeem, charlie, alice);
+
+        assertEq(expectedAliceAssets, asset.balanceOf(charlie));
+
+        for (uint256 i = 0; i < VAULT_COUNT; i++) {
+            assertEq(expectedAliceVaultsShares[i], aliceVaultShares[i]);
+            assertEq(expectedAliceVaultsShares[i], IERC20(vaults[i]).balanceOf(charlie));
         }
     }
 
