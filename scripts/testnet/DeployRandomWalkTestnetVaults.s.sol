@@ -21,7 +21,7 @@ contract DeployRandomWalkTestnetVaults is Script {
             _minAprBps: 200,
             _maxAprBps: 700,
             _maxAprChangeBps: 8,
-            _timeSegmentDuration: 2 hours
+            _timeSegmentDuration: 4 hours
         });
 
         RandomWalkTestnetVault vaultMid = new RandomWalkTestnetVault({
@@ -32,7 +32,7 @@ contract DeployRandomWalkTestnetVaults is Script {
             _minAprBps: 100,
             _maxAprBps: 1000,
             _maxAprChangeBps: 25,
-            _timeSegmentDuration: 2 hours
+            _timeSegmentDuration: 4 hours
         });
 
         RandomWalkTestnetVault vaultFast = new RandomWalkTestnetVault({
@@ -43,7 +43,7 @@ contract DeployRandomWalkTestnetVaults is Script {
             _minAprBps: -100,
             _maxAprBps: 1200,
             _maxAprChangeBps: 50,
-            _timeSegmentDuration: 2 hours
+            _timeSegmentDuration: 4 hours
         });
 
         console.log(string.concat(tokenName, " Slow Vault deployed to: "), address(vaultSlow));
