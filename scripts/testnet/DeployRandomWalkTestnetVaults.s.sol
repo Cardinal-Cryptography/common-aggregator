@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNKNOWN
 pragma solidity ^0.8.28;
 
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Script, console} from "forge-std/Script.sol";
 import {RandomWalkTestnetVault, MintableERC20} from "../../contracts/testnet/RandomWalkTestnetVault.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -46,14 +47,22 @@ contract DeployRandomWalkTestnetVaults is Script {
             _timeSegmentDuration: 2 hours
         });
 
-        console.log(string.concat(tokenName, " Slow Vault deployed to: "), address(vaultSlow));
-        console.log(string.concat(tokenName, " Mid Vault deployed to: "), address(vaultMid));
-        console.log(string.concat(tokenName, " Fast Vault deployed to: "), address(vaultFast));
+        string memory slowAddressStr = Strings.toChecksumHexString(address(vaultSlow));
+        string memory midAddressStr = Strings.toChecksumHexString(address(vaultMid));
+        string memory fastAddressStr = Strings.toChecksumHexString(address(vaultFast));
+
+        console.log(string.concat(tokenName, " Slow Vault deployed to: "), slowAddressStr);
+        console.log(string.concat(tokenName, " Mid Vault deployed to: "), midAddressStr);
+        console.log(string.concat(tokenName, " Fast Vault deployed to: "), fastAddressStr);
 
         // Approve the vaults to spend the token (for initial deposit later)
         MintableERC20(token).approve(address(vaultSlow), type(uint256).max);
         MintableERC20(token).approve(address(vaultMid), type(uint256).max);
         MintableERC20(token).approve(address(vaultFast), type(uint256).max);
+
+        vm.setEnv("TESTNET_SLOW_VAULT_ADDRESS", slowAddressStr);
+        vm.setEnv("TESTNET_MID_VAULT_ADDRESS", midAddressStr);
+        vm.setEnv("TESTNET_FAST_VAULT_ADDRESS", fastAddressStr);
 
         vm.stopBroadcast();
     }

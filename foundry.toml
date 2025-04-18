@@ -16,7 +16,6 @@ remappings = [
 
 no_match_path = "tests/aggregator/UpgradesOpenZeppelin.t.sol"
 
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 [rpc_endpoints]
 aleph_evm_testnet = "${ALEPH_EVM_TESTNET_RPC_URL}"
 
@@ -24,7 +23,7 @@ aleph_evm_testnet = "${ALEPH_EVM_TESTNET_RPC_URL}"
 ignore = [
     "contracts/Math.sol",
     "contracts/interfaces/Initializers.sol",
-    "contracts/testnet/*"
+    "contracts/testnet/*",
 ]
 
 # Includes also openzeppelin foundry upgrades

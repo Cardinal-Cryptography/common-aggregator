@@ -41,3 +41,9 @@ benchmark:
 doc-local: # Generate documentation for local usage
 doc-local:
 	forge doc --serve --port 14719
+
+.ONESHELL:
+.PHONY: local-devnet
+local-devnet: # Run local devnet with test vaults and aggregator (on anvil)
+local-devnet:
+	bash local_devnet.sh
