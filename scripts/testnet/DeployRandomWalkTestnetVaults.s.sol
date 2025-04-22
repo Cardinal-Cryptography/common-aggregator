@@ -7,7 +7,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 
 contract DeployRandomWalkTestnetVaults is Script {
     function run() public {
-        address token = vm.envAddress("TESTNET_VAULT_TOKEN_ADDRESS");
+        address token = vm.envAddress("TESTNET_VAULT_ASSET_ADDRESS");
         vm.startBroadcast();
 
         string memory tokenName = IERC20Metadata(token).name();
