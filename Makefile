@@ -54,8 +54,22 @@ doc-local:
 	forge doc --serve --port 14719
 
 .PHONY: deploy-mocks-on-testnet
-deploy-mocks-on-testnet:
+deploy-mocks-on-testnet: # Deploy mocks on testnet
 deploy-mocks-on-testnet:
 	@echo "Deploying mocks on testnet..."
-	forge script ./scripts/testnet/DeploySteadyTestnetVault.s.sol --rpc-url $TESTNET_RPC_URL --broadcast --verify
-	forge script ./scripts/testnet/RandomWalkTestnetVault.s.sol --rpc-url $TESTNET_RPC_URL --broadcast --verify
+	@forge script ./scripts/testnet/DeploySteadyTestnetVault.s.sol --rpc-url ${RPC_URL} --private-key ${DEPLOYER_PRIVATE_KEY} --broadcast --verify --verifier blockscout
+	@forge script ./scripts/testnet/DeployRandomWalkTestnetVaults.s.sol --rpc-url ${RPC_URL} --private-key ${DEPLOYER_PRIVATE_KEY} --broadcast --verify --verifier blockscout
+
+.PHONY: deploy-aggregator
+deploy-aggregator: # Deploy aggregator
+deploy-aggregator:
+	@echo "Building contracts with full profile..."
+	FOUNDRY_PROFILE=full forge clean;
+	FOUNDRY_PROFILE=full forge build;
+	@if [ "${DEPLOY_BROADCAST}" = "true" ]; then \
+		echo "Deploying aggregator..."; \
+		FOUNDRY_PROFILE=full forge script ./scripts/DeployAggregator.s.sol --rpc-url ${RPC_URL} --private-key ${DEPLOYER_PRIVATE_KEY} --broadcast --verify --verifier blockscout; \
+	else \
+		echo "Dry-running deployment of aggregator. To deploy, edit DEPLOY_BROADCAST flag in .env"; \
+		FOUNDRY_PROFILE=full forge script ./scripts/DeployAggregator.s.sol --rpc-url ${RPC_URL} --private-key ${DEPLOYER_PRIVATE_KEY}; \
+	fi
