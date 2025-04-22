@@ -24,6 +24,7 @@ aleph_evm_testnet = "${ALEPH_EVM_TESTNET_RPC_URL}"
 ignore = [
     "contracts/Math.sol",
     "contracts/interfaces/Initializers.sol",
+    "contracts/testnet/*"
 ]
 
 # Includes also openzeppelin foundry upgrades
