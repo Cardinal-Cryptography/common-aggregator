@@ -73,3 +73,8 @@ deploy-aggregator:
 		echo "Dry-running deployment of aggregator. To deploy, edit DEPLOY_BROADCAST flag in .env"; \
 		FOUNDRY_PROFILE=full forge script ./scripts/DeployAggregator.s.sol --rpc-url ${RPC_URL} --private-key ${DEPLOYER_PRIVATE_KEY}; \
 	fi
+
+.PHONY: local-devnet
+local-devnet: # Run local devnet with test vaults and aggregator (on anvil)
+local-devnet:
+	@./local_devnet.sh

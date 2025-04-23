@@ -16,5 +16,11 @@ node_modules/
 # docs
 docs/
 
+# Dev logs
+.anvil.log
+
 # coverage
 coverage/
+
+# deployment addresses
+addresses/devnet.env

@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 import {console} from "forge-std/console.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Script} from "forge-std/Script.sol";
 import {CommonAggregator, IERC20Metadata, IERC4626} from "../contracts/CommonAggregator.sol";
 import {CommonAggregatorDeployer} from "../contracts/CommonAggregatorDeployer.sol";
@@ -40,5 +41,8 @@ contract DeployAggregatorScript is Script {
         console.log("Deployed CommonAggregator contract to:", aggregator);
 
         vm.stopBroadcast();
+
+        vm.setEnv("MANAGEMENT_ADDRESS", Strings.toChecksumHexString(management));
+        vm.setEnv("AGGREGATOR_ADDRESS", Strings.toChecksumHexString(aggregator));
     }
 }
