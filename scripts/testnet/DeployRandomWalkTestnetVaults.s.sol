@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNKNOWN
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
@@ -8,7 +8,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 
 contract DeployRandomWalkTestnetVaults is Script {
     function run() public {
-        address token = vm.envAddress("TESTNET_VAULT_TOKEN_ADDRESS");
+        address token = vm.envAddress("TESTNET_VAULT_ASSET_ADDRESS");
         vm.startBroadcast();
 
         string memory tokenName = IERC20Metadata(token).name();
@@ -22,7 +22,7 @@ contract DeployRandomWalkTestnetVaults is Script {
             _minAprBps: 200,
             _maxAprBps: 700,
             _maxAprChangeBps: 8,
-            _timeSegmentDuration: 2 hours
+            _timeSegmentDuration: 4 hours
         });
 
         RandomWalkTestnetVault vaultMid = new RandomWalkTestnetVault({
@@ -33,7 +33,7 @@ contract DeployRandomWalkTestnetVaults is Script {
             _minAprBps: 100,
             _maxAprBps: 1000,
             _maxAprChangeBps: 25,
-            _timeSegmentDuration: 2 hours
+            _timeSegmentDuration: 4 hours
         });
 
         RandomWalkTestnetVault vaultFast = new RandomWalkTestnetVault({
@@ -44,7 +44,7 @@ contract DeployRandomWalkTestnetVaults is Script {
             _minAprBps: -100,
             _maxAprBps: 1200,
             _maxAprChangeBps: 50,
-            _timeSegmentDuration: 2 hours
+            _timeSegmentDuration: 4 hours
         });
 
         string memory slowAddressStr = Strings.toChecksumHexString(address(vaultSlow));

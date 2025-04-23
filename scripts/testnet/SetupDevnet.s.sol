@@ -16,7 +16,7 @@ contract SetupDevnet is Script {
         new DeploySteadyTestnetVault().run();
         new DeployRandomWalkTestnetVaults().run();
 
-        address assetAddr = vm.envAddress("TESTNET_VAULT_TOKEN_ADDRESS");
+        address assetAddr = vm.envAddress("TESTNET_VAULT_ASSET_ADDRESS");
         CommonAggregatorTestnetAsset asset = CommonAggregatorTestnetAsset(assetAddr);
 
         address steady = vm.envAddress("TESTNET_STEADY_VAULT_ADDRESS");

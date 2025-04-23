@@ -20,7 +20,7 @@ contract DeployTestnetAsset is Script {
 
         console.log("Testnet asset deployed to: ", addressStr);
 
-        vm.setEnv("TESTNET_VAULT_TOKEN_ADDRESS", addressStr);
+        vm.setEnv("TESTNET_VAULT_ASSET_ADDRESS", addressStr);
 
         vm.stopBroadcast();
     }

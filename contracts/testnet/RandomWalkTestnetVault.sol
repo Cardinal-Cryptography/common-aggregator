@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNKNOWN
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
@@ -157,7 +157,7 @@ contract RandomWalkTestnetVault is Ownable2Step, ERC4626, Pausable {
                 }
                 aprChangeTimestamp = time;
 
-                if (iters >= 200) {
+                if (iters >= 100) {
                     // Too much time from last update. Extend the duration of current time segment
                     // from `TIME_SEGMENT_DURATION` until the end. Keep the APR constant in that time segment.
                     uint256 itersYetExceptThis = (block.timestamp - time) / uint256(TIME_SEGMENT_DURATION);
