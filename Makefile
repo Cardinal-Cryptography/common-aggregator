@@ -74,8 +74,7 @@ deploy-aggregator:
 		FOUNDRY_PROFILE=full forge script ./scripts/DeployAggregator.s.sol --rpc-url ${RPC_URL} --private-key ${DEPLOYER_PRIVATE_KEY}; \
 	fi
 
-.ONESHELL:
 .PHONY: local-devnet
 local-devnet: # Run local devnet with test vaults and aggregator (on anvil)
 local-devnet:
-	@bash local_devnet.sh
+	@./local_devnet.sh
