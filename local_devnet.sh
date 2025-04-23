@@ -14,8 +14,7 @@ else
   # Kill a single background job (anvil), when scripts is terminated or exits.
   trap "kill %1" SIGINT SIGTERM EXIT
   anvil > .anvil.log &
-  echo "Waiting for anvil to start..."
-  sleep 1
+  echo "Waiting for devnet to start..."
 fi
 
 # Re-build to ensure that profile.full was used for generating artifacts

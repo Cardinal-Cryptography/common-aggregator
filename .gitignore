@@ -21,3 +21,6 @@ docs/
 
 # coverage
 coverage/
+
+# deployment addresses
+addresses/

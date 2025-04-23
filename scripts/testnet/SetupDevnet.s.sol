@@ -50,5 +50,10 @@ contract SetupDevnet is Script {
         vm.setEnv("VAULTS", vaults);
 
         new DeployAggregatorScript().run();
+
+        vm.removeFile("addresses/devnet.env");
+        vm.writeLine("addresses/devnet.env", string.concat("VAULTS_ADDRESSES=", vaults));
+        vm.writeLine("addresses/devnet.env", string.concat("AGGREGATOR_ADDRESS=", vm.envString("AGGREGATOR_ADDRESS")));
+        vm.writeLine("addresses/devnet.env", string.concat("MANAGEMENT_ADDRESS=", vm.envString("MANAGEMENT_ADDRESS")));
     }
 }
