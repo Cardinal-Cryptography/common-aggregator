@@ -15,4 +15,7 @@ interface IERC4626Buffered is IERC4626 {
 
     function getProtocolFee() external view returns (uint256);
     function getProtocolFeeReceiver() external view returns (address);
+    function getLastUpdate() external view returns (uint256);
+    function getBufferedShares() external view returns (uint256);
+    function getCurrentBufferEnd() external view returns (uint256);
 }

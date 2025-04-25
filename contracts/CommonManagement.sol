@@ -115,6 +115,10 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         _getManagementStorage().aggregator = aggregator;
     }
 
+    function getAggregator() public view returns (address) {
+        return address(_getManagementStorage().aggregator);
+    }
+
     // ----- Aggregated vaults management -----
 
     /// @notice Submits timelocked action for adding `vault` to the aggregator.
@@ -209,6 +213,11 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         $.aggregator.forceRemoveVault(vault);
         --$.pendingVaultForceRemovals;
     }
+
+    function getPendingVaultForceRemovals() public view returns (uint256) {
+        return _getManagementStorage().pendingVaultForceRemovals;
+    }
+
     // ----- Rebalancing -----
 
     /// @notice Allows the `REBALANCER` or higher role holder to trigger `pushFunds` on the aggregator.
@@ -299,6 +308,10 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         $.rewardTrader[rewardToken] = traderAddress;
 
         emit RewardsTraderSet(rewardToken, traderAddress);
+    }
+
+    function getRewardTrader(address rewardToken) public view returns (address) {
+        return _getManagementStorage().rewardTrader[rewardToken];
     }
 
     /// @notice Triggers `transferRewardsForSale` on the aggregator.
