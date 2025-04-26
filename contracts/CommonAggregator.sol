@@ -279,7 +279,7 @@ contract CommonAggregator is
     // ----- Emergency redeem -----
 
     /// @notice Burns exactly `shares` from `owner` and sends proportional amounts of aggregated vaults' shares
-    /// and idle assets to `account`. This function can called even if the contract is paused.
+    /// and idle assets to `account`. This function can be called even if the contract is paused.
     ///
     /// @param shares Amount of shares to be redeemed.
     /// @param account Account that will receive the assets and the aggregated vaults' shares.

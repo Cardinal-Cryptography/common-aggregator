@@ -91,6 +91,14 @@ contract VaultManagementTest is Test {
         management.submitAddVault(vault);
     }
 
+    function testCantAddItself() public {
+        (CommonAggregator aggregator, CommonManagement management) = _aggregatorWithThreeVaults();
+
+        vm.expectRevert();
+        vm.prank(manager);
+        management.submitAddVault(IERC4626(address(aggregator)));
+    }
+
     function testCantSubmitVaultWithDifferentAsset() public {
         (, CommonManagement management) = _aggregatorWithThreeVaults();
         IERC4626 vault = new ERC4626Mock(address(0x111));

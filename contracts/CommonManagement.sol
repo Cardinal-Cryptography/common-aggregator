@@ -353,7 +353,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
     /// @dev After the timelock passes, upgrader can `upgradeToAndCall` on the new implementation with
     /// any calldata. No check against missing some storage or selectors are done on the contract
-    /// level. It's recommended to use the `openzeppelin-foundry-upgrades` libarary for updates.
+    /// level. It's recommended to use the `openzeppelin-foundry-upgrades` library for updates.
     /// There could be many pending upgrades, so it's the guardian's responsibility to cancel
     /// the invalid ones.
     function submitUpgradeManagement(address newImplementation)
@@ -404,6 +404,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
 
     /// @notice Executes the upgrade of the aggregator contract to the new implementation.
     function upgradeAggregator(address newImplementation, bytes calldata callData)
+    // audit-DS: if we want to be super safe,  maybe `callData` should also be in actionData, not only newImplementation?
         external
         onlyOwner
         executesAction(keccak256(abi.encode(TimelockTypes.AGGREGATOR_UPGRADE)), keccak256(abi.encode(newImplementation)))
