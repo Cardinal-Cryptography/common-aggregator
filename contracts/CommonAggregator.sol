@@ -86,6 +86,7 @@ contract CommonAggregator is
     function ensureVaultCanBeAdded(IERC4626 vault) public view {
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
         require(_getAggregatorStorage().vaults.length < MAX_VAULTS, VaultLimitExceeded());
+        require(address(vault) != address(this), VaultIsAggregator());
         require(!isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 

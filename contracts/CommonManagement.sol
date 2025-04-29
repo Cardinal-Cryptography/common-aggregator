@@ -127,6 +127,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         require(
             $.aggregator.asset() == vault.asset(), ICommonAggregator.IncorrectAsset($.aggregator.asset(), vault.asset())
         );
+        require(address(vault) != address($.aggregator), ICommonAggregator.VaultIsAggregator());
         require(!$.aggregator.isVaultOnTheList(vault), ICommonAggregator.VaultAlreadyAdded(vault));
 
         emit VaultAdditionSubmitted(address(vault), saturatingAdd(block.timestamp, ADD_VAULT_TIMELOCK));
