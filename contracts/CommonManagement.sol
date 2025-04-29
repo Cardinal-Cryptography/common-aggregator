@@ -353,7 +353,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     /// After `unlockTimestamp` passes, the contract upgrade can be performed to the new implementation.
     /// @dev After the timelock passes, upgrader can `upgradeToAndCall` on the new implementation with
     /// any calldata. No check against missing some storage or selectors are done on the contract
-    /// level. It's recommended to use the `openzeppelin-foundry-upgrades` libarary for updates.
+    /// level. It's recommended to use the `openzeppelin-foundry-upgrades` library for updates.
     /// There could be many pending upgrades, so it's the guardian's responsibility to cancel
     /// the invalid ones.
     function submitUpgradeManagement(address newImplementation)
