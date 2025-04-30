@@ -45,6 +45,18 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         }
     }
 
+    function getBufferedShares() public view returns (uint256) {
+        return _getERC4626BufferedStorage().bufferedShares;
+    }
+
+    function getLastUpdate() public view returns (uint256) {
+        return _getERC4626BufferedStorage().lastUpdate;
+    }
+
+    function getCurrentBufferEnd() public view returns (uint256) {
+        return _getERC4626BufferedStorage().currentBufferEnd;
+    }
+
     // ----- Initialization -----
 
     // solhint-disable-next-line func-name-mixedcase
