@@ -3,7 +3,8 @@ pragma solidity ^0.8.28;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {ReentrancyGuardTransientUpgradeable} from
+    "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {
     ERC4626BufferedUpgradeable,
     IERC20,
@@ -22,7 +23,7 @@ contract CommonAggregator is
     ICommonAggregator,
     UUPSUpgradeable,
     ERC4626BufferedUpgradeable,
-    ReentrancyGuardUpgradeable,
+    ReentrancyGuardTransientUpgradeable,
     PausableUpgradeable
 {
     using Math for uint256;
@@ -68,7 +69,7 @@ contract CommonAggregator is
         __UUPSUpgradeable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name()), string.concat("ca", asset.symbol()));
         __ERC4626Buffered_init(asset);
-        __ReentrancyGuard_init();
+        __ReentrancyGuardTransient_init();
         __Pausable_init();
 
         AggregatorStorage storage $ = _getAggregatorStorage();
