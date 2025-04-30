@@ -87,6 +87,7 @@ contract CommonAggregator is
     function ensureVaultCanBeAdded(IERC4626 vault) public view {
         require(asset() == vault.asset(), IncorrectAsset(asset(), vault.asset()));
         require(_getAggregatorStorage().vaults.length < MAX_VAULTS, VaultLimitExceeded());
+        require(address(vault) != address(this), VaultIsAggregator());
         require(!isVaultOnTheList(vault), VaultAlreadyAdded(vault));
     }
 
@@ -280,7 +281,7 @@ contract CommonAggregator is
     // ----- Emergency redeem -----
 
     /// @notice Burns exactly `shares` from `owner` and sends proportional amounts of aggregated vaults' shares
-    /// and idle assets to `account`. This function can called even if the contract is paused.
+    /// and idle assets to `account`. This function can be called even if the contract is paused.
     ///
     /// @param shares Amount of shares to be redeemed.
     /// @param account Account that will receive the assets and the aggregated vaults' shares.
