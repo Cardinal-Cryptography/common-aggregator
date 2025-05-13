@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNKNOWN
+// SPDX-License-Identifier: GPL-2.0-or-later
 // solhint-disable no-console
 pragma solidity ^0.8.28;
 

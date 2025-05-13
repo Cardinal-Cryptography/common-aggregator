@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNKNOWN
+// SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.28;
 
 import {IERC4626, IERC4626Buffered} from "contracts/interfaces/IERC4626Buffered.sol";
