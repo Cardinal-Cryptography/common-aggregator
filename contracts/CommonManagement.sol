@@ -502,9 +502,8 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     /// @dev Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
     /// is greater than zero. A zero `delay` means that the action is locked only for the current timestamp.
     function _register(bytes32 actionHash, bytes32 actionData, uint256 delay) private {
-        ManagementStorage storage $ = _getManagementStorage();
         require(!isActionRegistered(actionHash), ActionAlreadyRegistered(actionHash));
-        $.registeredTimelocks[actionHash] =
+        _getManagementStorage().registeredTimelocks[actionHash] =
             TimelockData({lockedUntil: saturatingAdd(block.timestamp, delay), actionData: actionData});
     }
 
