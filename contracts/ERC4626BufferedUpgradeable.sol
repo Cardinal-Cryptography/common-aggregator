@@ -125,9 +125,11 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             _burn(address(this), sharesToBurn - sharesToMint);
         }
 
+        emit HoldingsStateUpdated(
+            oldTotalAssets, newTotalAssets, super.totalSupply(), $.bufferedShares, $.lastUpdate, $.currentBufferEnd
+        );
         $.lastUpdate = block.timestamp;
         $.assetsCached = newTotalAssets;
-        emit HoldingsStateUpdated(oldTotalAssets, newTotalAssets, $.currentBufferEnd, $.bufferedShares);
     }
 
     /// @notice Preview the holdings state update, without actually updating it.
