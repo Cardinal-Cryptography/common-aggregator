@@ -312,13 +312,16 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     }
 
     /// @notice Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the
-    /// vault, through a withdraw call. Accounts for shares burned in the reward buffer, but doesn't preview holdings
-    /// state update.
+    /// vault, through a withdraw call.
     /// If `owner` is `protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
     /// In that case, call the `updateHoldingsState()` right before calling this function,
     /// to ensure that the value of `maxWithdraw` is exact.
     function maxWithdraw(address owner) public view virtual returns (uint256) {
-        return convertToAssets(balanceOf(owner));
+        try ERC4626BufferedUpgradeable(address(this)).previewRedeem(balanceOf(owner)) returns (uint256 amount) {
+            return amount;
+        } catch {
+            return _maxWithdraw(owner);
+        }
     }
 
     /// @notice Returns the maximum amount of vault shares that can be redeemed from the owner balance in the vault,
@@ -378,7 +381,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         returns (uint256)
     {
         _updateHoldingsState();
-        uint256 maxAssets = maxWithdraw(owner);
+        uint256 maxAssets = _maxWithdraw(owner);
         if (assets > maxAssets) {
             revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
         }
@@ -410,6 +413,16 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
+    }
+
+    /// @notice Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the
+    /// vault, through a withdraw call. Accounts for shares burned in the reward buffer, but doesn't preview holdings
+    /// state update.
+    /// If `owner` is `protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
+    /// In that case, call the `updateHoldingsState()` right before calling this function,
+    /// to ensure that the value of `_maxWithdraw` is exact.
+    function _maxWithdraw(address owner) internal view virtual returns (uint256) {
+        return convertToAssets(balanceOf(owner));
     }
 
     /// @dev Deposit/mint common workflow.
