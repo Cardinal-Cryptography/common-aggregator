@@ -96,6 +96,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     function _updateHoldingsState() internal {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         uint256 oldTotalAssets = $.assetsCached;
+        uint256 oldTotalShares = super.totalShares();
 
         (uint256 newTotalAssets, uint256 sharesToBurn, uint256 sharesToMint) = _holdingsUpdate();
 
@@ -127,7 +128,13 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         }
 
         emit HoldingsStateUpdated(
-            oldTotalAssets, newTotalAssets, super.totalSupply(), $.bufferedShares, $.currentBufferEnd, fee
+            oldTotalAssets,
+            newTotalAssets,
+            oldTotalShares,
+            super.totalSupply(),
+            $.bufferedShares,
+            $.currentBufferEnd,
+            fee
         );
         $.lastUpdate = block.timestamp;
         $.assetsCached = newTotalAssets;

@@ -7,6 +7,7 @@ interface IERC4626Buffered is IERC4626 {
     event HoldingsStateUpdated(
         uint256 oldCachedAssets,
         uint256 newCachedAssets,
+        uint256 oldTotalShares,
         uint256 newTotalShares,
         uint256 bufferedSharesAfter,
         uint256 newBufferEnd,
