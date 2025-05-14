@@ -329,6 +329,30 @@ contract CommonAggregatorTest is Test {
         assertEq(commonAggregator.maxWithdraw(owner) - ownerWithdrawalBefore, airdropped / 50);
     }
 
+    function testProtocolFeeCantBeAppliedRetroactively() public {
+        asset.mint(alice, 10000);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 10000);
+        vm.prank(alice);
+        commonAggregator.deposit(10000, alice);
+
+        vm.startPrank(owner);
+
+        asset.mint(address(commonAggregator), 1000);
+        commonManagement.setProtocolFee(MAX_BPS / 2);
+        commonAggregator.updateHoldingsState();
+        address initialProtocolFeeReceiver = commonAggregator.getProtocolFeeReceiver();
+        assertEq(commonAggregator.balanceOf(initialProtocolFeeReceiver), 0, "setProtocolFee");
+
+        address newProtocolFeeReceiver = address(0xc0ffee);
+        asset.mint(address(commonAggregator), 1000);
+        commonManagement.setProtocolFeeReceiver(newProtocolFeeReceiver);
+        commonAggregator.updateHoldingsState();
+
+        assertEq(commonAggregator.balanceOf(newProtocolFeeReceiver), 0, "setProtocolFeeReceiver");
+        assertEq(commonAggregator.balanceOf(initialProtocolFeeReceiver), 5000);
+    }
+
     function testSmallLossNoProtocolFee() public {
         asset.mint(alice, 10000);
         asset.mint(bob, 5000);
