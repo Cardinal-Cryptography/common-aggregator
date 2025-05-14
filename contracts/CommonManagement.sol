@@ -29,6 +29,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
 
     uint256 public constant SET_TRADER_TIMELOCK = 3 days;
     uint256 public constant ADD_VAULT_TIMELOCK = 3 days;
+    uint256 public constant SET_LIMIT_TIMELOCK = 3 days;
     uint256 public constant FORCE_REMOVE_VAULT_TIMELOCK = 3 days;
     uint256 public constant AGGREGATOR_UPGRADE_TIMELOCK = 3 days;
     uint256 public constant MANAGEMENT_UPGRADE_TIMELOCK = 3 days;
@@ -40,6 +41,9 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     event ManagementUpgradeSubmitted(address indexed newImplementation, uint256 unlockTimestamp);
     event ManagementUpgradeCancelled(address indexed newImplementation);
     event ManagementUpgradeAuthorized(address indexed newImplementation);
+
+    event SetLimitSubmitted(address indexed vault, uint256 limit, uint256 unlockTimestamp);
+    event SetLimitCancelled(address indexed vault);
 
     event VaultAdditionSubmitted(address indexed vault, uint256 unlockTimestamp);
     event VaultAdditionCancelled(address indexed vault);
@@ -71,6 +75,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     enum TimelockTypes {
         SET_TRADER,
         ADD_VAULT,
+        SET_LIMIT,
         FORCE_REMOVE_VAULT,
         AGGREGATOR_UPGRADE,
         MANAGEMENT_UPGRADE
@@ -122,10 +127,14 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     // ----- Aggregated vaults management -----
 
     /// @notice Submits timelocked action for adding `vault` to the aggregator.
-    function submitAddVault(IERC4626 vault)
+    function submitAddVault(IERC4626 vault, uint256 allocationLimit)
         external
-        onlyManagerOrOwner
-        registersAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA, ADD_VAULT_TIMELOCK)
+        onlyOwner
+        registersAction(
+            keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)),
+            keccak256(abi.encode(allocationLimit)),
+            ADD_VAULT_TIMELOCK
+        )
     {
         ManagementStorage storage $ = _getManagementStorage();
         require(
@@ -238,8 +247,32 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
 
     // ----- Allocation Limits -----
 
+    function submitSetLimit(address vault, uint256 newLimitBps)
+        external
+        onlyOwner
+        registersAction(
+            keccak256(abi.encode(TimelockTypes.SET_LIMIT, vault)),
+            keccak256(abi.encode(newLimitBps)),
+            SET_LIMIT_TIMELOCK
+        )
+    {
+        emit SetLimitSubmitted(vault, newLimitBps, saturatingAdd(block.timestamp, SET_LIMIT_TIMELOCK));
+    }
+
+    function cancelSetLimit(address vault)
+        external
+        onlyGuardianOrHigherRole
+        cancelsAction(keccak256(abi.encode(TimelockTypes.SET_LIMIT, vault)))
+    {
+        emit SetLimitCancelled(vault);
+    }
+
     /// @notice Allows the `OWNER` role holder to trigger `setLimit` on the aggregator.
-    function setLimit(IERC4626 vault, uint256 newLimitBps) external onlyOwner {
+    function setLimit(IERC4626 vault, uint256 newLimitBps)
+        external
+        onlyManagerOrOwner
+        executesAction(keccak256(abi.encode(TimelockTypes.SET_LIMIT, vault)), keccak256(abi.encode(newLimitBps)))
+    {
         _getManagementStorage().aggregator.setLimit(vault, newLimitBps);
     }
 
