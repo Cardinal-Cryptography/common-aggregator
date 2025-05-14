@@ -350,7 +350,7 @@ contract CommonAggregatorTest is Test {
         commonAggregator.updateHoldingsState();
 
         assertEq(commonAggregator.balanceOf(newProtocolFeeReceiver), 0, "setProtocolFeeReceiver");
-        assertEq(commonAggregator.balanceOf(initialProtocolFeeReceiver), 5000);
+        assertEq(commonAggregator.balanceOf(initialProtocolFeeReceiver), 5000000);
     }
 
     function testSmallLossNoProtocolFee() public {
