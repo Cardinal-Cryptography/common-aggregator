@@ -536,6 +536,7 @@ contract CommonAggregator is
         nonReentrant
     {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
+        _updateHoldingsState();
 
         uint256 oldProtocolFee = getProtocolFee();
         if (oldProtocolFee == protocolFeeBps) return;
@@ -554,6 +555,7 @@ contract CommonAggregator is
         nonReentrant
     {
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
+        _updateHoldingsState();
 
         address oldProtocolFeeReceiver = getProtocolFeeReceiver();
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;
