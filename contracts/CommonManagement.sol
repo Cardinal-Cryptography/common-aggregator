@@ -156,12 +156,12 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     }
 
     /// @notice Adds `vault` to the aggregator, after the timelock has passed.
-    function addVault(IERC4626 vault)
+    function addVault(IERC4626 vault, uint256 allocationLimit)
         external
         onlyManagerOrOwner
-        executesAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), EMPTY_ACTION_DATA)
+        executesAction(keccak256(abi.encode(TimelockTypes.ADD_VAULT, vault)), keccak256(abi.encode(allocationLimit)))
     {
-        _getManagementStorage().aggregator.addVault(vault);
+        _getManagementStorage().aggregator.addVault(vault, allocationLimit);
     }
 
     /// @notice Allows the `MANAGER` or `OWNER` to call `remove(vault)` on aggregator.

@@ -20,7 +20,7 @@ interface ICommonAggregator is IERC4626Buffered {
     event VaultRemoved(address indexed vault);
     event VaultForceRemoved(address indexed vault);
 
-    function addVault(IERC4626 vault) external;
+    function addVault(IERC4626 vault, uint256 allocationLimit) external;
     function removeVault(IERC4626 vault) external;
     function forceRemoveVault(IERC4626 vault) external;
 
