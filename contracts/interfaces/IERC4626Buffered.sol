@@ -9,8 +9,8 @@ interface IERC4626Buffered is IERC4626 {
         uint256 newCachedAssets,
         uint256 newTotalShares,
         uint256 bufferedSharesAfter,
-        uint256 lastUpdate,
-        uint256 newBufferEnd
+        uint256 newBufferEnd,
+        uint256 feeSharesMinted
     );
 
     function setProtocolFee(uint256 protocolFee) external;

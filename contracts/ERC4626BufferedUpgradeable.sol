@@ -106,8 +106,9 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
         // Apply fee and compute new buffer end timestamp, if there was any gain
         // Note that `sharesToMint > 0` means there are no losses
+        uint256 fee = 0;
         if (sharesToMint > 0) {
-            uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
+            fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
             _mint($.protocolFeeReceiver, fee);
             sharesToMint -= fee;
 
@@ -126,7 +127,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         }
 
         emit HoldingsStateUpdated(
-            oldTotalAssets, newTotalAssets, super.totalSupply(), $.bufferedShares, $.lastUpdate, $.currentBufferEnd
+            oldTotalAssets, newTotalAssets, super.totalSupply(), $.bufferedShares, $.currentBufferEnd, fee
         );
         $.lastUpdate = block.timestamp;
         $.assetsCached = newTotalAssets;
