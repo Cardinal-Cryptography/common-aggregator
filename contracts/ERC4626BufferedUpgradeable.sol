@@ -127,7 +127,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
         $.lastUpdate = block.timestamp;
         $.assetsCached = newTotalAssets;
-        emit HoldingsStateUpdated(oldTotalAssets, newTotalAssets);
+        emit HoldingsStateUpdated(oldTotalAssets, newTotalAssets, $.currentBufferEnd, $.bufferedShares);
     }
 
     /// @notice Preview the holdings state update, without actually updating it.
@@ -169,8 +169,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             return 0;
         }
 
-        uint256 duration = checkedSub(end, start, 2);
-        uint256 elapsed = checkedSub(timestampNow, start, 3);
+        uint256 duration = checkedSub(end, start, 1);
+        uint256 elapsed = checkedSub(timestampNow, start, 2);
 
         if (elapsed >= duration) {
             sharesReleased = $.bufferedShares;
@@ -306,7 +306,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return type(uint256).max;
     }
 
-    /// @notice Returns the maximum amount of the underlying asset that can be minted for the receiver, through a mint call.
+    /// @notice Returns the maximum amount of the vault shares that can be minted for the receiver, through a mint call.
     function maxMint(address) public view virtual returns (uint256) {
         return type(uint256).max;
     }
@@ -321,7 +321,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return convertToAssets(balanceOf(owner));
     }
 
-    /// @notice Returns the maximum amount of vault shares that can be redeemed from the owner balance in the vault,
+    /// @notice Returns the maximum amount of the vault shares that can be redeemed from the owner balance in the vault,
     /// through a redeem call.
     /// If `owner` is `protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
     /// In that case, call the `updateHoldingsState()` right before calling this function,
