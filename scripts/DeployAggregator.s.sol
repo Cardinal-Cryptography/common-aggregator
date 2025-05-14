@@ -16,6 +16,7 @@ import {CommonManagement} from "../contracts/CommonManagement.sol";
 contract DeployAggregatorScript is Script {
     function run() public {
         IERC20Metadata asset = IERC20Metadata(vm.envAddress("ASSET_ADDRESS"));
+        address protocolFeeReceiver = vm.envAddress("PROTOCOL_FEE_RECEIVER_ADDRESS");
         address[] memory vaultAddresses = vm.envAddress("VAULTS", ",");
 
         IERC4626[] memory vaults = new IERC4626[](vaultAddresses.length);
@@ -34,8 +35,9 @@ contract DeployAggregatorScript is Script {
         address aggregatorImplementation = address(new CommonAggregator());
         address managementImplementation = address(new CommonManagement());
 
-        (address aggregator, address management) =
-            factory.deployAggregator(aggregatorImplementation, managementImplementation, owner, asset, vaults);
+        (address aggregator, address management) = factory.deployAggregator(
+            aggregatorImplementation, managementImplementation, owner, asset, protocolFeeReceiver, vaults
+        );
 
         console.log("Deployed CommonManagement contract to:", management);
         console.log("Deployed CommonAggregator contract to:", aggregator);

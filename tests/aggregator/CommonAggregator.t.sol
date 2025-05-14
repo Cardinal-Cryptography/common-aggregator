@@ -21,13 +21,14 @@ contract CommonAggregatorTest is Test {
 
     address alice = address(0x456);
     address bob = address(0x678);
+    address protocolFeeReceiver = address(1);
 
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
-        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
+        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, protocolFeeReceiver, vaults);
     }
 
     function testExternalStorageGetters() public view {

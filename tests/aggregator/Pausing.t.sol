@@ -17,6 +17,7 @@ contract PausingTest is Test {
     address guardian = address(0x312);
     address alice = address(0x456);
     address bob = address(0x789);
+    address protocolFeeReceiver = address(1);
     ERC20Mock asset = new ERC20Mock();
     CommonAggregator aggregator;
     CommonManagement management;
@@ -26,7 +27,7 @@ contract PausingTest is Test {
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
-        (aggregator, management) = setUpAggregator(owner, asset, vaults);
+        (aggregator, management) = setUpAggregator(owner, asset, protocolFeeReceiver, vaults);
         _grantRoles();
     }
 

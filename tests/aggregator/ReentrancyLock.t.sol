@@ -38,10 +38,11 @@ contract ERC20WithHook is ERC20Mock {
 contract ReentrancyLockTest is Test {
     function testReentrantLock() public {
         address owner = address(0x123);
+        address protocolFeeReceiver = address(1);
         ERC20WithHook asset = new ERC20WithHook();
         IERC4626[] memory vaults = new IERC4626[](1);
         vaults[0] = new ERC4626Mock(address(asset));
-        (CommonAggregator commonAggregator,) = setUpAggregator(owner, asset, vaults);
+        (CommonAggregator commonAggregator,) = setUpAggregator(owner, asset, protocolFeeReceiver, vaults);
 
         vm.startPrank(owner);
         asset.mint(address(owner), 10 ** 30);
