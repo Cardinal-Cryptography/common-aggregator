@@ -60,11 +60,12 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     // ----- Initialization -----
 
     // solhint-disable-next-line func-name-mixedcase
-    function __ERC4626Buffered_init(IERC20 _asset) internal onlyInitializing {
+    function __ERC4626Buffered_init(IERC20 _asset, address _protocolFeeReceiver) internal onlyInitializing {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         $.lastUpdate = block.timestamp;
         $.currentBufferEnd = block.timestamp;
-        $.protocolFeeReceiver = address(1);
+        require(_protocolFeeReceiver != address(0), ZeroProtocolFeeReceiver());
+        $.protocolFeeReceiver = _protocolFeeReceiver;
 
         (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(_asset);
         $.underlyingDecimals = success ? assetDecimals : 18;
@@ -96,6 +97,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     function _updateHoldingsState() internal {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         uint256 oldTotalAssets = $.assetsCached;
+        uint256 oldTotalShares = super.totalSupply();
 
         (uint256 newTotalAssets, uint256 sharesToBurn, uint256 sharesToMint) = _holdingsUpdate();
 
@@ -106,8 +108,9 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
         // Apply fee and compute new buffer end timestamp, if there was any gain
         // Note that `sharesToMint > 0` means there are no losses
+        uint256 fee = 0;
         if (sharesToMint > 0) {
-            uint256 fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
+            fee = sharesToMint.mulDiv($.protocolFeeBps, MAX_BPS, Math.Rounding.Ceil);
             _mint($.protocolFeeReceiver, fee);
             sharesToMint -= fee;
 
@@ -125,9 +128,17 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             _burn(address(this), sharesToBurn - sharesToMint);
         }
 
+        emit HoldingsStateUpdated(
+            oldTotalAssets,
+            newTotalAssets,
+            oldTotalShares,
+            super.totalSupply(),
+            $.bufferedShares,
+            $.currentBufferEnd,
+            fee
+        );
         $.lastUpdate = block.timestamp;
         $.assetsCached = newTotalAssets;
-        emit HoldingsStateUpdated(oldTotalAssets, newTotalAssets);
     }
 
     /// @notice Preview the holdings state update, without actually updating it.
@@ -169,8 +180,8 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
             return 0;
         }
 
-        uint256 duration = checkedSub(end, start, 2);
-        uint256 elapsed = checkedSub(timestampNow, start, 3);
+        uint256 duration = checkedSub(end, start, 1);
+        uint256 elapsed = checkedSub(timestampNow, start, 2);
 
         if (elapsed >= duration) {
             sharesReleased = $.bufferedShares;
@@ -306,7 +317,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return type(uint256).max;
     }
 
-    /// @notice Returns the maximum amount of the underlying asset that can be minted for the receiver, through a mint call.
+    /// @notice Returns the maximum amount of the vault shares that can be minted for the receiver, through a mint call.
     function maxMint(address) public view virtual returns (uint256) {
         return type(uint256).max;
     }
@@ -321,7 +332,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         return convertToAssets(balanceOf(owner));
     }
 
-    /// @notice Returns the maximum amount of vault shares that can be redeemed from the owner balance in the vault,
+    /// @notice Returns the maximum amount of the vault shares that can be redeemed from the owner balance in the vault,
     /// through a redeem call.
     /// If `owner` is `protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
     /// In that case, call the `updateHoldingsState()` right before calling this function,

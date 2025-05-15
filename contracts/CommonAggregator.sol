@@ -65,10 +65,13 @@ contract CommonAggregator is
     /// @param asset The address of the underlying ERC20 token. It must implement the `IERC20Metadata` interface.
     /// @param vaults The list of ERC4626 vaults to be aggregated initially. Vaults must aggregate the same `asset`,
     /// and be already initialized.
-    function initialize(address management, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
+    function initialize(address management, IERC20Metadata asset, address protocolFeeReceiver, IERC4626[] memory vaults)
+        public
+        initializer
+    {
         __UUPSUpgradeable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name()), string.concat("ca", asset.symbol()));
-        __ERC4626Buffered_init(asset);
+        __ERC4626Buffered_init(asset, protocolFeeReceiver);
         __ReentrancyGuardTransient_init();
         __Pausable_init();
 
@@ -542,6 +545,7 @@ contract CommonAggregator is
         nonReentrant
     {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
+        _updateHoldingsState();
 
         uint256 oldProtocolFee = getProtocolFee();
         if (oldProtocolFee == protocolFeeBps) return;
@@ -560,6 +564,7 @@ contract CommonAggregator is
         nonReentrant
     {
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
+        _updateHoldingsState();
 
         address oldProtocolFeeReceiver = getProtocolFeeReceiver();
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;

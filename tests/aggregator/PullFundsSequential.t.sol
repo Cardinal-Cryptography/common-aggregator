@@ -27,6 +27,7 @@ contract RevertingWithdrawVault is ERC4626Mock {
 abstract contract PullSequentialTest is Test {
     CommonAggregatorImpl commonAggregator;
     address owner = address(0x123);
+    address protocolFeeReceiver = address(1);
     address alice = address(0x456);
     ERC20Mock asset = new ERC20Mock();
     ERC4626Mock[] vaults;
@@ -39,7 +40,8 @@ contract HealthyVaultsTest is PullSequentialTest {
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
+        bytes memory initializeData =
+            abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, protocolFeeReceiver, vaults);
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
         commonAggregator = CommonAggregatorImpl(address(proxy));
@@ -98,7 +100,8 @@ contract UnhealthyVaultTest is PullSequentialTest {
         vaults[1] = new RevertingWithdrawVault(address(asset));
         vaults[2] = new ERC4626Mock(address(asset));
 
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
+        bytes memory initializeData =
+            abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, protocolFeeReceiver, vaults);
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
         commonAggregator = CommonAggregatorImpl(address(proxy));

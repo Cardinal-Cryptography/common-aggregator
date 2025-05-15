@@ -51,13 +51,14 @@ contract CommonAggregatorTest is Test {
     address rebalancer = address(0x312);
     address guardian = address(0x543);
     address alice = address(0x456);
+    address protocolFeeReceiver = address(1);
 
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
-        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
+        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, protocolFeeReceiver, vaults);
         vm.prank(owner);
         commonManagement.grantRole(CommonManagement.Roles.Manager, manager);
         vm.prank(owner);
