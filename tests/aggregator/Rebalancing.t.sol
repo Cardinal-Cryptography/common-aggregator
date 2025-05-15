@@ -199,16 +199,14 @@ contract CommonAggregatorTest is Test {
             vm.prank(rebalancer);
             commonManagement.pullFundsByShares(1, a);
 
+            vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
             vm.prank(owner);
             commonManagement.submitSetLimit(address(a), 0);
             skip(3 days + 1);
 
             vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
-            vm.prank(owner);
-            commonManagement.setLimit(address(a), 0);
-
-            vm.prank(owner);
-            commonManagement.cancelSetLimit(address(a));
+            vm.prank(address(commonManagement));
+            commonAggregator.setLimit(a, 0);
         }
     }
 
@@ -318,7 +316,7 @@ contract CommonAggregatorTest is Test {
     }
 
     function testSetLimitMaxLimit() public {
-        vm.expectRevert(CommonManagement.IncorrectMaxAllocationLimit.selector);
+        vm.expectRevert(ICommonAggregator.IncorrectMaxAllocationLimit.selector);
         vm.prank(owner);
         commonManagement.submitSetLimit(address(vaults[0]), MAX_BPS + 1);
 

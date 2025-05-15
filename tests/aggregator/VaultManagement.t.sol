@@ -522,7 +522,7 @@ contract VaultManagementTest is Test {
         (CommonAggregator aggregator, CommonManagement management) = _noVaultAggregator();
         IERC4626 vault = new ERC4626Mock(address(asset));
 
-        vm.expectRevert(CommonManagement.IncorrectMaxAllocationLimit.selector);
+        vm.expectRevert(ICommonAggregator.IncorrectMaxAllocationLimit.selector);
         vm.prank(owner);
         management.submitAddVault(vault, MAX_BPS + 1);
 

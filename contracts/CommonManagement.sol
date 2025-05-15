@@ -60,8 +60,6 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     event RoleGranted(Roles role, address indexed account);
     event RoleRevoked(Roles role, address indexed account);
 
-    error IncorrectMaxAllocationLimit();
-
     error PendingVaultForceRemoval(IERC4626 vault);
 
     error InvalidRewardToken(address token);
@@ -138,7 +136,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         )
     {
         ManagementStorage storage $ = _getManagementStorage();
-        require(allocationLimit <= MAX_BPS, IncorrectMaxAllocationLimit());
+        require(allocationLimit <= MAX_BPS, ICommonAggregator.IncorrectMaxAllocationLimit());
         require(
             $.aggregator.asset() == vault.asset(), ICommonAggregator.IncorrectAsset($.aggregator.asset(), vault.asset())
         );
@@ -258,7 +256,11 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
             SET_LIMIT_TIMELOCK
         )
     {
-        require(newLimitBps <= MAX_BPS, IncorrectMaxAllocationLimit());
+        require(newLimitBps <= MAX_BPS, ICommonAggregator.IncorrectMaxAllocationLimit());
+        require(
+            _getManagementStorage().aggregator.isVaultOnTheList(IERC4626(vault)),
+            ICommonAggregator.VaultNotOnTheList(IERC4626(vault))
+        );
         emit SetLimitSubmitted(vault, newLimitBps, saturatingAdd(block.timestamp, SET_LIMIT_TIMELOCK));
     }
 
