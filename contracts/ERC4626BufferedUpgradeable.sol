@@ -320,9 +320,9 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         // Try calling `_previewUpdateHoldingsState()` and then `convertToAssets(balanceOf(owner))` on the updated state.
         // So happens that `previewRedeem(balanceOf(owner))` does exactly the thing.
         try ERC4626BufferedUpgradeable(address(this)).previewRedeem(balanceOf(owner)) returns (uint256 amount) {
-            return amount;
+            return amount.min(_totalMaxWithdraw());
         } catch {
-            return convertToAssets(balanceOf(owner));
+            return convertToAssets(balanceOf(owner)).min(_totalMaxWithdraw());
         }
     }
 
@@ -332,7 +332,9 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// In that case, call the `updateHoldingsState()` right before calling this function,
     /// to ensure that the value of `maxRedeem` is exact.
     function maxRedeem(address owner) public view virtual returns (uint256) {
-        return balanceOf(owner);
+        uint256 totalMaxWithdrawConvertedToShares =
+            convertToShares(_totalMaxWithdraw().min(type(uint256).max / 10 ** _decimalsOffset()));
+        return balanceOf(owner).min(totalMaxWithdrawConvertedToShares);
     }
 
     /// @notice Mints vault shares to `receiver` by depositing exactly `assets` of underlying tokens.
@@ -383,7 +385,7 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         returns (uint256)
     {
         _updateHoldingsState();
-        uint256 maxAssets = _maxWithdraw(owner);
+        uint256 maxAssets = convertToAssets(balanceOf(owner)).min(_totalMaxWithdraw());
         if (assets > maxAssets) {
             revert ERC4626ExceededMaxWithdraw(owner, assets, maxAssets);
         }
@@ -415,16 +417,6 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
-    }
-
-    /// @notice Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the
-    /// vault, through a withdraw call. Accounts for shares burned in the reward buffer, but doesn't preview holdings
-    /// state update.
-    /// If `owner` is `protocolFeeReceiver`, this function might underestimate when there are pending protocol fees.
-    /// In that case, call the `updateHoldingsState()` right before calling this function,
-    /// to ensure that the value of `_maxWithdraw` is exact.
-    function _maxWithdraw(address owner) internal view virtual returns (uint256) {
-        return convertToAssets(balanceOf(owner));
     }
 
     /// @dev Deposit/mint common workflow.
@@ -480,6 +472,12 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
 
     /// @dev Defines calculation for amount of assets currently held by the vault (disregarding cache).
     function _totalAssetsNotCached() internal view virtual returns (uint256) {
+        return IERC20(asset()).balanceOf(address(this));
+    }
+
+    /// @notice Returns how much assets are withdrawable from the aggregator by all accounts in total.
+    /// - MUST NOT revert.
+    function _totalMaxWithdraw() internal view virtual returns (uint256) {
         return IERC20(asset()).balanceOf(address(this));
     }
 

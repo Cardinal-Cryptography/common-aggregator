@@ -120,12 +120,7 @@ contract CommonAggregator is
         if (paused()) {
             return 0;
         }
-        return super.maxWithdraw(owner).min(_availableFunds());
-    }
-
-    /// @inheritdoc ERC4626BufferedUpgradeable
-    function _maxWithdraw(address owner) internal view override(ERC4626BufferedUpgradeable) returns (uint256) {
-        return super._maxWithdraw(owner).min(_availableFunds());
+        return super.maxWithdraw(owner);
     }
 
     /// @inheritdoc ERC4626BufferedUpgradeable
@@ -134,15 +129,12 @@ contract CommonAggregator is
         if (paused()) {
             return 0;
         }
-        // Avoid overflow
-        uint256 availableConvertedToShares =
-            convertToShares(_availableFunds().min(type(uint256).max / 10 ** _decimalsOffset()));
-        return super.maxRedeem(owner).min(availableConvertedToShares);
+        return super.maxRedeem(owner);
     }
 
-    /// @notice Returns how much assets are withdrawable from the aggregator by all accounts in total.
+    /// @inheritdoc ERC4626BufferedUpgradeable
     /// @dev Assumes that the `maxWithdraw` amounts in each vaults are independent of each other.
-    function _availableFunds() internal view returns (uint256) {
+    function _totalMaxWithdraw() internal view override returns (uint256) {
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 availableFunds = IERC20(asset()).balanceOf(address(this));
 
@@ -335,7 +327,7 @@ contract CommonAggregator is
 
     /// @notice Returns the maximum amount of shares that can be emergency-redeemed by the given owner.
     function maxEmergencyRedeem(address owner) public view returns (uint256) {
-        return super.maxRedeem(owner);
+        return balanceOf(owner);
     }
 
     // ----- Reporting -----
