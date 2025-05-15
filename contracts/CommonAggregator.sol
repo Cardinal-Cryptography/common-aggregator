@@ -118,26 +118,12 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc ERC4626BufferedUpgradeable
-    /// @dev Returns 0 when the contract is paused. Users can use `emergencyRedeem` to exit the aggregator instead.
-    function maxWithdraw(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
-        if (paused()) {
-            return 0;
-        }
-        return super.maxWithdraw(owner);
-    }
-
-    /// @inheritdoc ERC4626BufferedUpgradeable
-    /// @dev Returns 0 when the contract is paused. Users can use `emergencyRedeem` to exit the aggregator instead.
-    function maxRedeem(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
-        if (paused()) {
-            return 0;
-        }
-        return super.maxRedeem(owner);
-    }
-
-    /// @inheritdoc ERC4626BufferedUpgradeable
     /// @dev Assumes that the `maxWithdraw` amounts in each vaults are independent of each other.
+    /// Returns 0 when the contract is paused. Users can use `emergencyRedeem` to exit the aggregator instead.
     function _totalMaxWithdraw() internal view override returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 availableFunds = IERC20(asset()).balanceOf(address(this));
 
