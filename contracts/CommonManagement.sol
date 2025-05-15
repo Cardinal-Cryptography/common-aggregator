@@ -57,7 +57,6 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     event RoleRevoked(Roles role, address indexed account);
 
     error PendingVaultForceRemoval(IERC4626 vault);
-    error VaultAdditionAlreadyPending(IERC4626 vault);
 
     error InvalidRewardToken(address token);
     error NoTraderSetForToken(address token);
@@ -503,21 +502,17 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     /// @dev Adds a timelock entry for the given action if it doesn't exist yet. It is safely assumed that `block.timestamp`
     /// is greater than zero. A zero `delay` means that the action is locked only for the current timestamp.
     function _register(bytes32 actionHash, bytes32 actionData, uint256 delay) private {
-        ManagementStorage storage $ = _getManagementStorage();
-        if ($.registeredTimelocks[actionHash].lockedUntil != 0) {
-            revert ActionAlreadyRegistered(actionHash);
-        }
-        $.registeredTimelocks[actionHash] =
+        require(!isActionRegistered(actionHash), ActionAlreadyRegistered(actionHash));
+        _getManagementStorage().registeredTimelocks[actionHash] =
             TimelockData({lockedUntil: saturatingAdd(block.timestamp, delay), actionData: actionData});
     }
 
     /// @dev Removes a timelock entry for the given action if it exists and the timelock has passed.
     function _execute(bytes32 actionHash, bytes32 actionData) private {
+        require(isActionRegistered(actionHash), ActionNotRegistered(actionHash));
+
         ManagementStorage storage $ = _getManagementStorage();
         uint256 lockedUntil = $.registeredTimelocks[actionHash].lockedUntil;
-        if (lockedUntil == 0) {
-            revert ActionNotRegistered(actionHash);
-        }
         if (lockedUntil >= block.timestamp) {
             revert ActionTimelocked(actionHash, lockedUntil);
         }
@@ -531,11 +526,8 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     /// @dev Removes a timelock entry for the given action if it exists. Cancellation works both during
     /// and after the timelock period.
     function _cancel(bytes32 actionHash) private {
-        ManagementStorage storage $ = _getManagementStorage();
-        if ($.registeredTimelocks[actionHash].lockedUntil == 0) {
-            revert ActionNotRegistered(actionHash);
-        }
-        delete $.registeredTimelocks[actionHash];
+        require(isActionRegistered(actionHash), ActionNotRegistered(actionHash));
+        delete _getManagementStorage().registeredTimelocks[actionHash];
     }
 
     /// @notice Checks if a timelocked action is registered.
