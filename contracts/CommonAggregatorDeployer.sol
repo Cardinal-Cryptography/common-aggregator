@@ -19,6 +19,7 @@ contract CommonAggregatorDeployer {
         address managementImplementation,
         address owner,
         IERC20Metadata asset,
+        address protocolFeeReceiver,
         IERC4626[] calldata vaults
     ) external returns (address aggregator, address management) {
         assert(msg.sender == DEPLOYER);
@@ -35,7 +36,7 @@ contract CommonAggregatorDeployer {
         IAggregatorInitializer aggregatorInit = IAggregatorInitializer(aggregator);
         IManagementInitializer managementInit = IManagementInitializer(management);
 
-        aggregatorInit.initialize(management, asset, vaults);
+        aggregatorInit.initialize(management, asset, protocolFeeReceiver, vaults);
         managementInit.initialize(owner, aggregator);
     }
 }

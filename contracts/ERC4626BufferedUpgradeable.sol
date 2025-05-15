@@ -60,11 +60,12 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     // ----- Initialization -----
 
     // solhint-disable-next-line func-name-mixedcase
-    function __ERC4626Buffered_init(IERC20 _asset) internal onlyInitializing {
+    function __ERC4626Buffered_init(IERC20 _asset, address _protocolFeeReceiver) internal onlyInitializing {
         ERC4626BufferedStorage storage $ = _getERC4626BufferedStorage();
         $.lastUpdate = block.timestamp;
         $.currentBufferEnd = block.timestamp;
-        $.protocolFeeReceiver = address(1);
+        require(_protocolFeeReceiver != address(0), ZeroProtocolFeeReceiver());
+        $.protocolFeeReceiver = _protocolFeeReceiver;
 
         (bool success, uint8 assetDecimals) = _tryGetAssetDecimals(_asset);
         $.underlyingDecimals = success ? assetDecimals : 18;

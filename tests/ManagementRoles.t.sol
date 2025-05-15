@@ -20,10 +20,11 @@ contract CommonAggregatorTest is Test {
 
     address internal alice = address(0x456);
     address internal bob = address(0x678);
+    address internal protocolFeeReceiver = address(1);
 
     function setUp() public {
         vaults[0] = new ERC4626Mock(address(asset));
-        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
+        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, protocolFeeReceiver, vaults);
     }
 
     function testRoleGranting() public {

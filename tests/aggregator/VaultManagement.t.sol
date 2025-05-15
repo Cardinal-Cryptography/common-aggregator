@@ -20,6 +20,7 @@ contract VaultManagementTest is Test {
     address owner = address(0x123);
     address manager = address(0x321);
     address guardian = address(0x432);
+    address protocolFeeReceiver = address(1);
 
     ERC20Mock asset = new ERC20Mock();
     address alice = address(0x456);
@@ -686,7 +687,7 @@ contract VaultManagementTest is Test {
         vaults[1] = new ERC4626Mock(address(asset));
         vaults[2] = new ERC4626Mock(address(asset));
 
-        (aggregator, management) = setUpAggregator(owner, asset, vaults);
+        (aggregator, management) = setUpAggregator(owner, asset, protocolFeeReceiver, vaults);
         _grantRoles(management);
     }
 
@@ -696,12 +697,12 @@ contract VaultManagementTest is Test {
             vaults[i] = new ERC4626Mock(address(asset));
         }
 
-        (aggregator, management) = setUpAggregator(owner, asset, vaults);
+        (aggregator, management) = setUpAggregator(owner, asset, protocolFeeReceiver, vaults);
         _grantRoles(management);
     }
 
     function _noVaultAggregator() private returns (CommonAggregator aggregator, CommonManagement management) {
-        (aggregator, management) = setUpAggregator(owner, asset, new IERC4626[](0));
+        (aggregator, management) = setUpAggregator(owner, asset, protocolFeeReceiver, new IERC4626[](0));
         _grantRoles(management);
     }
 

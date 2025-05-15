@@ -21,6 +21,7 @@ contract CommonAggregatorTest is Test {
     CommonManagement commonManagement;
     address owner = address(0x123);
     address rebalancer = address(0x321);
+    address protocolFeeReceiver = address(1);
 
     ERC20Mock asset = new ERC20Mock();
     ERC4626Mock[] vaults = new ERC4626Mock[](2);
@@ -35,7 +36,7 @@ contract CommonAggregatorTest is Test {
         ierc4626Vaults[0] = vaults[0];
         ierc4626Vaults[1] = vaults[1];
 
-        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, ierc4626Vaults);
+        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, protocolFeeReceiver, ierc4626Vaults);
         vm.prank(owner);
         commonManagement.grantRole(CommonManagement.Roles.Rebalancer, rebalancer);
     }

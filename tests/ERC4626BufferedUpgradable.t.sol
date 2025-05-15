@@ -15,7 +15,7 @@ contract ERC4626BufferedUpgradeableConcrete is ERC4626BufferedUpgradeable {
     uint8 internal decimalsOffset;
 
     function initialize(uint8 __decimalsOffset, IERC20 _asset) public initializer {
-        __ERC4626Buffered_init(_asset);
+        __ERC4626Buffered_init(_asset, address(1));
         decimalsOffset = __decimalsOffset;
     }
 

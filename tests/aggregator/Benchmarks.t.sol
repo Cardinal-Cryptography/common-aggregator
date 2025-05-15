@@ -17,6 +17,7 @@ contract CommonAggregatorTest is Test {
 
     CommonAggregator commonAggregator;
     address owner = address(0x123);
+    address protocolFeeRecevier = address(1);
     ERC20Mock asset = new ERC20Mock();
     ERC4626Mock[] vaults = new ERC4626Mock[](VAULT_COUNT);
 
@@ -31,7 +32,8 @@ contract CommonAggregatorTest is Test {
             vaults[i] = new ERC4626Mock(address(asset));
         }
 
-        bytes memory initializeData = abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, vaults);
+        bytes memory initializeData =
+            abi.encodeWithSelector(CommonAggregator.initialize.selector, owner, asset, protocolFeeRecevier, vaults);
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initializeData);
         commonAggregator = CommonAggregator(address(proxy));
