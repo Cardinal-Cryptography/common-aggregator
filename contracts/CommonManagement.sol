@@ -247,7 +247,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
 
     // ----- Allocation Limits -----
 
-    function submitSetLimit(address vault, uint256 newLimitBps)
+    function submitSetLimit(IERC4626 vault, uint256 newLimitBps)
         external
         onlyOwner
         registersAction(
@@ -257,28 +257,25 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         )
     {
         require(newLimitBps <= MAX_BPS, ICommonAggregator.IncorrectMaxAllocationLimit());
-        require(
-            _getManagementStorage().aggregator.isVaultOnTheList(IERC4626(vault)),
-            ICommonAggregator.VaultNotOnTheList(IERC4626(vault))
-        );
-        emit SetLimitSubmitted(vault, newLimitBps, saturatingAdd(block.timestamp, SET_LIMIT_TIMELOCK));
+        require(_getManagementStorage().aggregator.isVaultOnTheList(vault), ICommonAggregator.VaultNotOnTheList(vault));
+        emit SetLimitSubmitted(address(vault), newLimitBps, saturatingAdd(block.timestamp, SET_LIMIT_TIMELOCK));
     }
 
-    function cancelSetLimit(address vault)
+    function cancelSetLimit(IERC4626 vault)
         external
         onlyGuardianOrHigherRole
         cancelsAction(keccak256(abi.encode(TimelockTypes.SET_LIMIT, vault)))
     {
-        emit SetLimitCancelled(vault);
+        emit SetLimitCancelled(address(vault));
     }
 
     /// @notice Allows the `OWNER` role holder to trigger `setLimit` on the aggregator.
-    function setLimit(address vault, uint256 newLimitBps)
+    function setLimit(IERC4626 vault, uint256 newLimitBps)
         external
         onlyManagerOrOwner
         executesAction(keccak256(abi.encode(TimelockTypes.SET_LIMIT, vault)), keccak256(abi.encode(newLimitBps)))
     {
-        _getManagementStorage().aggregator.setLimit(IERC4626(vault), newLimitBps);
+        _getManagementStorage().aggregator.setLimit(vault, newLimitBps);
     }
 
     // ----- Fee management -----

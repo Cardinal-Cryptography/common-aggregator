@@ -210,10 +210,10 @@ contract VaultManagementTest is Test {
         assertEq(aggregator.getMaxAllocationLimit(vault), 0);
 
         vm.prank(owner);
-        management.submitSetLimit(address(vault), MAX_BPS);
+        management.submitSetLimit(vault, MAX_BPS);
         skip(3 days + 1);
         vm.prank(owner);
-        management.setLimit(address(vault), MAX_BPS);
+        management.setLimit(vault, MAX_BPS);
 
         assertEq(aggregator.getMaxAllocationLimit(vault), MAX_BPS);
 
