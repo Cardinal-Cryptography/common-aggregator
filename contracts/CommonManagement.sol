@@ -138,6 +138,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
         )
     {
         ManagementStorage storage $ = _getManagementStorage();
+        require(allocationLimit <= MAX_BPS, IncorrectMaxAllocationLimit());
         require(
             $.aggregator.asset() == vault.asset(), ICommonAggregator.IncorrectAsset($.aggregator.asset(), vault.asset())
         );

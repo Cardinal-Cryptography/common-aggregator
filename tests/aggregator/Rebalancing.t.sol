@@ -201,7 +201,7 @@ contract CommonAggregatorTest is Test {
 
             vm.prank(owner);
             commonManagement.submitSetLimit(address(a), 0);
-            vm.warp(block.timestamp + (i + 1) * (3 days + 1));
+            skip(3 days + 1);
 
             vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
             vm.prank(owner);
@@ -297,7 +297,7 @@ contract CommonAggregatorTest is Test {
         notAllowed[1] = rebalancer;
         notAllowed[2] = manager;
 
-        for (uint256 i = 0; i < notAllowed.length; i++) {
+        for (uint256 i = 0; i < notAllowed.length; ++i) {
             address a = notAllowed[i];
             vm.expectRevert(abi.encodeWithSelector(errorSelector, a));
             vm.prank(a);
@@ -307,6 +307,14 @@ contract CommonAggregatorTest is Test {
             vm.prank(a);
             commonManagement.submitSetLimit(address(vaults[0]), MAX_BPS);
         }
+
+        vm.prank(owner);
+        commonManagement.submitSetLimit(address(vaults[0]), MAX_BPS);
+
+        skip(3 days + 1);
+
+        vm.prank(manager);
+        commonManagement.setLimit(address(vaults[0]), MAX_BPS);
     }
 
     function testSetLimitMaxLimit() public {
@@ -319,10 +327,51 @@ contract CommonAggregatorTest is Test {
         commonAggregator.setLimit(vaults[0], MAX_BPS + 1);
     }
 
+    function testSetLimitTimelock() public {
+        vm.startPrank(owner);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonManagement.ActionNotRegistered.selector,
+                keccak256(abi.encode(CommonManagement.TimelockTypes.SET_LIMIT, address(vaults[0])))
+            )
+        );
+        commonManagement.setLimit(address(vaults[0]), 100);
+
+        commonManagement.submitSetLimit(address(vaults[0]), 100);
+
+        skip(1 days);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonManagement.ActionTimelocked.selector,
+                keccak256(abi.encode(CommonManagement.TimelockTypes.SET_LIMIT, address(vaults[0]))),
+                block.timestamp + 2 days
+            )
+        );
+        commonManagement.setLimit(address(vaults[0]), 100);
+
+        commonManagement.cancelSetLimit(address(vaults[0]));
+        skip(2 days + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonManagement.ActionNotRegistered.selector,
+                keccak256(abi.encode(CommonManagement.TimelockTypes.SET_LIMIT, address(vaults[0])))
+            )
+        );
+        commonManagement.setLimit(address(vaults[0]), 100);
+
+        commonManagement.submitSetLimit(address(vaults[0]), 100);
+        skip(3 days + 1);
+        commonManagement.setLimit(address(vaults[0]), 100);
+
+        vm.stopPrank();
+    }
+
     function _ownerSetLimit(address vault, uint256 newLimitBps) private {
         vm.prank(owner);
         commonManagement.submitSetLimit(vault, newLimitBps);
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
         vm.prank(owner);
         commonManagement.setLimit(vault, newLimitBps);
     }

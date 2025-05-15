@@ -211,7 +211,7 @@ contract VaultManagementTest is Test {
 
         vm.prank(owner);
         management.submitSetLimit(address(vault), MAX_BPS);
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
         vm.prank(owner);
         management.setLimit(address(vault), MAX_BPS);
 
@@ -518,6 +518,19 @@ contract VaultManagementTest is Test {
         assertEq(initialVaults[2].balanceOf(address(alice)), 250, "vault 2");
     }
 
+    function testAddVaultBadLimit() public {
+        (CommonAggregator aggregator, CommonManagement management) = _noVaultAggregator();
+        IERC4626 vault = new ERC4626Mock(address(asset));
+
+        vm.expectRevert(CommonManagement.IncorrectMaxAllocationLimit.selector);
+        vm.prank(owner);
+        management.submitAddVault(vault, MAX_BPS + 1);
+
+        vm.expectRevert(ICommonAggregator.IncorrectMaxAllocationLimit.selector);
+        vm.prank(address(management));
+        aggregator.addVault(vault, MAX_BPS + 1);
+    }
+
     function testRolesSubmitAddVault() public {
         (, CommonManagement management) = _noVaultAggregator();
         IERC4626 vault = new ERC4626Mock(address(asset));
@@ -530,12 +543,12 @@ contract VaultManagementTest is Test {
         vm.prank(guardian);
         management.submitAddVault(vault, 0);
 
-        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, manager));
+        vm.prank(manager);
         management.submitAddVault(vault, 0);
 
-        IERC4626 vault2 = new ERC4626Mock(address(asset));
         vm.prank(owner);
-        management.submitAddVault(vault2, 0);
+        management.submitAddVault(vault, 0);
     }
 
     function testRolesCancelAddVault() public {
