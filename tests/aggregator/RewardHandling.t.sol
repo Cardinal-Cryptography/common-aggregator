@@ -110,14 +110,14 @@ contract CommonAggregatorTest is Test {
         IERC4626 newVaultB = new ERC4626Mock(address(asset));
 
         vm.startPrank(owner);
-        commonManagement.submitAddVault(newVaultA);
+        commonManagement.submitAddVault(newVaultA, 0);
 
         vm.expectRevert(abi.encodeWithSelector(CommonManagement.InvalidRewardToken.selector, address(newVaultA)));
         commonManagement.submitSetRewardTrader(address(newVaultA), trader);
 
         // in other direction it works
         commonManagement.submitSetRewardTrader(address(newVaultB), trader);
-        commonManagement.submitAddVault(newVaultB);
+        commonManagement.submitAddVault(newVaultB, 0);
 
         vm.warp(STARTING_TIMESTAMP + 30 days);
 
@@ -224,7 +224,7 @@ contract CommonAggregatorTest is Test {
         commonManagement.setRewardTrader(address(freshVault), trader);
 
         vm.prank(owner);
-        commonManagement.submitAddVault(IERC4626(address(freshVault)));
+        commonManagement.submitAddVault(IERC4626(address(freshVault)), 0);
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(freshVault)));
         commonManagement.transferRewardsForSale(address(freshVault));
@@ -232,7 +232,7 @@ contract CommonAggregatorTest is Test {
         vm.warp(STARTING_TIMESTAMP + 20 days);
 
         vm.prank(owner);
-        commonManagement.addVault(IERC4626(address(freshVault)));
+        commonManagement.addVault(IERC4626(address(freshVault)), 0);
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.InvalidRewardToken.selector, address(freshVault)));
         commonManagement.transferRewardsForSale(address(freshVault));

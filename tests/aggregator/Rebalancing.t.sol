@@ -65,8 +65,7 @@ contract CommonAggregatorTest is Test {
         asset.approve(address(commonAggregator), amount);
         vm.prank(alice);
         commonAggregator.deposit(amount, alice);
-        vm.prank(owner);
-        commonManagement.setLimit(vaults[0], MAX_BPS / 2);
+        _ownerSetLimit(vaults[0], MAX_BPS / 2);
 
         vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.AllocationLimitExceeded.selector, vaults[0]));
         vm.prank(rebalancer);
@@ -89,8 +88,7 @@ contract CommonAggregatorTest is Test {
 
         vm.prank(rebalancer);
         commonManagement.pushFunds(50, vaults[0]);
-        vm.prank(owner);
-        commonManagement.setLimit(vaults[0], 0);
+        _ownerSetLimit(vaults[0], 0);
 
         vm.prank(rebalancer);
         commonManagement.pushFunds(50, vaults[1]);
@@ -102,8 +100,7 @@ contract CommonAggregatorTest is Test {
         asset.mint(address(vaults[0]), assets);
         vaults[0].mint(address(commonAggregator), shares);
 
-        vm.prank(owner);
-        commonManagement.setLimit(vaults[0], 0);
+        _ownerSetLimit(vaults[0], 0);
         vm.prank(rebalancer);
         commonManagement.pullFunds(60, vaults[0]);
         assertEq(asset.balanceOf(address(commonAggregator)), 60);
@@ -116,8 +113,7 @@ contract CommonAggregatorTest is Test {
         asset.mint(address(vaults[0]), assets);
         vaults[0].mint(address(commonAggregator), shares);
 
-        vm.prank(owner);
-        commonManagement.setLimit(vaults[0], 0);
+        _ownerSetLimit(vaults[0], 0);
         vm.prank(rebalancer);
         commonManagement.pullFundsByShares(shares / 2, vaults[0]);
         assertEq(asset.balanceOf(address(commonAggregator)), 549);
@@ -188,7 +184,7 @@ contract CommonAggregatorTest is Test {
         notAddedAddresses[2] = IERC4626(address(0x0));
         notAddedAddresses[3] = IERC4626(address(0x1));
 
-        for (uint256 i = 0; i < notAddedAddresses.length; i++) {
+        for (uint256 i = 0; i < notAddedAddresses.length; ++i) {
             IERC4626 a = notAddedAddresses[i];
 
             vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
@@ -205,7 +201,12 @@ contract CommonAggregatorTest is Test {
 
             vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
             vm.prank(owner);
-            commonManagement.setLimit(a, 0);
+            commonManagement.submitSetLimit(a, 0);
+            skip(3 days + 1);
+
+            vm.expectRevert(abi.encodeWithSelector(ICommonAggregator.VaultNotOnTheList.selector, a));
+            vm.prank(address(commonManagement));
+            commonAggregator.setLimit(a, 0);
         }
     }
 
@@ -294,21 +295,82 @@ contract CommonAggregatorTest is Test {
         notAllowed[1] = rebalancer;
         notAllowed[2] = manager;
 
-        for (uint256 i = 0; i < notAllowed.length; i++) {
+        for (uint256 i = 0; i < notAllowed.length; ++i) {
             address a = notAllowed[i];
             vm.expectRevert(abi.encodeWithSelector(errorSelector, a));
             vm.prank(a);
-            commonManagement.setLimit(vaults[0], 0);
+            commonManagement.submitSetLimit(vaults[0], 0);
 
             vm.expectRevert(abi.encodeWithSelector(errorSelector, a));
             vm.prank(a);
-            commonManagement.setLimit(vaults[0], MAX_BPS);
+            commonManagement.submitSetLimit(vaults[0], MAX_BPS);
         }
+
+        vm.prank(owner);
+        commonManagement.submitSetLimit(vaults[0], MAX_BPS);
+
+        skip(3 days + 1);
+
+        vm.prank(manager);
+        commonManagement.setLimit(vaults[0], MAX_BPS);
     }
 
     function testSetLimitMaxLimit() public {
         vm.expectRevert(ICommonAggregator.IncorrectMaxAllocationLimit.selector);
         vm.prank(owner);
-        commonManagement.setLimit(vaults[0], MAX_BPS + 1);
+        commonManagement.submitSetLimit(vaults[0], MAX_BPS + 1);
+
+        vm.expectRevert(ICommonAggregator.IncorrectMaxAllocationLimit.selector);
+        vm.prank(address(commonManagement));
+        commonAggregator.setLimit(vaults[0], MAX_BPS + 1);
+    }
+
+    function testSetLimitTimelock() public {
+        vm.startPrank(owner);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonManagement.ActionNotRegistered.selector,
+                keccak256(abi.encode(CommonManagement.TimelockTypes.SET_LIMIT, address(vaults[0])))
+            )
+        );
+        commonManagement.setLimit(vaults[0], 100);
+
+        commonManagement.submitSetLimit(vaults[0], 100);
+
+        skip(1 days);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonManagement.ActionTimelocked.selector,
+                keccak256(abi.encode(CommonManagement.TimelockTypes.SET_LIMIT, address(vaults[0]))),
+                block.timestamp + 2 days
+            )
+        );
+        commonManagement.setLimit(vaults[0], 100);
+
+        commonManagement.cancelSetLimit(vaults[0]);
+        skip(2 days + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CommonManagement.ActionNotRegistered.selector,
+                keccak256(abi.encode(CommonManagement.TimelockTypes.SET_LIMIT, address(vaults[0])))
+            )
+        );
+        commonManagement.setLimit(vaults[0], 100);
+
+        commonManagement.submitSetLimit(vaults[0], 100);
+        skip(3 days + 1);
+        commonManagement.setLimit(vaults[0], 100);
+
+        vm.stopPrank();
+    }
+
+    function _ownerSetLimit(IERC4626 vault, uint256 newLimitBps) private {
+        vm.prank(owner);
+        commonManagement.submitSetLimit(vault, newLimitBps);
+        skip(3 days + 1);
+        vm.prank(owner);
+        commonManagement.setLimit(vault, newLimitBps);
     }
 }

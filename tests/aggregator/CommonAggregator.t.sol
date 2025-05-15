@@ -85,7 +85,7 @@ contract CommonAggregatorTest is Test {
         commonAggregator.pauseUserInteractions();
 
         vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
-        commonAggregator.addVault(IERC4626(address(1)));
+        commonAggregator.addVault(IERC4626(address(1)), 10);
 
         vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
         commonAggregator.removeVault(vaults[0]);

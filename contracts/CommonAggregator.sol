@@ -374,13 +374,15 @@ contract CommonAggregator is
     /// limit set to 0.
     /// @dev Reverts if the vault is already present on the list, or if the
     /// `MAX_VAULTS` limit would be exceeded.
-    function addVault(IERC4626 vault) external override onlyManagement nonReentrant {
+    function addVault(IERC4626 vault, uint256 allocationLimit) external override onlyManagement nonReentrant {
         ensureVaultCanBeAdded(vault);
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.vaults.push(vault);
         _updateHoldingsState();
 
         emit VaultAdded(address(vault));
+
+        _setLimit(vault, allocationLimit);
     }
 
     /// @notice Removes `vault` from the list, redeeming all of its shares held by the aggregator.
@@ -504,6 +506,10 @@ contract CommonAggregator is
     /// on the vault list.
     /// Doesn't rebalance the assets, after the action limits may be exceeded.
     function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyManagement nonReentrant {
+        _setLimit(vault, newLimitBps);
+    }
+
+    function _setLimit(IERC4626 vault, uint256 newLimitBps) internal {
         require(newLimitBps <= MAX_BPS, IncorrectMaxAllocationLimit());
         ensureVaultIsPresent(vault);
 
