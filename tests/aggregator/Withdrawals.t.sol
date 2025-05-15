@@ -55,6 +55,18 @@ contract CommonAggregatorTest is Test {
         assertEq(commonAggregator.maxWithdraw(alice), 100);
     }
 
+    function testMaxWithdrawDoesNotOverestimate() public {
+        _prepareDistribution([uint256(30), 30, 30], 30);
+        vaults[0].setWithdrawLimit(10);
+
+        assertEq(commonAggregator.maxWithdraw(alice), 100);
+
+        // simulate loss on vault
+        asset.burn(address(vaults[1]), 10);
+
+        assertEq(commonAggregator.maxWithdraw(alice), 90);
+    }
+
     function testMaxWithdrawWithRevertingVault() public {
         _prepareDistribution([uint256(30), 30, 30], 30);
         vaults[2].setReverting(true);
