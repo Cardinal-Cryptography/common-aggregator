@@ -65,10 +65,13 @@ contract CommonAggregator is
     /// @param asset The address of the underlying ERC20 token. It must implement the `IERC20Metadata` interface.
     /// @param vaults The list of ERC4626 vaults to be aggregated initially. Vaults must aggregate the same `asset`,
     /// and be already initialized.
-    function initialize(address management, IERC20Metadata asset, IERC4626[] memory vaults) public initializer {
+    function initialize(address management, IERC20Metadata asset, address protocolFeeReceiver, IERC4626[] memory vaults)
+        public
+        initializer
+    {
         __UUPSUpgradeable_init();
         __ERC20_init(string.concat("Common-Aggregator-", asset.name()), string.concat("ca", asset.symbol()));
-        __ERC4626Buffered_init(asset);
+        __ERC4626Buffered_init(asset, protocolFeeReceiver);
         __ReentrancyGuardTransient_init();
         __Pausable_init();
 
@@ -368,13 +371,15 @@ contract CommonAggregator is
     /// limit set to 0.
     /// @dev Reverts if the vault is already present on the list, or if the
     /// `MAX_VAULTS` limit would be exceeded.
-    function addVault(IERC4626 vault) external override onlyManagement nonReentrant {
+    function addVault(IERC4626 vault, uint256 allocationLimit) external override onlyManagement nonReentrant {
         ensureVaultCanBeAdded(vault);
         AggregatorStorage storage $ = _getAggregatorStorage();
         $.vaults.push(vault);
         _updateHoldingsState();
 
         emit VaultAdded(address(vault));
+
+        _setLimit(vault, allocationLimit);
     }
 
     /// @notice Removes `vault` from the list, redeeming all of its shares held by the aggregator.
@@ -498,6 +503,10 @@ contract CommonAggregator is
     /// on the vault list.
     /// Doesn't rebalance the assets, after the action limits may be exceeded.
     function setLimit(IERC4626 vault, uint256 newLimitBps) external override onlyManagement nonReentrant {
+        _setLimit(vault, newLimitBps);
+    }
+
+    function _setLimit(IERC4626 vault, uint256 newLimitBps) internal {
         require(newLimitBps <= MAX_BPS, IncorrectMaxAllocationLimit());
         ensureVaultIsPresent(vault);
 
@@ -533,6 +542,7 @@ contract CommonAggregator is
         nonReentrant
     {
         require(protocolFeeBps <= MAX_PROTOCOL_FEE_BPS, ProtocolFeeTooHigh());
+        _updateHoldingsState();
 
         uint256 oldProtocolFee = getProtocolFee();
         if (oldProtocolFee == protocolFeeBps) return;
@@ -551,6 +561,7 @@ contract CommonAggregator is
         nonReentrant
     {
         require(protocolFeeReceiver != address(this), SelfProtocolFeeReceiver());
+        _updateHoldingsState();
 
         address oldProtocolFeeReceiver = getProtocolFeeReceiver();
         if (oldProtocolFeeReceiver == protocolFeeReceiver) return;

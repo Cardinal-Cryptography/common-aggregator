@@ -85,7 +85,7 @@ contract CommonAggregatorUpgradeMissingStorageFields is
 
     function initialize(address, IERC20Metadata asset, IERC4626[] memory) public initializer {
         __ERC20_init("", "");
-        __ERC4626Buffered_init(asset);
+        __ERC4626Buffered_init(asset, address(1));
         __Pausable_init();
         __AccessControl_init();
     }
@@ -98,6 +98,7 @@ contract CommonAggregatorTest is Test {
     uint256 constant STARTING_TIMESTAMP = 100_000_000;
     address owner = address(0x123);
     ERC20Mock asset = new ERC20Mock();
+    address protocolFeeReceiver = address(1);
     IERC4626[] vaults = new IERC4626[](1);
 
     address aggregatorProxy;
@@ -108,7 +109,7 @@ contract CommonAggregatorTest is Test {
         managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
         aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
         CommonManagement(managementProxy).initialize(owner, CommonAggregator(aggregatorProxy));
-        CommonAggregator(aggregatorProxy).initialize(address(managementProxy), asset, vaults);
+        CommonAggregator(aggregatorProxy).initialize(address(managementProxy), asset, protocolFeeReceiver, vaults);
 
         Options memory options;
         Upgrades.validateUpgrade("UpgradesOpenZeppelin.t.sol:CommonAggregatorCorrectUpgrade", options);
@@ -119,7 +120,7 @@ contract CommonAggregatorTest is Test {
         managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
         aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
         CommonManagement(managementProxy).initialize(owner, CommonAggregator(aggregatorProxy));
-        CommonAggregator(aggregatorProxy).initialize(address(managementProxy), asset, vaults);
+        CommonAggregator(aggregatorProxy).initialize(address(managementProxy), asset, protocolFeeReceiver, vaults);
 
         vm.expectRevert();
         this.validateUpgrade("UpgradesOpenZeppelin.t.sol:CommonAggregatorUpgradeMissingNamespaceStorage");
@@ -130,7 +131,7 @@ contract CommonAggregatorTest is Test {
         managementProxy = Upgrades.deployUUPSProxy("CommonManagement.sol", "");
         aggregatorProxy = Upgrades.deployUUPSProxy("CommonAggregator.sol", "");
         CommonManagement(managementProxy).initialize(owner, CommonAggregator(aggregatorProxy));
-        CommonAggregator(aggregatorProxy).initialize(address(managementProxy), asset, vaults);
+        CommonAggregator(aggregatorProxy).initialize(address(managementProxy), asset, protocolFeeReceiver, vaults);
 
         vm.expectRevert();
         this.validateUpgrade("UpgradesOpenZeppelin.t.sol:CommonAggregatorUpgradeMissingStorageFields");

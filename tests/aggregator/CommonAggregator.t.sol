@@ -21,13 +21,14 @@ contract CommonAggregatorTest is Test {
 
     address alice = address(0x456);
     address bob = address(0x678);
+    address protocolFeeReceiver = address(1);
 
     function setUp() public {
         vm.warp(STARTING_TIMESTAMP);
         vaults[0] = new ERC4626Mock(address(asset));
         vaults[1] = new ERC4626Mock(address(asset));
 
-        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, vaults);
+        (commonAggregator, commonManagement) = setUpAggregator(owner, asset, protocolFeeReceiver, vaults);
     }
 
     function testExternalStorageGetters() public view {
@@ -84,7 +85,7 @@ contract CommonAggregatorTest is Test {
         commonAggregator.pauseUserInteractions();
 
         vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
-        commonAggregator.addVault(IERC4626(address(1)));
+        commonAggregator.addVault(IERC4626(address(1)), 10);
 
         vm.expectRevert(ICommonAggregator.CallerNotManagement.selector);
         commonAggregator.removeVault(vaults[0]);
@@ -327,6 +328,30 @@ contract CommonAggregatorTest is Test {
         asset.mint(address(commonAggregator), airdropped);
         commonAggregator.updateHoldingsState();
         assertEq(commonAggregator.maxWithdraw(owner) - ownerWithdrawalBefore, airdropped / 50);
+    }
+
+    function testProtocolFeeCantBeAppliedRetroactively() public {
+        asset.mint(alice, 10000);
+        vm.prank(alice);
+        asset.approve(address(commonAggregator), 10000);
+        vm.prank(alice);
+        commonAggregator.deposit(10000, alice);
+
+        vm.startPrank(owner);
+
+        asset.mint(address(commonAggregator), 1000);
+        commonManagement.setProtocolFee(MAX_BPS / 2);
+        commonAggregator.updateHoldingsState();
+        address initialProtocolFeeReceiver = commonAggregator.getProtocolFeeReceiver();
+        assertEq(commonAggregator.balanceOf(initialProtocolFeeReceiver), 0, "setProtocolFee");
+
+        address newProtocolFeeReceiver = address(0xc0ffee);
+        asset.mint(address(commonAggregator), 1000);
+        commonManagement.setProtocolFeeReceiver(newProtocolFeeReceiver);
+        commonAggregator.updateHoldingsState();
+
+        assertEq(commonAggregator.balanceOf(newProtocolFeeReceiver), 0, "setProtocolFeeReceiver");
+        assertEq(commonAggregator.balanceOf(initialProtocolFeeReceiver), 5000000);
     }
 
     function testSmallLossNoProtocolFee() public {
