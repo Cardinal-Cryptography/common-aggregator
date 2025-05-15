@@ -317,10 +317,12 @@ abstract contract ERC4626BufferedUpgradeable is Initializable, ERC20Upgradeable,
     /// In that case, call the `updateHoldingsState()` right before calling this function,
     /// to ensure that the value of `maxWithdraw` is exact.
     function maxWithdraw(address owner) public view virtual returns (uint256) {
+        // Try calling `_previewUpdateHoldingsState()` and then `convertToAssets(balanceOf(owner))` on the updated state.
+        // So happens that `previewRedeem(balanceOf(owner))` does exactly the thing.
         try ERC4626BufferedUpgradeable(address(this)).previewRedeem(balanceOf(owner)) returns (uint256 amount) {
             return amount;
         } catch {
-            return _maxWithdraw(owner);
+            return convertToAssets(balanceOf(owner));
         }
     }
 
