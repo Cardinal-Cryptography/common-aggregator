@@ -10,7 +10,7 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {ICommonAggregator} from "./CommonAggregator.sol";
-import {saturatingAdd} from "./Math.sol";
+import {saturatingAdd, MAX_BPS} from "./Math.sol";
 
 /// @notice CommonManagement is the contract that manages the CommonAggregator, adding
 /// more fine-grained access control and timelocking the most sensitive actions.
@@ -59,6 +59,8 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
 
     event RoleGranted(Roles role, address indexed account);
     event RoleRevoked(Roles role, address indexed account);
+
+    error IncorrectMaxAllocationLimit();
 
     error PendingVaultForceRemoval(IERC4626 vault);
     error VaultAdditionAlreadyPending(IERC4626 vault);
@@ -256,6 +258,7 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
             SET_LIMIT_TIMELOCK
         )
     {
+        require(newLimitBps <= MAX_BPS, IncorrectMaxAllocationLimit());
         emit SetLimitSubmitted(vault, newLimitBps, saturatingAdd(block.timestamp, SET_LIMIT_TIMELOCK));
     }
 
@@ -268,12 +271,12 @@ contract CommonManagement is UUPSUpgradeable, Ownable2StepUpgradeable {
     }
 
     /// @notice Allows the `OWNER` role holder to trigger `setLimit` on the aggregator.
-    function setLimit(IERC4626 vault, uint256 newLimitBps)
+    function setLimit(address vault, uint256 newLimitBps)
         external
         onlyManagerOrOwner
         executesAction(keccak256(abi.encode(TimelockTypes.SET_LIMIT, vault)), keccak256(abi.encode(newLimitBps)))
     {
-        _getManagementStorage().aggregator.setLimit(vault, newLimitBps);
+        _getManagementStorage().aggregator.setLimit(IERC4626(vault), newLimitBps);
     }
 
     // ----- Fee management -----
