@@ -124,6 +124,11 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc ERC4626BufferedUpgradeable
+    function _maxWithdraw(address owner) internal view override(ERC4626BufferedUpgradeable) returns (uint256) {
+        return super._maxWithdraw(owner).min(_availableFunds());
+    }
+
+    /// @inheritdoc ERC4626BufferedUpgradeable
     /// @dev Returns 0 when the contract is paused. Users can use `emergencyRedeem` to exit the aggregator instead.
     function maxRedeem(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
         if (paused()) {
