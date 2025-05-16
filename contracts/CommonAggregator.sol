@@ -118,29 +118,12 @@ contract CommonAggregator is
     }
 
     /// @inheritdoc ERC4626BufferedUpgradeable
-    /// @dev Returns 0 when the contract is paused. Users can use `emergencyRedeem` to exit the aggregator instead.
-    function maxWithdraw(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
-        if (paused()) {
-            return 0;
-        }
-        return super.maxWithdraw(owner).min(_availableFunds());
-    }
-
-    /// @inheritdoc ERC4626BufferedUpgradeable
-    /// @dev Returns 0 when the contract is paused. Users can use `emergencyRedeem` to exit the aggregator instead.
-    function maxRedeem(address owner) public view override(ERC4626BufferedUpgradeable, IERC4626) returns (uint256) {
-        if (paused()) {
-            return 0;
-        }
-        // Avoid overflow
-        uint256 availableConvertedToShares =
-            convertToShares(_availableFunds().min(type(uint256).max / 10 ** _decimalsOffset()));
-        return super.maxRedeem(owner).min(availableConvertedToShares);
-    }
-
-    /// @notice Returns how much assets are withdrawable from the aggregator by all accounts in total.
     /// @dev Assumes that the `maxWithdraw` amounts in each vaults are independent of each other.
-    function _availableFunds() internal view returns (uint256) {
+    /// Returns 0 when the contract is paused. Users can use `emergencyRedeem` to exit the aggregator instead.
+    function _totalMaxWithdraw() internal view override returns (uint256) {
+        if (paused()) {
+            return 0;
+        }
         AggregatorStorage storage $ = _getAggregatorStorage();
         uint256 availableFunds = IERC20(asset()).balanceOf(address(this));
 
@@ -333,7 +316,7 @@ contract CommonAggregator is
 
     /// @notice Returns the maximum amount of shares that can be emergency-redeemed by the given owner.
     function maxEmergencyRedeem(address owner) public view returns (uint256) {
-        return super.maxRedeem(owner);
+        return balanceOf(owner);
     }
 
     // ----- Reporting -----
