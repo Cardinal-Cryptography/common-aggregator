@@ -105,7 +105,7 @@ contract CommonAggregatorTest is Test {
         vm.prank(alice);
         asset.approve(address(router), assetAmount);
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(ShielderMock.ShielderReverted.selector);
         router.mintAndShieldWithNewAccount(
             address(shielder), MOCK_CONTRACT_VERSION, address(vault), shareAmount, 0, 0, 0, 0, 0, 0, 0, 0, bytes("")
         );
@@ -119,7 +119,7 @@ contract CommonAggregatorTest is Test {
         vm.prank(alice);
         asset.approve(address(router), assetAmount);
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(ShielderMock.ShielderReverted.selector);
         router.mintAndShield(
             address(shielder), MOCK_CONTRACT_VERSION, address(vault), shareAmount, 0, 0, 0, 0, 0, bytes("")
         );
