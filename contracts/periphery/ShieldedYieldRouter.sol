@@ -2,35 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {IERC20, IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-
-interface IShielder {
-    function newAccountERC20(
-        bytes3 expectedContractVersion,
-        address tokenAddress,
-        uint256 amount,
-        uint256 newNote,
-        uint256 prenullifier,
-        uint256 symKeyEncryptionC1X,
-        uint256 symKeyEncryptionC1Y,
-        uint256 symKeyEncryptionC2X,
-        uint256 symKeyEncryptionC2Y,
-        uint256 macSalt,
-        uint256 macCommitment,
-        bytes calldata proof
-    ) external;
-
-    function depositERC20(
-        bytes3 expectedContractVersion,
-        address tokenAddress,
-        uint256 amount,
-        uint256 oldNullifierHash,
-        uint256 newNote,
-        uint256 merkleRoot,
-        uint256 macSalt,
-        uint256 macCommitment,
-        bytes calldata proof
-    ) external;
-}
+import {IShielder} from "./IShielder.sol";
 
 contract ShieldedYieldRouter {
     constructor() {}
