@@ -9,11 +9,14 @@ contract ShieldedYieldRouter {
 
     /// @notice Mint exactly `amount` shares and deposit them in the `shielder`.
     /// @dev    The `msg.sender` must approve sufficient assets to this contract.
+    /// @param shielder Shielder contract address
+    /// @param vault ERC4626 Vault contract address
+    /// @param amount Amount of the Vault shares to mint and shield
     function mintAndShieldWithNewAccount(
         address shielder,
         bytes3 expectedContractVersion,
         address vault,
-        uint256 amount, // shares amount
+        uint256 amount,
         uint256 newNote,
         uint256 prenullifier,
         uint256 symKeyEncryptionC1X,
@@ -44,11 +47,14 @@ contract ShieldedYieldRouter {
 
     /// @notice Mint exactly `amount` shares and deposit them in the `shielder`.
     /// @dev    The `msg.sender` must approve sufficient assets to this contract.
+    /// @param shielder Shielder contract address
+    /// @param vault ERC4626 Vault contract address
+    /// @param amount Amount of the Vault shares to mint and shield
     function mintAndShield(
         address shielder,
         bytes3 expectedContractVersion,
         address vault,
-        uint256 amount, // shares amount
+        uint256 amount,
         uint256 oldNullifierHash,
         uint256 newNote,
         uint256 merkleRoot,
